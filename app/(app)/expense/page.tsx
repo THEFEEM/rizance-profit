@@ -7,16 +7,12 @@ import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
 import { Input } from "@/components/ui/Input";
 import { apiFetch } from "@/lib/api-client";
 import { today } from "@/lib/date";
-import { EXPENSE_CATEGORIES, type Expense, type ExpenseCategory } from "@/types";
-
-const CATEGORY_LABELS: Record<ExpenseCategory, string> = {
-  supplies: "Supplies",
-  rent: "Rent",
-  salary: "Salary",
-  utilities: "Utilities",
-  equipment: "Equipment",
-  other: "Other",
-};
+import {
+  EXPENSE_CATEGORIES,
+  EXPENSE_CATEGORY_LABELS as CATEGORY_LABELS,
+  type Expense,
+  type ExpenseCategory,
+} from "@/types";
 
 export default function AddExpensePage() {
   const router = useRouter();

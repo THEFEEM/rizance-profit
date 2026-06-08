@@ -26,6 +26,15 @@ export const EXPENSE_CATEGORIES = [
 
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 
+export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
+  supplies: "Supplies",
+  rent: "Rent",
+  salary: "Salary",
+  utilities: "Utilities",
+  equipment: "Equipment",
+  other: "Other",
+};
+
 export type Expense = {
   id: string;
   amount: string;
