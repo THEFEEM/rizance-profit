@@ -1,4 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
+import { useSecureCookies } from "@/lib/env";
 
 // Edge-safe (jose only — no bcrypt) so middleware can import it.
 export const SESSION_COOKIE = "rizance_session";
@@ -33,13 +34,28 @@ export async function verifySession(token: string | undefined): Promise<string |
   }
 }
 
-/** Cookie options shared by login/register (set) — httpOnly, Secure in prod. */
-export function sessionCookieOptions() {
+/** Shared cookie flags: httpOnly always; Secure on Vercel / production HTTPS. */
+function baseCookieOptions() {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: useSecureCookies(),
     sameSite: "lax" as const,
     path: "/",
+  };
+}
+
+/** Cookie options for login/register (set session). */
+export function sessionCookieOptions() {
+  return {
+    ...baseCookieOptions(),
     maxAge: SESSION_TTL_SECONDS,
+  };
+}
+
+/** Cookie options for logout (clear session). */
+export function clearSessionCookieOptions() {
+  return {
+    ...baseCookieOptions(),
+    maxAge: 0,
   };
 }

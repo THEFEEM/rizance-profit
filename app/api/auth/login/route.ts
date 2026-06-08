@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkAuthRateLimit } from "@/lib/auth-rate-limit";
 import { loginSchema, fieldErrorsFrom } from "@/lib/validation";
 import { findUserByEmail } from "@/lib/queries";
 import { verifyPassword, signSession, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
+  const limited = checkAuthRateLimit(req, "login");
+  if (limited) return limited;
+
   let body: unknown;
   try {
     body = await req.json();

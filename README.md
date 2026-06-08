@@ -96,3 +96,13 @@ db/schema.sql        PostgreSQL schema
 ## Install as PWA
 
 On mobile Chrome/Safari: **Add to Home Screen**. A web manifest and icons are included under `public/`.
+
+## Deploy to Vercel
+
+See **[DEPLOY.md](./DEPLOY.md)** for the full step-by-step guide (GitHub → Vercel → Neon env vars → migration).
+
+Production security baked in:
+
+- Session cookie: `httpOnly` + `Secure` + `SameSite=Lax` on Vercel
+- HSTS and security headers on Vercel deployments
+- HTTP → HTTPS redirect on Vercel

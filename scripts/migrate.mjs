@@ -1,16 +1,22 @@
-// Runs db/schema.sql against DATABASE_URL using the pg driver.
-// Usage: node scripts/migrate.mjs   (loads .env.local / .env automatically)
-import { readFileSync } from "node:fs";
+// Runs db/schema.sql then db/migrations/*.sql (sorted) against DATABASE_URL.
+//
+// DATABASE_URL resolution (first wins):
+//   1. Shell environment (e.g. DATABASE_URL=... npm run db:migrate) — use for prod
+//   2. .env.local / .env in project root (local dev)
+//
+// Usage: npm run db:migrate
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import pg from "pg";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const root = join(__dirname, "..");
 
 // Minimal .env loader (no dependency). Prefers .env.local, then .env.
 for (const file of [".env.local", ".env"]) {
   try {
-    const raw = readFileSync(join(__dirname, "..", file), "utf8");
+    const raw = readFileSync(join(root, file), "utf8");
     for (const line of raw.split("\n")) {
       const m = line.match(/^\s*([\w.]+)\s*=\s*(.*)\s*$/);
       if (!m) continue;
@@ -28,13 +34,17 @@ for (const file of [".env.local", ".env"]) {
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
-  console.error("DATABASE_URL is not set. Copy .env.example to .env.local first.");
+  console.error(
+    "DATABASE_URL is not set. Export it in your shell or copy .env.example to .env.local.",
+  );
   process.exit(1);
 }
 
 const needsSsl = /sslmode=require/i.test(connectionString) || /neon\.tech|supabase\.co|amazonaws\.com/i.test(connectionString);
 
-const sql = readFileSync(join(__dirname, "..", "db", "schema.sql"), "utf8");
+const migrationFiles = readdirSync(join(root, "db", "migrations"))
+  .filter((f) => f.endsWith(".sql"))
+  .sort();
 
 const client = new pg.Client({
   connectionString,
@@ -43,8 +53,18 @@ const client = new pg.Client({
 
 try {
   await client.connect();
-  await client.query(sql);
-  console.log("✓ Migration applied: users, income_entries, expense_entries + indexes.");
+
+  const schema = readFileSync(join(root, "db", "schema.sql"), "utf8");
+  await client.query(schema);
+  console.log("✓ schema.sql applied");
+
+  for (const file of migrationFiles) {
+    const sql = readFileSync(join(root, "db", "migrations", file), "utf8");
+    await client.query(sql);
+    console.log(`✓ ${file} applied`);
+  }
+
+  console.log("✓ All migrations complete.");
 } catch (err) {
   console.error("✗ Migration failed:", err.message);
   process.exitCode = 1;

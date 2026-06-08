@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS income_entries (
   user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   amount     NUMERIC(12,2) NOT NULL CHECK (amount >= 0),
   note       VARCHAR(255),
-  entry_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  entry_date DATE NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS expense_entries (
   amount     NUMERIC(12,2) NOT NULL CHECK (amount >= 0),
   category   VARCHAR(40) NOT NULL DEFAULT 'other',
   note       VARCHAR(255),
-  entry_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  entry_date DATE NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

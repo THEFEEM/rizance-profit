@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/jwt";
+import { isVercel } from "@/lib/env";
 
 const PUBLIC_PATHS = ["/login", "/register"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // Belt-and-suspenders: force HTTPS on production (Vercel terminates TLS at the edge).
+  if (isVercel() && req.headers.get("x-forwarded-proto") === "http") {
+    const host = req.headers.get("host") ?? req.nextUrl.host;
+    return NextResponse.redirect(`https://${host}${pathname}${req.nextUrl.search}`, 301);
+  }
+
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
   const token = req.cookies.get(SESSION_COOKIE)?.value;
