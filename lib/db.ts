@@ -5,6 +5,10 @@ import { Pool, types } from "pg";
 // never coerce money through JS floats. This is just an explicit safeguard.
 types.setTypeParser(1700, (val) => val);
 
+// DATE (OID 1082): return the raw "YYYY-MM-DD" string instead of a JS Date,
+// so calendar days never shift due to the server's local timezone.
+types.setTypeParser(1082, (val) => val);
+
 const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
