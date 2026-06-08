@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "db:migrate": "node scripts/migrate.mjs"
+    "db:migrate": "node scripts/migrate.mjs",
+    "db:cleanup-smoke": "node scripts/cleanup-smoke.mjs",
+    "test:smoke": "node scripts/smoke.mjs",
+    "test:timezone": "node scripts/timezone-check.mjs",
+    "test:colors": "node scripts/profit-colors-check.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

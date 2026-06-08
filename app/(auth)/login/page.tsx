@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Spinner } from "@/components/ui/Spinner";
 import { apiFetch } from "@/lib/api-client";
 import type { User } from "@/types";
 
@@ -17,11 +18,13 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fields, setFields] = useState<Record<string, string[] | undefined>>({});
   const [submitting, setSubmitting] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setFields({});
     setSubmitting(true);
     const res = await apiFetch<{ user: User }>("/api/auth/login", {
       method: "POST",
@@ -32,6 +35,7 @@ function LoginForm() {
       router.refresh();
     } else {
       setError(res.message);
+      setFields(res.fields ?? {});
       setSubmitting(false);
     }
   }
@@ -47,6 +51,7 @@ function LoginForm() {
         placeholder="you@shop.com"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
+        error={fields.email?.[0]}
         required
       />
       <div className="relative">
@@ -57,6 +62,7 @@ function LoginForm() {
           placeholder="Your password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          error={fields.password?.[0]}
           required
         />
         <button
@@ -69,7 +75,7 @@ function LoginForm() {
         </button>
       </div>
 
-      {error && (
+      {error && !fields.email && !fields.password && (
         <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
           {error}
         </p>
@@ -91,7 +97,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<Spinner label="Loading…" />}>
       <LoginForm />
     </Suspense>
   );

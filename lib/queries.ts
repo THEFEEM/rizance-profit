@@ -10,7 +10,7 @@ import type {
   User,
 } from "@/types";
 import type { ExpenseInput, IncomeInput } from "@/lib/validation";
-import { monthRange } from "@/lib/date";
+import { monthRange, today } from "@/lib/date";
 
 // ---- row → domain mappers -------------------------------------------------
 
@@ -114,11 +114,12 @@ export async function emailExists(email: string): Promise<boolean> {
 // ---- income ---------------------------------------------------------------
 
 export async function createIncome(userId: string, input: IncomeInput): Promise<Income> {
+  const entryDate = input.entryDate ?? today();
   const { rows } = await query<IncomeRow>(
     `INSERT INTO income_entries (user_id, amount, note, entry_date)
-     VALUES ($1, $2, $3, COALESCE($4::date, CURRENT_DATE))
+     VALUES ($1, $2, $3, $4::date)
      RETURNING id, amount, note, entry_date::text AS entry_date, created_at`,
-    [userId, input.amount.toFixed(2), input.note ?? null, input.entryDate ?? null],
+    [userId, input.amount.toFixed(2), input.note ?? null, entryDate],
   );
   return mapIncome(rows[0]);
 }
@@ -146,11 +147,12 @@ export async function deleteIncome(userId: string, id: string): Promise<boolean>
 // ---- expense --------------------------------------------------------------
 
 export async function createExpense(userId: string, input: ExpenseInput): Promise<Expense> {
+  const entryDate = input.entryDate ?? today();
   const { rows } = await query<ExpenseRow>(
     `INSERT INTO expense_entries (user_id, amount, category, note, entry_date)
-     VALUES ($1, $2, COALESCE($3, 'other'), $4, COALESCE($5::date, CURRENT_DATE))
+     VALUES ($1, $2, COALESCE($3, 'other'), $4, $5::date)
      RETURNING id, amount, category, note, entry_date::text AS entry_date, created_at`,
-    [userId, input.amount.toFixed(2), input.category ?? null, input.note ?? null, input.entryDate ?? null],
+    [userId, input.amount.toFixed(2), input.category ?? null, input.note ?? null, entryDate],
   );
   return mapExpense(rows[0]);
 }

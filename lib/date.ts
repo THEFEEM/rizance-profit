@@ -13,8 +13,17 @@ const isoDateFmt = new Intl.DateTimeFormat("en-CA", {
 
 /** Today's date in Asia/Bangkok as "YYYY-MM-DD". */
 export function today(): string {
-  // en-CA formats as YYYY-MM-DD.
-  return isoDateFmt.format(new Date());
+  return todayAt(new Date());
+}
+
+/** Calendar date in Asia/Bangkok for an arbitrary instant (used in tests). */
+export function todayAt(instant: Date): string {
+  return isoDateFmt.format(instant);
+}
+
+/** What Postgres CURRENT_DATE would be if the server clock is UTC. */
+export function utcCalendarDate(instant: Date): string {
+  return instant.toISOString().slice(0, 10);
 }
 
 /** Current month in Asia/Bangkok as "YYYY-MM". */
