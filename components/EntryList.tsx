@@ -19,10 +19,13 @@ export function EntryList({
   entries,
   currency = "THB",
   emptyHint = "No entries yet.",
+  readOnly = false,
 }: {
   entries: EntryRow[];
   currency?: string;
   emptyHint?: string;
+  /** Hide delete actions (e.g. Stats close-out view). */
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -30,7 +33,7 @@ export function EntryList({
   const [pending, setPending] = useState<EntryRow | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const visible = entries.filter((e) => !removed.has(e.id));
+  const visible = readOnly ? entries : entries.filter((e) => !removed.has(e.id));
 
   async function confirmDelete() {
     if (!pending || deleting) return;
@@ -78,14 +81,16 @@ export function EntryList({
               >
                 {displayAmount}
               </span>
-              <button
-                onClick={() => setPending(e)}
-                disabled={deleting === e.id}
-                aria-label={`Delete ${title}`}
-                className="tap-target -mr-2 flex h-10 w-10 items-center justify-center rounded-full text-slate-400 active:bg-slate-100 disabled:opacity-40"
-              >
-                {deleting === e.id ? "…" : "✕"}
-              </button>
+              {!readOnly && (
+                <button
+                  onClick={() => setPending(e)}
+                  disabled={deleting === e.id}
+                  aria-label={`Delete ${title}`}
+                  className="tap-target -mr-2 flex h-10 w-10 items-center justify-center rounded-full text-slate-400 active:bg-slate-100 disabled:opacity-40"
+                >
+                  {deleting === e.id ? "…" : "✕"}
+                </button>
+              )}
             </li>
           );
         })}

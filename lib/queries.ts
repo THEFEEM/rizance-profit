@@ -7,10 +7,12 @@ import type {
   Income,
   MonthlyDay,
   MonthlySummary,
+  PeriodKey,
+  PeriodSummary,
   User,
 } from "@/types";
 import type { ExpenseInput, IncomeInput } from "@/lib/validation";
-import { monthRange, today } from "@/lib/date";
+import { monthRange, periodRange, today } from "@/lib/date";
 
 // ---- row → domain mappers -------------------------------------------------
 
@@ -177,6 +179,38 @@ export async function deleteExpense(userId: string, id: string): Promise<boolean
 }
 
 // ---- summaries (computed, never stored) -----------------------------------
+
+export async function periodSummary(userId: string, period: PeriodKey): Promise<PeriodSummary> {
+  const { start, end } = periodRange(period);
+  const { rows } = await query<{
+    income: string;
+    expense: string;
+    income_count: string;
+    expense_count: string;
+  }>(
+    `SELECT
+       COALESCE((SELECT SUM(amount) FROM income_entries
+                 WHERE user_id = $1 AND entry_date >= $2 AND entry_date <= $3), 0)::text AS income,
+       COALESCE((SELECT SUM(amount) FROM expense_entries
+                 WHERE user_id = $1 AND entry_date >= $2 AND entry_date <= $3), 0)::text AS expense,
+       (SELECT COUNT(*) FROM income_entries
+        WHERE user_id = $1 AND entry_date >= $2 AND entry_date <= $3)::text AS income_count,
+       (SELECT COUNT(*) FROM expense_entries
+        WHERE user_id = $1 AND entry_date >= $2 AND entry_date <= $3)::text AS expense_count`,
+    [userId, start, end],
+  );
+  const r = rows[0];
+  return {
+    period,
+    start,
+    end,
+    income: r.income,
+    expense: r.expense,
+    profit: computeProfit(r.income, r.expense),
+    incomeCount: Number(r.income_count),
+    expenseCount: Number(r.expense_count),
+  };
+}
 
 export async function dailySummary(userId: string, date: string): Promise<DailySummary> {
   const { rows } = await query<{

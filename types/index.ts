@@ -44,6 +44,20 @@ export type Expense = {
   createdAt: string;
 };
 
+export const PERIOD_KEYS = ["today", "month", "last_7", "last_14", "last_30"] as const;
+export type PeriodKey = (typeof PERIOD_KEYS)[number];
+
+export type PeriodSummary = {
+  period: PeriodKey;
+  start: string;
+  end: string;
+  income: string;
+  expense: string;
+  profit: string;
+  incomeCount: number;
+  expenseCount: number;
+};
+
 export type DailySummary = {
   date: string; // YYYY-MM-DD
   income: string;
