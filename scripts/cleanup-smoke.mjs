@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import pg from "pg";
+import { pgClientOptions } from "./pg-config.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -30,11 +31,7 @@ if (!connectionString) {
   process.exit(1);
 }
 
-const needsSsl = /sslmode=require/i.test(connectionString) || /neon\.tech|supabase\.co/i.test(connectionString);
-const client = new pg.Client({
-  connectionString,
-  ssl: needsSsl ? { rejectUnauthorized: false } : undefined,
-});
+const client = new pg.Client(pgClientOptions(connectionString));
 
 try {
   await client.connect();

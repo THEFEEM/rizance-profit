@@ -1,4 +1,5 @@
 import { Pool, types } from "pg";
+import { pgPoolOptions } from "@/lib/pg-config";
 
 // NUMERIC (OID 1700) comes back from pg as a string by default, which is
 // exactly what we want for exact-decimal money. We keep it as a string and
@@ -15,9 +16,7 @@ if (!connectionString) {
   throw new Error("DATABASE_URL is not set. Copy .env.example to .env.local and fill it in.");
 }
 
-// Enable SSL for hosted providers (Neon/Supabase/RDS) that require it, while
-// keeping local development (localhost) plain. Detected from the URL.
-const needsSsl = /sslmode=require/i.test(connectionString) || /\bneon\.tech|supabase\.co|amazonaws\.com\b/i.test(connectionString);
+const pgOpts = pgPoolOptions(connectionString);
 
 // Reuse a single Pool across hot-reloads in development.
 const globalForPg = globalThis as unknown as { __rizancePgPool?: Pool };
@@ -25,8 +24,7 @@ const globalForPg = globalThis as unknown as { __rizancePgPool?: Pool };
 export const pool =
   globalForPg.__rizancePgPool ??
   new Pool({
-    connectionString,
-    ssl: needsSsl ? { rejectUnauthorized: false } : undefined,
+    ...pgOpts,
     max: 10,
     idleTimeoutMillis: 30_000,
   });

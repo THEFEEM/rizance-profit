@@ -109,11 +109,8 @@ if (s?.profit === "-400.00") {
 const connectionString = process.env.DATABASE_URL;
 if (connectionString) {
   const pg = (await import("pg")).default;
-  const needsSsl = /neon\.tech|sslmode=require/i.test(connectionString);
-  const client = new pg.Client({
-    connectionString,
-    ssl: needsSsl ? { rejectUnauthorized: false } : undefined,
-  });
+  const { pgClientOptions } = await import("./pg-config.mjs");
+  const client = new pg.Client(pgClientOptions(connectionString));
   try {
     await client.connect();
     await client.query(`DELETE FROM users WHERE email = $1`, [email]);

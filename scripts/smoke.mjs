@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 async function detectBase() {
   if (process.env.SMOKE_BASE_URL) return process.env.SMOKE_BASE_URL;
-  for (const port of [3001, 3000]) {
+  for (const port of [3001, 3000, 3002, 3003]) {
     try {
       const res = await fetch(`http://localhost:${port}/api/auth/me`, {
         signal: AbortSignal.timeout(2000),
