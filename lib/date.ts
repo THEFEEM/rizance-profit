@@ -101,6 +101,64 @@ export function formatDayShort(date: string): string {
   }).format(dt);
 }
 
+export const PERIOD_KEYS = ["today", "month", "last_7", "last_14", "last_30"] as const;
+export type PeriodKey = (typeof PERIOD_KEYS)[number];
+
+export const PERIOD_LABELS: Record<PeriodKey, string> = {
+  today: "วันนี้",
+  month: "เดือนนี้",
+  last_7: "7 วัน",
+  last_14: "14 วัน",
+  last_30: "30 วัน",
+};
+
+export function isValidPeriod(s: string): s is PeriodKey {
+  return (PERIOD_KEYS as readonly string[]).includes(s);
+}
+
+/**
+ * Inclusive date range for a summary period, anchored to a Bangkok calendar day.
+ * - month: calendar month-to-date (1st → anchor)
+ * - last_N: rolling N calendar days inclusive of anchor (last_7 = anchor − 6 days … anchor)
+ */
+export function periodRange(
+  period: PeriodKey,
+  anchor: string = today(),
+): { period: PeriodKey; start: string; end: string } {
+  const end = anchor;
+  let start: string;
+  switch (period) {
+    case "today":
+      start = anchor;
+      break;
+    case "month":
+      start = `${anchor.slice(0, 7)}-01`;
+      break;
+    case "last_7":
+      start = addDays(anchor, -6);
+      break;
+    case "last_14":
+      start = addDays(anchor, -13);
+      break;
+    case "last_30":
+      start = addDays(anchor, -29);
+      break;
+    default:
+      start = anchor;
+  }
+  return { period, start, end };
+}
+
+/** Short Thai-friendly range label for period summaries. */
+export function formatPeriodRangeLabel(start: string, end: string): string {
+  if (start === end) return formatDateLabel(start);
+  const sameMonth = start.slice(0, 7) === end.slice(0, 7);
+  if (sameMonth) {
+    return `${Number(start.slice(8, 10))}–${formatDayShort(end)}`;
+  }
+  return `${formatDayShort(start)} – ${formatDayShort(end)}`;
+}
+
 /** Human label like "June 2026" for a "YYYY-MM" month. */
 export function formatMonthLabel(month: string): string {
   const [y, m] = month.split("-").map(Number);
