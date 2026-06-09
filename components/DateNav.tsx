@@ -1,18 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { addDays } from "@/lib/date";
+import { addDays, type PeriodKey } from "@/lib/date";
+
+function summaryHref(period: PeriodKey, targetDate: string) {
+  const qs = new URLSearchParams({ period, date: targetDate });
+  return `/summary?${qs}`;
+}
 
 export function DateNav({
   date,
   label,
-  hrefForDate,
+  period,
   maxDate,
 }: {
   date: string;
   label: string;
-  /** Build the full href for a calendar day (include other query params as needed). */
-  hrefForDate: (date: string) => string;
+  /** Preserved in URL when changing close-out date. */
+  period: PeriodKey;
   /** If set, forward navigation is disabled when date >= maxDate. */
   maxDate?: string;
 }) {
@@ -23,7 +28,7 @@ export function DateNav({
   return (
     <div className="flex items-center justify-between gap-2 px-4 py-3">
       <Link
-        href={hrefForDate(prev)}
+        href={summaryHref(period, prev)}
         className="tap-target flex h-12 w-12 items-center justify-center rounded-full text-xl font-bold text-slate-600 active:bg-slate-100"
         aria-label="Previous day"
       >
@@ -32,7 +37,7 @@ export function DateNav({
       <p className="min-w-0 flex-1 text-center text-base font-semibold text-slate-900">{label}</p>
       {canGoNext ? (
         <Link
-          href={hrefForDate(next)}
+          href={summaryHref(period, next)}
           className="tap-target flex h-12 w-12 items-center justify-center rounded-full text-xl font-bold text-slate-600 active:bg-slate-100"
           aria-label="Next day"
         >

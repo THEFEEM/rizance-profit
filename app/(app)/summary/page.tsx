@@ -35,11 +35,6 @@ const CLOSE_OUT_LABELS = {
   profit: "กำไร",
 };
 
-function summaryHref(period: PeriodKey, date: string) {
-  const qs = new URLSearchParams({ period, date });
-  return `/summary?${qs}`;
-}
-
 export default async function StatsSummaryPage({
   searchParams,
 }: {
@@ -83,7 +78,6 @@ export default async function StatsSummaryPage({
   ].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 
   const entryTotal = periodData.incomeCount + periodData.expenseCount;
-  const closeOutHref = (d: string) => summaryHref(period, d);
 
   return (
     <div className="pb-6">
@@ -127,7 +121,7 @@ export default async function StatsSummaryPage({
         <DateNav
           date={closeDate}
           label={formatDateLabel(closeDate)}
-          hrefForDate={closeOutHref}
+          period={period}
           maxDate={bangkokToday}
         />
         <SummaryRows
