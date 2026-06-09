@@ -63,3 +63,15 @@ export function recipeQuantityInPurchaseUnits(
 export function recipeUsageUnitLabel(purchaseUnit: PurchaseUnit): string {
   return RECIPE_USAGE_UNIT_LABELS[purchaseUnit];
 }
+
+/** Volume/mass recipe qty < 1 often means liters/kg were entered by mistake. */
+export function isSuspiciousRecipeQuantity(
+  quantity: string | number,
+  purchaseUnit: PurchaseUnit,
+): boolean {
+  const family = unitFamily(purchaseUnit);
+  if (family !== "volume" && family !== "mass") return false;
+  const q = Number(quantity);
+  if (!Number.isFinite(q) || q <= 0) return false;
+  return q < 1;
+}

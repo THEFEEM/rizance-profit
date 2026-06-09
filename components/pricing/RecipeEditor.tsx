@@ -8,7 +8,7 @@ import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
 import { apiFetch } from "@/lib/api-client";
 import { formatMoney } from "@/lib/money";
 import { computeCostPerUnit, computeRecipeLineCost, sumLineCosts } from "@/lib/pricing-math";
-import { recipeUsageUnitLabel } from "@/lib/pricing-units";
+import { isSuspiciousRecipeQuantity, recipeUsageUnitLabel } from "@/lib/pricing-units";
 import {
   PRICING_LABELS,
   type Ingredient,
@@ -39,6 +39,14 @@ export function RecipeEditor({
   const [error, setError] = useState<string | null>(null);
 
   const ingMap = useMemo(() => new Map(ingredients.map((i) => [i.id, i])), [ingredients]);
+  const pickedIngredient = pickIngredient ? ingMap.get(pickIngredient) : undefined;
+  const usageUnitLabel = pickedIngredient
+    ? recipeUsageUnitLabel(pickedIngredient.purchaseUnit)
+    : null;
+  const qtySuspicious =
+    pickedIngredient !== undefined &&
+    qtyRaw !== "" &&
+    isSuspiciousRecipeQuantity(qtyRaw, pickedIngredient.purchaseUnit);
 
   const previewLines = lines.map((l) => {
     const ing = ingMap.get(l.ingredientId);
@@ -144,16 +152,25 @@ export function RecipeEditor({
                 <option key={i.id} value={i.id}>{i.name}</option>
               ))}
             </select>
-            <p className="mt-2 text-sm text-slate-600">
-              {PRICING_LABELS.quantityUsed}
-              {pickIngredient && ingMap.has(pickIngredient) && (
-                <span className="text-slate-400">
-                  {" "}
-                  ({recipeUsageUnitLabel(ingMap.get(pickIngredient)!.purchaseUnit)})
+            <p className="mt-3 text-sm font-medium text-slate-700">{PRICING_LABELS.quantityUsed}</p>
+            <div className="mt-1 flex items-center gap-3">
+              <p className="min-w-0 flex-1 text-3xl font-bold tabular-nums text-slate-900">
+                {formatTyped(qtyRaw) || "0"}
+              </p>
+              {usageUnitLabel && (
+                <span className="shrink-0 rounded-xl bg-emerald-100 px-4 py-2 text-xl font-bold text-emerald-800">
+                  {usageUnitLabel}
                 </span>
               )}
-            </p>
-            <p className="text-2xl font-bold tabular-nums">{formatTyped(qtyRaw) || "0"}</p>
+            </div>
+            {qtySuspicious && (
+              <p
+                className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-sm leading-snug text-amber-900"
+                role="status"
+              >
+                ปริมาณน้อยผิดปกติ — กรอกเป็น มล./กรัม ใช่ไหม?
+              </p>
+            )}
             <QuickAmountPad value={qtyRaw} onChange={setQtyRaw} onSave={addLine} saveLabel="เพิ่มในสูตร" />
           </>
         )}
