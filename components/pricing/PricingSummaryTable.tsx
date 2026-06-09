@@ -55,7 +55,7 @@ export function PricingSummaryTable({ summary }: { summary: PricingSummary }) {
                   <td className="px-3 py-3 font-medium text-slate-900">{r.menuName}</td>
                   <td className="px-2 py-3 tabular-nums">{formatMoney(r.ingredientCostPerCup)}</td>
                   <td className="px-2 py-3 tabular-nums">
-                    {overheadPerCup ? formatMoney(r.overheadPerCup) : "—"}
+                    {r.overheadPerCup ? formatMoney(r.overheadPerCup) : "—"}
                   </td>
                   <td className="px-2 py-3 tabular-nums">{formatMoney(r.totalCostPerCup)}</td>
                   <td className="px-2 py-3 tabular-nums text-emerald-700">

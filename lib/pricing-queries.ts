@@ -326,9 +326,9 @@ export async function ensureDefaultOverheads(userId: string): Promise<void> {
   for (const category of FIXED_OVERHEAD_CATEGORIES) {
     await query(
       `INSERT INTO overheads (user_id, category, monthly_amount)
-       SELECT $1, $2, 0
+       SELECT $1, $2::varchar, 0
        WHERE NOT EXISTS (
-         SELECT 1 FROM overheads WHERE user_id = $1 AND category = $2
+         SELECT 1 FROM overheads WHERE user_id = $1 AND category = $2::varchar
        )`,
       [userId, category],
     );
@@ -457,6 +457,7 @@ export async function getPricingSummary(userId: string): Promise<PricingSummary>
     listOverheads(userId),
     listMenuItems(userId),
   ]);
+  const needsCupsPerMonth = settings.estimatedCupsPerMonth <= 0;
   const overheadPerCup = computeOverheadPerCup(monthlyTotal, settings.estimatedCupsPerMonth);
 
   const rows: PricingSummaryRow[] = menuItems.map((m) => {
@@ -467,7 +468,7 @@ export async function getPricingSummary(userId: string): Promise<PricingSummary>
       menuItemId: m.id,
       menuName: m.name,
       ingredientCostPerCup: m.ingredientCostPerCup,
-      overheadPerCup: overheadPerCup ?? "0.00",
+      overheadPerCup,
       totalCostPerCup: totalCost,
       profitPerCup: profit,
       sellingPriceExact: sellingExact,
@@ -479,6 +480,7 @@ export async function getPricingSummary(userId: string): Promise<PricingSummary>
     settings,
     monthlyOverheadTotal: monthlyTotal,
     overheadPerCup,
+    needsCupsPerMonth,
     rows,
   };
 }

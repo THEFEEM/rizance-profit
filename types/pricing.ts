@@ -95,7 +95,7 @@ export type PricingSummaryRow = {
   menuItemId: string;
   menuName: string;
   ingredientCostPerCup: string;
-  overheadPerCup: string;
+  overheadPerCup: string | null;
   totalCostPerCup: string;
   profitPerCup: string;
   sellingPriceExact: string;
@@ -106,5 +106,7 @@ export type PricingSummary = {
   settings: PricingSettings;
   monthlyOverheadTotal: string;
   overheadPerCup: string | null;
+  /** True when cups/month is unset or zero — overhead per cup cannot be computed. */
+  needsCupsPerMonth: boolean;
   rows: PricingSummaryRow[];
 };

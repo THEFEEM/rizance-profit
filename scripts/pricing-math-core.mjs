@@ -63,7 +63,38 @@ export function computeRecipeLineCost(recipeQuantity, purchasePrice, purchaseQua
   return computeLineCost(qtyInPurchaseUnits, costPerUnit);
 }
 
-export function sumLineCosts(...lines) {
-  const total = lines.reduce((acc, v) => acc + toCents(v), 0);
+export function sumDecimals(...values) {
+  const total = values.reduce((acc, v) => acc + toCents(v), 0);
   return centsToDecimalString(total);
+}
+
+export function sumLineCosts(...lines) {
+  return sumDecimals(...lines, 0);
+}
+
+export function computeOverheadPerCup(monthlyTotal, cupsPerMonth) {
+  if (cupsPerMonth <= 0) return null;
+  const totalCents = toCents(monthlyTotal);
+  return centsToDecimalString(Math.round(totalCents / cupsPerMonth));
+}
+
+export function computeTotalCostPerCup(ingredientCost, overheadPerCup) {
+  if (overheadPerCup === null) return sumDecimals(ingredientCost, 0);
+  return sumDecimals(ingredientCost, overheadPerCup);
+}
+
+export function resolveProfitPerCup(itemProfit, defaultProfit) {
+  if (itemProfit !== null && itemProfit !== undefined && itemProfit !== "") return itemProfit;
+  if (defaultProfit !== null && defaultProfit !== undefined && defaultProfit !== "") return defaultProfit;
+  return "0.00";
+}
+
+export function computeSellingPriceExact(totalCost, profit) {
+  return sumDecimals(totalCost, profit);
+}
+
+export function formatSellingPriceDisplay(exact) {
+  const cents = toCents(exact);
+  const wholeBaht = Math.round(cents / 100);
+  return `฿${new Intl.NumberFormat("en-US").format(wholeBaht)}`;
 }
