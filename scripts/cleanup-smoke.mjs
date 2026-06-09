@@ -38,7 +38,8 @@ try {
   const { rowCount } = await client.query(
     `DELETE FROM users WHERE email LIKE 'smoke-%@rizance.test'
        OR email LIKE 'colors-%@rizance.test'
-       OR email LIKE 'tz-check-%@rizance.test'`,
+       OR email LIKE 'tz-check-%@rizance.test'
+       OR email LIKE 'pricing-units-%@rizance.test'`,
   );
   console.log(`✓ Removed ${rowCount ?? 0} test user(s) and their entries (CASCADE).`);
 } catch (err) {

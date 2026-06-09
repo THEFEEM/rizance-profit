@@ -1,4 +1,6 @@
 import { centsToDecimalString, sumDecimals, toCents } from "@/lib/money";
+import { recipeQuantityInPurchaseUnits } from "@/lib/pricing-units";
+import type { PurchaseUnit } from "@/types/pricing";
 
 /** cost_per_unit = purchase_price / purchase_quantity (up to 4 decimal places). */
 export function computeCostPerUnit(purchasePrice: string | number, purchaseQuantity: string | number): string {
@@ -17,6 +19,21 @@ export function computeLineCost(quantity: string | number, costPerUnit: string |
   const u = Number(costPerUnit);
   if (!Number.isFinite(q) || !Number.isFinite(u) || q <= 0) return "0.00";
   return centsToDecimalString(Math.round(q * u * 100));
+}
+
+/**
+ * Recipe line cost: recipe qty is in usage units (ml/g/same discrete unit),
+ * purchase price/qty define cost per purchase unit — convert before multiply.
+ */
+export function computeRecipeLineCost(
+  recipeQuantity: string | number,
+  purchasePrice: string | number,
+  purchaseQuantity: string | number,
+  purchaseUnit: PurchaseUnit,
+): string {
+  const qtyInPurchaseUnits = recipeQuantityInPurchaseUnits(recipeQuantity, purchaseUnit);
+  const costPerUnit = computeCostPerUnit(purchasePrice, purchaseQuantity);
+  return computeLineCost(qtyInPurchaseUnits, costPerUnit);
 }
 
 export function sumLineCosts(...lines: (string | number)[]): string {

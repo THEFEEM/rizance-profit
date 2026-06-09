@@ -1,7 +1,7 @@
 import { query } from "@/lib/db";
 import {
   computeCostPerUnit,
-  computeLineCost,
+  computeRecipeLineCost,
   computeOverheadPerCup,
   computeSellingPriceExact,
   computeTotalCostPerCup,
@@ -180,8 +180,13 @@ export async function deleteIngredient(
 // ---- menu items & recipes -------------------------------------------------
 
 async function computeMenuItemIngredientCost(userId: string, menuItemId: string): Promise<string> {
-  const { rows } = await query<{ quantity: string; purchase_price: string; purchase_quantity: string }>(
-    `SELECT ri.quantity, i.purchase_price, i.purchase_quantity
+  const { rows } = await query<{
+    quantity: string;
+    purchase_price: string;
+    purchase_quantity: string;
+    purchase_unit: string;
+  }>(
+    `SELECT ri.quantity, i.purchase_price, i.purchase_quantity, i.purchase_unit
      FROM recipe_items ri
      JOIN ingredients i ON i.id = ri.ingredient_id
      JOIN menu_items m ON m.id = ri.menu_item_id
@@ -189,7 +194,12 @@ async function computeMenuItemIngredientCost(userId: string, menuItemId: string)
     [userId, menuItemId],
   );
   const lines = rows.map((r) =>
-    computeLineCost(r.quantity, computeCostPerUnit(r.purchase_price, r.purchase_quantity)),
+    computeRecipeLineCost(
+      r.quantity,
+      r.purchase_price,
+      r.purchase_quantity,
+      r.purchase_unit as PurchaseUnit,
+    ),
   );
   return sumLineCosts(...lines, 0);
 }
@@ -274,15 +284,21 @@ export async function getRecipe(userId: string, menuItemId: string): Promise<Rec
     [userId, menuItemId],
   );
   return rows.map((r) => {
+    const purchaseUnit = r.purchase_unit as PurchaseUnit;
     const costPerUnit = computeCostPerUnit(r.purchase_price, r.purchase_quantity);
     return {
       id: r.id,
       ingredientId: r.ingredient_id,
       ingredientName: r.ingredient_name,
-      purchaseUnit: r.purchase_unit as PurchaseUnit,
+      purchaseUnit,
       quantity: r.quantity,
       costPerUnit,
-      lineCost: computeLineCost(r.quantity, costPerUnit),
+      lineCost: computeRecipeLineCost(
+        r.quantity,
+        r.purchase_price,
+        r.purchase_quantity,
+        purchaseUnit,
+      ),
     };
   });
 }

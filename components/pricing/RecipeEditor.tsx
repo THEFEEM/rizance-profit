@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/Input";
 import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
 import { apiFetch } from "@/lib/api-client";
 import { formatMoney } from "@/lib/money";
-import { computeCostPerUnit, computeLineCost, sumLineCosts } from "@/lib/pricing-math";
+import { computeCostPerUnit, computeRecipeLineCost, sumLineCosts } from "@/lib/pricing-math";
+import { recipeUsageUnitLabel } from "@/lib/pricing-units";
 import {
   PRICING_LABELS,
   type Ingredient,
@@ -16,10 +17,6 @@ import {
 } from "@/types/pricing";
 
 type DraftLine = { ingredientId: string; quantity: string };
-
-const UNIT_LABELS: Record<string, string> = {
-  ml: "มล.", g: "กรัม", kg: "กก.", l: "ลิตร", piece: "ชิ้น", shot: "ช็อต", pump: "ปั๊ม",
-};
 
 export function RecipeEditor({
   menuItem,
@@ -49,14 +46,19 @@ export function RecipeEditor({
     const cpu = computeCostPerUnit(ing.purchasePrice, ing.purchaseQuantity);
     return {
       name: ing.name,
-      unit: ing.purchaseUnit,
+      unitLabel: recipeUsageUnitLabel(ing.purchaseUnit),
       quantity: l.quantity,
       costPerUnit: cpu,
-      lineCost: computeLineCost(l.quantity, cpu),
+      lineCost: computeRecipeLineCost(
+        l.quantity,
+        ing.purchasePrice,
+        ing.purchaseQuantity,
+        ing.purchaseUnit,
+      ),
     };
   }).filter(Boolean) as {
     name: string;
-    unit: string;
+    unitLabel: string;
     quantity: string;
     costPerUnit: string;
     lineCost: string;
@@ -142,7 +144,15 @@ export function RecipeEditor({
                 <option key={i.id} value={i.id}>{i.name}</option>
               ))}
             </select>
-            <p className="mt-2 text-sm text-slate-600">{PRICING_LABELS.quantityUsed}</p>
+            <p className="mt-2 text-sm text-slate-600">
+              {PRICING_LABELS.quantityUsed}
+              {pickIngredient && ingMap.has(pickIngredient) && (
+                <span className="text-slate-400">
+                  {" "}
+                  ({recipeUsageUnitLabel(ingMap.get(pickIngredient)!.purchaseUnit)})
+                </span>
+              )}
+            </p>
             <p className="text-2xl font-bold tabular-nums">{formatTyped(qtyRaw) || "0"}</p>
             <QuickAmountPad value={qtyRaw} onChange={setQtyRaw} onSave={addLine} saveLabel="เพิ่มในสูตร" />
           </>
@@ -166,7 +176,7 @@ export function RecipeEditor({
                 <tr key={l.name} className="border-b border-slate-50">
                   <td className="px-3 py-2">{l.name}</td>
                   <td className="px-2 py-2 tabular-nums">
-                    {l.quantity} {UNIT_LABELS[l.unit]}
+                    {l.quantity} {l.unitLabel}
                   </td>
                   <td className="px-2 py-2 tabular-nums">{formatMoney(l.costPerUnit)}</td>
                   <td className="px-2 py-2 font-semibold tabular-nums text-emerald-700">
