@@ -1,58 +1,6 @@
--- Rizance Profit — database schema (idempotent: safe on a fresh DB or re-run)
--- Profit is NEVER stored; it is always derived (income − expense) in app code.
--- Money is NUMERIC(12,2) — never float — to avoid rounding errors on cash.
--- All CREATE EXTENSION / TABLE / INDEX statements use IF NOT EXISTS.
--- Requires the pgcrypto extension for gen_random_uuid().
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- 0003_cost_pricing — ingredients, recipes, overheads, pricing settings
+-- Money: NUMERIC(12,2). Quantities: NUMERIC(12,4). All scoped by user_id.
 
--- =========================================================
--- users  (the shop owner; one owner == one shop in the MVP)
--- =========================================================
-CREATE TABLE IF NOT EXISTS users (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email         VARCHAR(255) UNIQUE NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
-  shop_name     VARCHAR(120) NOT NULL,
-  currency      CHAR(3)      NOT NULL DEFAULT 'THB',
-  created_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
-  updated_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
-);
-
--- =========================================================
--- income_entries  (money in)
--- =========================================================
-CREATE TABLE IF NOT EXISTS income_entries (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  amount     NUMERIC(12,2) NOT NULL CHECK (amount >= 0),
-  note       VARCHAR(255),
-  entry_date DATE NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- =========================================================
--- expense_entries  (money out)
--- category: supplies | rent | salary | utilities | equipment | other
--- =========================================================
-CREATE TABLE IF NOT EXISTS expense_entries (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  amount     NUMERIC(12,2) NOT NULL CHECK (amount >= 0),
-  category   VARCHAR(40) NOT NULL DEFAULT 'other',
-  note       VARCHAR(255),
-  entry_date DATE NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- =========================================================
--- Indexes — every summary is a (user_id, date-range) scan
--- =========================================================
-CREATE INDEX IF NOT EXISTS idx_income_user_date  ON income_entries  (user_id, entry_date);
-CREATE INDEX IF NOT EXISTS idx_expense_user_date ON expense_entries (user_id, entry_date);
-
--- =========================================================
--- Cost & Pricing (computed costs never stored)
--- =========================================================
 CREATE TABLE IF NOT EXISTS ingredients (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -63,6 +11,7 @@ CREATE TABLE IF NOT EXISTS ingredients (
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
 CREATE INDEX IF NOT EXISTS idx_ingredients_user ON ingredients (user_id);
 
 CREATE TABLE IF NOT EXISTS menu_items (
@@ -74,6 +23,7 @@ CREATE TABLE IF NOT EXISTS menu_items (
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
 CREATE INDEX IF NOT EXISTS idx_menu_items_user ON menu_items (user_id);
 
 CREATE TABLE IF NOT EXISTS recipe_items (
@@ -83,6 +33,7 @@ CREATE TABLE IF NOT EXISTS recipe_items (
   quantity      NUMERIC(12,4) NOT NULL CHECK (quantity > 0),
   UNIQUE (menu_item_id, ingredient_id)
 );
+
 CREATE INDEX IF NOT EXISTS idx_recipe_items_menu ON recipe_items (menu_item_id);
 CREATE INDEX IF NOT EXISTS idx_recipe_items_ingredient ON recipe_items (ingredient_id);
 
@@ -95,7 +46,10 @@ CREATE TABLE IF NOT EXISTS overheads (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
 CREATE INDEX IF NOT EXISTS idx_overheads_user ON overheads (user_id);
+
+-- Fixed overhead categories: one row per (user, category). "other" may repeat.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_overheads_user_fixed_category
   ON overheads (user_id, category)
   WHERE category <> 'other';
