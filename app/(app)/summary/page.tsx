@@ -48,9 +48,10 @@ export default async function DailySummaryPage({
     <div className="pb-6">
       <div className="flex items-center justify-between px-4 pt-3">
         <h1 className="text-lg font-bold text-slate-900">Daily Summary</h1>
-        <Link href="/summary/monthly" className="text-sm font-medium text-emerald-700">
-          Monthly →
-        </Link>
+        <div className="flex gap-3 text-sm font-medium text-emerald-700">
+          <Link href="/pricing">ต้นทุนและราคา →</Link>
+          <Link href="/summary/monthly">Monthly →</Link>
+        </div>
       </div>
 
       <DateNav date={date} label={formatDateLabel(date)} />
