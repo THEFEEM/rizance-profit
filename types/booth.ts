@@ -80,3 +80,11 @@ export type BoothSummary = {
 export type BoothEntryResult<T> =
   | { ok: true; entry: T }
   | { ok: false; reason: "booth_not_found" | "booth_closed" | "date_out_of_range" };
+
+export type BoothUpdateResult =
+  | { ok: true; booth: Booth }
+  | {
+      ok: false;
+      reason: "booth_not_found" | "booth_closed" | "entries_outside_new_range";
+      count?: number;
+    };

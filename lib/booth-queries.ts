@@ -13,6 +13,7 @@ import type {
   BoothMember,
   BoothStatus,
   BoothSummary,
+  BoothUpdateResult,
   PaymentMethod,
 } from "@/types/booth";
 
@@ -144,13 +145,45 @@ export async function createBooth(userId: string, input: BoothInput): Promise<Bo
   return mapBooth(rows[0]);
 }
 
+/** Count income + expense rows whose entry_date falls outside [start, end]. */
+async function countBoothEntriesOutsideRange(
+  boothId: string,
+  start: string,
+  end: string,
+): Promise<number> {
+  const { rows } = await query<{ count: string }>(
+    `SELECT (
+       (SELECT COUNT(*) FROM booth_income_entries
+        WHERE booth_id = $1 AND (entry_date < $2::date OR entry_date > $3::date)) +
+       (SELECT COUNT(*) FROM booth_expense_entries
+        WHERE booth_id = $1 AND (entry_date < $2::date OR entry_date > $3::date))
+     )::text AS count`,
+    [boothId, start, end],
+  );
+  return Number(rows[0].count);
+}
+
 export async function updateBooth(
   userId: string,
   id: string,
   input: Partial<BoothInput>,
-): Promise<Booth | null> {
+): Promise<BoothUpdateResult> {
   const existing = await getBooth(userId, id);
-  if (!existing || existing.status === "closed") return null;
+  if (!existing) return { ok: false, reason: "booth_not_found" };
+  if (existing.status === "closed") return { ok: false, reason: "booth_closed" };
+
+  const newStart = input.startDate ?? existing.startDate;
+  const newEnd = input.endDate ?? existing.endDate;
+  const rangeNarrowed =
+    newStart > existing.startDate || newEnd < existing.endDate;
+
+  if (rangeNarrowed) {
+    const outside = await countBoothEntriesOutsideRange(id, newStart, newEnd);
+    if (outside > 0) {
+      return { ok: false, reason: "entries_outside_new_range", count: outside };
+    }
+  }
+
   const { rows } = await query<BoothRow>(
     `UPDATE booths SET name = $3, starting_budget = $4, start_date = $5::date,
        end_date = $6::date, note = $7, updated_at = now()
@@ -161,12 +194,13 @@ export async function updateBooth(
       id,
       input.name ?? existing.name,
       (input.startingBudget ?? Number(existing.startingBudget)).toFixed(2),
-      input.startDate ?? existing.startDate,
-      input.endDate ?? existing.endDate,
+      newStart,
+      newEnd,
       input.note !== undefined ? input.note : existing.note,
     ],
   );
-  return rows[0] ? mapBooth(rows[0]) : null;
+  if (!rows[0]) return { ok: false, reason: "booth_not_found" };
+  return { ok: true, booth: mapBooth(rows[0]) };
 }
 
 /** Close a booth (permanent in v1). Returns the closed booth or null. */
