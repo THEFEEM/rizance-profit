@@ -40,7 +40,9 @@ try {
        OR email LIKE 'colors-%@rizance.test'
        OR email LIKE 'tz-check-%@rizance.test'
        OR email LIKE 'pricing-units-%@rizance.test'
-       OR email LIKE 'pricing-edge-%@rizance.test'`,
+       OR email LIKE 'pricing-edge-%@rizance.test'
+       OR email LIKE 'booth-iso-%@rizance.test'
+       OR email LIKE 'booth-range-%@rizance.test'`,
   );
   console.log(`✓ Removed ${rowCount ?? 0} test user(s) and their entries (CASCADE).`);
 } catch (err) {
