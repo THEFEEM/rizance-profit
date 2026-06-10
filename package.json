@@ -18,7 +18,8 @@
     "test:booth-update-range": "node scripts/test-booth-update-range.mjs",
     "test:booth-entries": "node scripts/test-booth-entries.mjs",
     "test:booth-summary-close": "node scripts/test-booth-summary-close.mjs",
-    "test:context": "node scripts/test-context.mjs"
+    "test:context": "node scripts/test-context.mjs",
+    "test:stats-context": "node scripts/test-stats-context.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

@@ -20,11 +20,13 @@ export function BoothDayEntryList({
   incomes,
   expenses,
   currency = "THB",
+  readOnly = false,
 }: {
   boothId: string;
   incomes: BoothIncome[];
   expenses: BoothExpense[];
   currency?: string;
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -105,14 +107,16 @@ export function BoothDayEntryList({
               >
                 {displayAmount}
               </span>
-              <button
-                onClick={() => setPending(row)}
-                disabled={deleting === e.id}
-                aria-label={`ลบ ${t}`}
-                className="tap-target -mr-2 flex h-10 w-10 items-center justify-center rounded-full text-slate-400 active:bg-slate-100 disabled:opacity-40"
-              >
-                {deleting === e.id ? "…" : "✕"}
-              </button>
+              {!readOnly && (
+                <button
+                  onClick={() => setPending(row)}
+                  disabled={deleting === e.id}
+                  aria-label={`ลบ ${t}`}
+                  className="tap-target -mr-2 flex h-10 w-10 items-center justify-center rounded-full text-slate-400 active:bg-slate-100 disabled:opacity-40"
+                >
+                  {deleting === e.id ? "…" : "✕"}
+                </button>
+              )}
             </li>
           );
         })}
