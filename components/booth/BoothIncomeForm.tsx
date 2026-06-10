@@ -7,6 +7,7 @@ import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
 import { Input } from "@/components/ui/Input";
 import { BoothBack } from "@/components/booth/BoothBack";
 import { BoothClosedBanner } from "@/components/booth/BoothClosedBanner";
+import { EntryContextBanner } from "@/components/EntryContextBanner";
 import { BoothEntryList } from "@/components/booth/BoothEntryList";
 import { apiFetch } from "@/lib/api-client";
 import { clampDateToRange } from "@/lib/date";
@@ -76,7 +77,7 @@ export function BoothIncomeForm({
         <h1 className="text-base font-bold text-slate-900">รายรับบูธ</h1>
         <span className="w-16" />
       </div>
-      <p className="px-4 pb-2 text-center text-sm text-slate-500">{boothName}</p>
+      <EntryContextBanner target="booth" name={boothName} />
 
       {closed && (
         <div className="mb-3">

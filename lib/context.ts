@@ -112,3 +112,17 @@ export async function getAppContext(userId: string, req?: NextRequest): Promise<
 export type SetContextResult =
   | { ok: true; context: AppContext }
   | { ok: false; reason: "invalid_input" | "booth_not_found" | "booth_closed" };
+
+/** Bottom-nav +In / −Out targets from resolved context (closed/invalid booth → regular). */
+export function entryNavRoutes(resolved: ResolvedTodayContext): {
+  income: string;
+  expense: string;
+} {
+  if (resolved.mode === "booth") {
+    return {
+      income: `/booth/${resolved.boothId}/income`,
+      expense: `/booth/${resolved.boothId}/expense`,
+    };
+  }
+  return { income: "/income", expense: "/expense" };
+}

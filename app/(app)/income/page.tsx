@@ -7,6 +7,7 @@ import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
 import { Input } from "@/components/ui/Input";
 import { apiFetch } from "@/lib/api-client";
 import { today } from "@/lib/date";
+import { EntryContextBanner } from "@/components/EntryContextBanner";
 import type { Income } from "@/types";
 
 export default function AddIncomePage() {
@@ -46,6 +47,8 @@ export default function AddIncomePage() {
         <h1 className="text-base font-bold text-slate-900">Add Income</h1>
         <span className="w-16" />
       </div>
+
+      <EntryContextBanner target="regular" />
 
       <AmountInput value={formatTyped(raw)} tone="income" />
 

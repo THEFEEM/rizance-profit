@@ -7,6 +7,7 @@ import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
 import { Input } from "@/components/ui/Input";
 import { apiFetch } from "@/lib/api-client";
 import { today } from "@/lib/date";
+import { EntryContextBanner } from "@/components/EntryContextBanner";
 import {
   EXPENSE_CATEGORIES,
   EXPENSE_CATEGORY_LABELS as CATEGORY_LABELS,
@@ -53,6 +54,8 @@ export default function AddExpensePage() {
         <h1 className="text-base font-bold text-slate-900">Add Expense</h1>
         <span className="w-16" />
       </div>
+
+      <EntryContextBanner target="regular" />
 
       <AmountInput value={formatTyped(raw)} tone="expense" />
 
