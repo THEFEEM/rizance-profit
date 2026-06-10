@@ -7,13 +7,9 @@ import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
 import { Input } from "@/components/ui/Input";
 import { apiFetch } from "@/lib/api-client";
 import { today } from "@/lib/date";
+import { CategoryGrid } from "@/components/CategoryGrid";
 import { EntryContextBanner } from "@/components/EntryContextBanner";
-import {
-  EXPENSE_CATEGORIES,
-  EXPENSE_CATEGORY_LABELS as CATEGORY_LABELS,
-  type Expense,
-  type ExpenseCategory,
-} from "@/types";
+import { EXPENSE_CATEGORY_OPTIONS, type Expense, type ExpenseCategory } from "@/types";
 
 export default function AddExpensePage() {
   const router = useRouter();
@@ -61,23 +57,13 @@ export default function AddExpensePage() {
 
       <div className="flex flex-col gap-3 px-4">
         <div>
-          <p className="mb-1.5 text-sm font-medium text-slate-700">Category</p>
-          <div className="flex flex-wrap gap-2">
-            {EXPENSE_CATEGORIES.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setCategory(c)}
-                className={`tap-target rounded-full border px-4 text-sm font-medium transition-colors ${
-                  category === c
-                    ? "border-emerald-600 bg-emerald-600 text-white"
-                    : "border-slate-300 bg-white text-slate-700 active:bg-slate-100"
-                }`}
-              >
-                {CATEGORY_LABELS[c]}
-              </button>
-            ))}
-          </div>
+          <p className="mb-1.5 text-sm font-medium text-slate-700">ประเภทรายจ่าย</p>
+          <CategoryGrid
+            options={EXPENSE_CATEGORY_OPTIONS}
+            value={category}
+            onChange={setCategory}
+            columns={3}
+          />
         </div>
 
         <Input

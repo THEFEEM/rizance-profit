@@ -20,11 +20,14 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- =========================================================
 -- income_entries  (money in)
+-- category: storefront | delivery | other
 -- =========================================================
 CREATE TABLE IF NOT EXISTS income_entries (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   amount     NUMERIC(12,2) NOT NULL CHECK (amount >= 0),
+  category   VARCHAR(40) NOT NULL DEFAULT 'storefront'
+             CHECK (category IN ('storefront', 'delivery', 'other')),
   note       VARCHAR(255),
   entry_date DATE NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()

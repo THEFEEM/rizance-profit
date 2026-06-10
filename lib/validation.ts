@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EXPENSE_CATEGORIES } from "@/types";
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@/types";
 import { isValidDate } from "@/lib/date";
 
 const email = z.preprocess(
@@ -44,6 +44,7 @@ const entryDate = z
 
 export const incomeSchema = z.object({
   amount,
+  category: z.enum(INCOME_CATEGORIES).optional(),
   note,
   entryDate,
 });

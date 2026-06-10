@@ -26,6 +26,7 @@ export async function RegularToday({ user }: { user: User }) {
       kind: "income" as const,
       amount: i.amount,
       note: i.note,
+      category: i.category,
       createdAt: i.createdAt,
     })),
     ...expenses.map((e) => ({

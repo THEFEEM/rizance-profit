@@ -7,12 +7,14 @@ import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
 import { Input } from "@/components/ui/Input";
 import { apiFetch } from "@/lib/api-client";
 import { today } from "@/lib/date";
+import { CategoryGrid } from "@/components/CategoryGrid";
 import { EntryContextBanner } from "@/components/EntryContextBanner";
-import type { Income } from "@/types";
+import { INCOME_CATEGORY_OPTIONS, type Income, type IncomeCategory } from "@/types";
 
 export default function AddIncomePage() {
   const router = useRouter();
   const [raw, setRaw] = useState("");
+  const [category, setCategory] = useState<IncomeCategory>("storefront");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(today());
   const [saving, setSaving] = useState(false);
@@ -25,6 +27,7 @@ export default function AddIncomePage() {
       method: "POST",
       body: JSON.stringify({
         amount: Number(raw),
+        category,
         note: note.trim() || undefined,
         entryDate: date,
       }),
@@ -53,6 +56,16 @@ export default function AddIncomePage() {
       <AmountInput value={formatTyped(raw)} tone="income" />
 
       <div className="flex flex-col gap-3 px-4">
+        <div>
+          <p className="mb-1.5 text-sm font-medium text-slate-700">ประเภทรายรับ</p>
+          <CategoryGrid
+            options={INCOME_CATEGORY_OPTIONS}
+            value={category}
+            onChange={setCategory}
+            columns={3}
+          />
+        </div>
+
         <Input
           label="Note (optional)"
           placeholder="Morning sales"
