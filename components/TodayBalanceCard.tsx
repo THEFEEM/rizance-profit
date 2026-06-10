@@ -11,14 +11,10 @@ function profitColor(amount: string): string {
 export function TodayBalanceCard({
   cumulativeProfit,
   todayProfit,
-  todayIncome,
-  todayExpense,
   currency = "THB",
 }: {
   cumulativeProfit: string;
   todayProfit: string;
-  todayIncome: string;
-  todayExpense: string;
   currency?: string;
 }) {
   return (
@@ -30,21 +26,12 @@ export function TodayBalanceCard({
         {formatMoney(cumulativeProfit, currency)}
       </p>
 
-      <div className="mt-3 space-y-1 text-sm">
-        <p className="text-slate-600">
-          กำไรวันนี้{" "}
-          <span className={`font-semibold ${profitColor(todayProfit)}`}>
-            {formatMoney(todayProfit, currency)}
-          </span>
-        </p>
-        <p className="text-slate-500">
-          รายรับวันนี้{" "}
-          <span className="font-semibold text-emerald-600">{formatMoney(todayIncome, currency)}</span>
-          <span aria-hidden> · </span>
-          รายจ่ายวันนี้{" "}
-          <span className="font-semibold text-red-600">{formatMoney(todayExpense, currency)}</span>
-        </p>
-      </div>
+      <p className="mt-3 text-sm text-slate-600">
+        กำไรวันนี้{" "}
+        <span className={`font-semibold ${profitColor(todayProfit)}`}>
+          {formatMoney(todayProfit, currency)}
+        </span>
+      </p>
     </section>
   );
 }

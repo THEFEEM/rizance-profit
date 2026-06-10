@@ -1,4 +1,3 @@
-import Link from "next/link";
 import {
   allTimeSummary,
   dailySummary,
@@ -7,6 +6,7 @@ import {
 } from "@/lib/queries";
 import { today } from "@/lib/date";
 import { TodayBalanceCard } from "@/components/TodayBalanceCard";
+import { TodayStatCards } from "@/components/TodayStatCards";
 import { EntryList, type EntryRow } from "@/components/EntryList";
 import type { User } from "@/types";
 
@@ -43,25 +43,14 @@ export async function RegularToday({ user }: { user: User }) {
       <TodayBalanceCard
         cumulativeProfit={allTime.profit}
         todayProfit={summary.profit}
-        todayIncome={summary.income}
-        todayExpense={summary.expense}
         currency={user.currency}
       />
 
-      <div className="grid grid-cols-2 gap-3 px-4">
-        <Link
-          href="/income"
-          className="tap-target flex h-20 items-center justify-center rounded-2xl bg-emerald-600 text-lg font-bold text-white active:bg-emerald-700"
-        >
-          + INCOME
-        </Link>
-        <Link
-          href="/expense"
-          className="tap-target flex h-20 items-center justify-center rounded-2xl bg-red-600 text-lg font-bold text-white active:bg-red-700"
-        >
-          − EXPENSE
-        </Link>
-      </div>
+      <TodayStatCards
+        income={summary.income}
+        expense={summary.expense}
+        currency={user.currency}
+      />
 
       <div className="mt-6">
         <h2 className="px-4 pb-1 text-sm font-semibold text-slate-500">Recent today</h2>
@@ -69,7 +58,7 @@ export async function RegularToday({ user }: { user: User }) {
           <EntryList
             entries={entries}
             currency={user.currency}
-            emptyHint="No entries today — tap + INCOME or − EXPENSE to start."
+            emptyHint="No entries today — tap +In or −Out in the nav to start."
           />
         </div>
       </div>
