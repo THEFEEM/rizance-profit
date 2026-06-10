@@ -19,6 +19,8 @@
     "test:booth-entries": "node scripts/test-booth-entries.mjs",
     "test:booth-summary-close": "node scripts/test-booth-summary-close.mjs",
     "test:context": "node scripts/test-context.mjs",
+    "test:entry-context": "node scripts/test-entry-context.mjs",
+    "test:income-category": "node scripts/test-income-category.mjs",
     "test:stats-context": "node scripts/test-stats-context.mjs",
     "test:combined-summary": "node scripts/test-combined-summary.mjs"
   },

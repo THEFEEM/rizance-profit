@@ -3,7 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatMoney } from "@/lib/money";
-import { EXPENSE_CATEGORY_LABELS, type ExpenseCategory } from "@/types";
+import {
+  EXPENSE_CATEGORY_LABELS,
+  INCOME_CATEGORY_LABELS,
+  type ExpenseCategory,
+  type IncomeCategory,
+} from "@/types";
 import { DeleteConfirm } from "@/components/DeleteConfirm";
 
 export type EntryRow = {
@@ -11,9 +16,18 @@ export type EntryRow = {
   kind: "income" | "expense";
   amount: string;
   note: string | null;
-  category?: ExpenseCategory;
+  category?: ExpenseCategory | IncomeCategory;
   createdAt: string;
 };
+
+function entryTitle(e: EntryRow): string {
+  if (e.kind === "income") {
+    const label = INCOME_CATEGORY_LABELS[(e.category as IncomeCategory) ?? "storefront"];
+    return e.note ? `${label} · ${e.note}` : label;
+  }
+  const label = EXPENSE_CATEGORY_LABELS[(e.category as ExpenseCategory) ?? "other"];
+  return e.note ? `${label} · ${e.note}` : label;
+}
 
 export function EntryList({
   entries,
@@ -64,9 +78,7 @@ export function EntryList({
       <ul className="divide-y divide-slate-100">
         {visible.map((e) => {
           const isIncome = e.kind === "income";
-          const title = isIncome
-            ? e.note || "Sales"
-            : `${EXPENSE_CATEGORY_LABELS[e.category ?? "other"]}${e.note ? ` · ${e.note}` : ""}`;
+          const title = entryTitle(e);
           const displayAmount = `${isIncome ? "+ " : "− "}${formatMoney(e.amount, currency)}`;
           return (
             <li key={e.id} className="flex items-center gap-3 px-4 py-3">
@@ -98,11 +110,7 @@ export function EntryList({
 
       {pending && (
         <DeleteConfirm
-          title={
-            pending.kind === "income"
-              ? pending.note || "Sales"
-              : `${EXPENSE_CATEGORY_LABELS[pending.category ?? "other"]}${pending.note ? ` · ${pending.note}` : ""}`
-          }
+          title={entryTitle(pending)}
           amount={formatMoney(pending.amount, currency)}
           onConfirm={confirmDelete}
           onCancel={() => setPending(null)}

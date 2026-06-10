@@ -60,6 +60,7 @@ export async function RegularStatsSummary({
       kind: "income" as const,
       amount: i.amount,
       note: i.note,
+      category: i.category,
       createdAt: i.createdAt,
     })),
     ...expenses.map((e) => ({

@@ -1,14 +1,20 @@
-import Link from "next/link";
-import { dailySummary, listIncomeByDate, listExpenseByDate } from "@/lib/queries";
+import {
+  allTimeSummary,
+  dailySummary,
+  listIncomeByDate,
+  listExpenseByDate,
+} from "@/lib/queries";
 import { today } from "@/lib/date";
-import { ProfitCard } from "@/components/ProfitCard";
+import { TodayBalanceCard } from "@/components/TodayBalanceCard";
+import { TodayStatCards } from "@/components/TodayStatCards";
 import { EntryList, type EntryRow } from "@/components/EntryList";
 import type { User } from "@/types";
 
-/** Regular-shop Today — must stay identical to pre–Mode Even behavior. */
+/** Regular-shop Today — cumulative hero + today's breakdown; booth mode unchanged. */
 export async function RegularToday({ user }: { user: User }) {
   const date = today();
-  const [summary, incomes, expenses] = await Promise.all([
+  const [allTime, summary, incomes, expenses] = await Promise.all([
+    allTimeSummary(user.id),
     dailySummary(user.id, date),
     listIncomeByDate(user.id, date),
     listExpenseByDate(user.id, date),
@@ -20,6 +26,7 @@ export async function RegularToday({ user }: { user: User }) {
       kind: "income" as const,
       amount: i.amount,
       note: i.note,
+      category: i.category,
       createdAt: i.createdAt,
     })),
     ...expenses.map((e) => ({
@@ -34,27 +41,17 @@ export async function RegularToday({ user }: { user: User }) {
 
   return (
     <>
-      <ProfitCard
-        profit={summary.profit}
+      <TodayBalanceCard
+        cumulativeProfit={allTime.profit}
+        todayProfit={summary.profit}
+        currency={user.currency}
+      />
+
+      <TodayStatCards
         income={summary.income}
         expense={summary.expense}
         currency={user.currency}
       />
-
-      <div className="grid grid-cols-2 gap-3 px-4">
-        <Link
-          href="/income"
-          className="tap-target flex h-20 items-center justify-center rounded-2xl bg-emerald-600 text-lg font-bold text-white active:bg-emerald-700"
-        >
-          + INCOME
-        </Link>
-        <Link
-          href="/expense"
-          className="tap-target flex h-20 items-center justify-center rounded-2xl bg-red-600 text-lg font-bold text-white active:bg-red-700"
-        >
-          − EXPENSE
-        </Link>
-      </div>
 
       <div className="mt-6">
         <h2 className="px-4 pb-1 text-sm font-semibold text-slate-500">Recent today</h2>
@@ -62,7 +59,7 @@ export async function RegularToday({ user }: { user: User }) {
           <EntryList
             entries={entries}
             currency={user.currency}
-            emptyHint="No entries today — tap + INCOME or − EXPENSE to start."
+            emptyHint="No entries today — tap +In or −Out in the nav to start."
           />
         </div>
       </div>

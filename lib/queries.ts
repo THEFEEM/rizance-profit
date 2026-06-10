@@ -1,10 +1,12 @@
 import { query } from "@/lib/db";
 import { computeProfit, sumDecimals } from "@/lib/money";
 import type {
+  AllTimeSummary,
   DailySummary,
   Expense,
   ExpenseCategory,
   Income,
+  IncomeCategory,
   MonthlyDay,
   MonthlySummary,
   PeriodKey,
@@ -41,6 +43,7 @@ function mapUser(r: UserRow): User {
 type IncomeRow = {
   id: string;
   amount: string;
+  category: string;
   note: string | null;
   entry_date: string;
   created_at: Date | string;
@@ -50,6 +53,7 @@ function mapIncome(r: IncomeRow): Income {
   return {
     id: r.id,
     amount: r.amount,
+    category: r.category as IncomeCategory,
     note: r.note,
     entryDate: r.entry_date,
     createdAt: toIso(r.created_at),
@@ -118,17 +122,17 @@ export async function emailExists(email: string): Promise<boolean> {
 export async function createIncome(userId: string, input: IncomeInput): Promise<Income> {
   const entryDate = input.entryDate ?? today();
   const { rows } = await query<IncomeRow>(
-    `INSERT INTO income_entries (user_id, amount, note, entry_date)
-     VALUES ($1, $2, $3, $4::date)
-     RETURNING id, amount, note, entry_date::text AS entry_date, created_at`,
-    [userId, input.amount.toFixed(2), input.note ?? null, entryDate],
+    `INSERT INTO income_entries (user_id, amount, category, note, entry_date)
+     VALUES ($1, $2, COALESCE($3, 'storefront'), $4, $5::date)
+     RETURNING id, amount, category, note, entry_date::text AS entry_date, created_at`,
+    [userId, input.amount.toFixed(2), input.category ?? null, input.note ?? null, entryDate],
   );
   return mapIncome(rows[0]);
 }
 
 export async function listIncomeByDate(userId: string, date: string): Promise<Income[]> {
   const { rows } = await query<IncomeRow>(
-    `SELECT id, amount, note, entry_date::text AS entry_date, created_at
+    `SELECT id, amount, category, note, entry_date::text AS entry_date, created_at
      FROM income_entries
      WHERE user_id = $1 AND entry_date = $2
      ORDER BY created_at DESC`,
@@ -179,6 +183,30 @@ export async function deleteExpense(userId: string, id: string): Promise<boolean
 }
 
 // ---- summaries (computed, never stored) -----------------------------------
+
+export async function allTimeSummary(userId: string): Promise<AllTimeSummary> {
+  const { rows } = await query<{
+    income: string;
+    expense: string;
+    income_count: string;
+    expense_count: string;
+  }>(
+    `SELECT
+       COALESCE((SELECT SUM(amount) FROM income_entries  WHERE user_id = $1), 0)::text AS income,
+       COALESCE((SELECT SUM(amount) FROM expense_entries WHERE user_id = $1), 0)::text AS expense,
+       (SELECT COUNT(*) FROM income_entries  WHERE user_id = $1)::text AS income_count,
+       (SELECT COUNT(*) FROM expense_entries WHERE user_id = $1)::text AS expense_count`,
+    [userId],
+  );
+  const r = rows[0];
+  return {
+    income: r.income,
+    expense: r.expense,
+    profit: computeProfit(r.income, r.expense),
+    incomeCount: Number(r.income_count),
+    expenseCount: Number(r.expense_count),
+  };
+}
 
 export async function periodSummary(userId: string, period: PeriodKey): Promise<PeriodSummary> {
   const { start, end } = periodRange(period);
