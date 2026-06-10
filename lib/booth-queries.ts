@@ -269,6 +269,67 @@ export async function createBoothIncome(
   return { ok: true, entry: mapBoothIncome(rows[0]) };
 }
 
+export type BoothDaySummary = {
+  income: string;
+  expense: string;
+  profit: string;
+};
+
+/** Day-scoped booth P&L for Today booth mode (entry_date = date). */
+export async function boothDaySummary(
+  userId: string,
+  boothId: string,
+  date: string,
+): Promise<BoothDaySummary | null> {
+  const booth = await getBooth(userId, boothId);
+  if (!booth) return null;
+
+  const { rows } = await query<{ income: string; expense: string }>(
+    `SELECT
+       COALESCE((SELECT SUM(amount) FROM booth_income_entries
+                 WHERE booth_id = $1 AND user_id = $2 AND entry_date = $3::date), 0)::text AS income,
+       COALESCE((SELECT SUM(amount) FROM booth_expense_entries
+                 WHERE booth_id = $1 AND user_id = $2 AND entry_date = $3::date), 0)::text AS expense`,
+    [boothId, userId, date],
+  );
+  const r = rows[0];
+  return {
+    income: r.income,
+    expense: r.expense,
+    profit: computeProfit(r.income, r.expense),
+  };
+}
+
+export async function listBoothIncomeByDate(
+  userId: string,
+  boothId: string,
+  date: string,
+): Promise<BoothIncome[]> {
+  const { rows } = await query<BoothIncomeRow>(
+    `SELECT id, booth_id, amount, payment_method, note, entry_date::text AS entry_date, created_at
+     FROM booth_income_entries
+     WHERE user_id = $1 AND booth_id = $2 AND entry_date = $3::date
+     ORDER BY created_at DESC`,
+    [userId, boothId, date],
+  );
+  return rows.map(mapBoothIncome);
+}
+
+export async function listBoothExpenseByDate(
+  userId: string,
+  boothId: string,
+  date: string,
+): Promise<BoothExpense[]> {
+  const { rows } = await query<BoothExpenseRow>(
+    `SELECT id, booth_id, amount, cost_type, label, note, entry_date::text AS entry_date, created_at
+     FROM booth_expense_entries
+     WHERE user_id = $1 AND booth_id = $2 AND entry_date = $3::date
+     ORDER BY created_at DESC`,
+    [userId, boothId, date],
+  );
+  return rows.map(mapBoothExpense);
+}
+
 export async function listBoothIncome(userId: string, boothId: string): Promise<BoothIncome[]> {
   const { rows } = await query<BoothIncomeRow>(
     `SELECT id, booth_id, amount, payment_method, note, entry_date::text AS entry_date, created_at
