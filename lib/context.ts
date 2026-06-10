@@ -1,4 +1,3 @@
-import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { useSecureCookies } from "@/lib/env";
 import { defaultBoothEntryDate } from "@/lib/date";
@@ -44,36 +43,26 @@ export function parseContextCookie(
   return { type: "invalid" };
 }
 
-async function readContextRawAsync(req?: NextRequest): Promise<string | undefined> {
-  if (req) return req.cookies.get(CONTEXT_COOKIE)?.value;
-  const store = await cookies();
-  return store.get(CONTEXT_COOKIE)?.value;
+function readContextRaw(req?: NextRequest): string | undefined {
+  return req?.cookies.get(CONTEXT_COOKIE)?.value;
 }
 
-async function setContextCookieValue(value: string) {
-  const store = await cookies();
-  store.set(CONTEXT_COOKIE, value, contextCookieOptions());
-}
-
-async function clearContextCookie() {
-  const store = await cookies();
-  store.set(CONTEXT_COOKIE, "", clearContextCookieOptions());
-}
-
-/** Resolved context for Today — invalid/stale cookies fall back to regular. */
+/** Resolved context for Today — read-only; never mutates cookies (safe in Server Components). */
 export type ResolvedTodayContext =
   | { mode: "regular" }
   | { mode: "booth"; booth: Booth; boothId: string; date: string };
 
 /**
- * Resolve effective Today context. Clears cookie when booth is missing, closed,
- * or cookie is malformed — never throws, never returns another user's booth.
+ * Resolve effective Today context from a cookie value.
+ * Invalid/stale booth cookies fall back to regular WITHOUT writing cookies here —
+ * cookie cleanup belongs in Route Handlers (see GET /api/context).
  */
 export async function resolveTodayContext(
   userId: string,
   req?: NextRequest,
+  rawCookie?: string,
 ): Promise<ResolvedTodayContext> {
-  const raw = await readContextRawAsync(req);
+  const raw = rawCookie ?? readContextRaw(req);
   const parsed = parseContextCookie(raw);
 
   if (parsed.type === "regular") {
@@ -81,13 +70,11 @@ export async function resolveTodayContext(
   }
 
   if (parsed.type === "invalid") {
-    if (raw) await clearContextCookie();
     return { mode: "regular" };
   }
 
   const booth = await getBooth(userId, parsed.boothId);
   if (!booth || booth.status !== "open") {
-    await clearContextCookie();
     return { mode: "regular" };
   }
 
@@ -97,6 +84,18 @@ export async function resolveTodayContext(
     boothId: booth.id,
     date: defaultBoothEntryDate(booth.startDate, booth.endDate),
   };
+}
+
+/** True when the stored cookie should be cleared (stale/invalid booth reference). */
+export function shouldClearContextCookie(
+  raw: string | undefined,
+  resolved: ResolvedTodayContext,
+): boolean {
+  if (!raw || raw === "regular") return false;
+  const parsed = parseContextCookie(raw);
+  if (parsed.type === "invalid") return true;
+  if (parsed.type === "booth" && resolved.mode === "regular") return true;
+  return false;
 }
 
 /** API-facing context (no booth domain object). */
@@ -113,28 +112,3 @@ export async function getAppContext(userId: string, req?: NextRequest): Promise<
 export type SetContextResult =
   | { ok: true; context: AppContext }
   | { ok: false; reason: "invalid_input" | "booth_not_found" | "booth_closed" };
-
-/** Validate and persist context cookie (PATCH /api/context). */
-export async function setAppContext(
-  userId: string,
-  input: { mode: "regular" } | { mode: "booth"; boothId: string },
-): Promise<SetContextResult> {
-  if (input.mode === "regular") {
-    await setContextCookieValue("regular");
-    return { ok: true, context: { mode: "regular" } };
-  }
-
-  if (!UUID_RE.test(input.boothId)) {
-    return { ok: false, reason: "invalid_input" };
-  }
-
-  const booth = await getBooth(userId, input.boothId);
-  if (!booth) return { ok: false, reason: "booth_not_found" };
-  if (booth.status !== "open") return { ok: false, reason: "booth_closed" };
-
-  await setContextCookieValue(encodeContextCookie({ boothId: booth.id }));
-  return {
-    ok: true,
-    context: { mode: "booth", boothId: booth.id, boothName: booth.name },
-  };
-}
