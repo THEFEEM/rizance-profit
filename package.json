@@ -15,7 +15,8 @@
     "test:pricing-edge": "node scripts/test-pricing-edge.mjs",
     "test:period-ranges": "node scripts/test-period-ranges.mjs",
     "test:booth-isolation": "node scripts/test-booth-isolation.mjs",
-    "test:booth-update-range": "node scripts/test-booth-update-range.mjs"
+    "test:booth-update-range": "node scripts/test-booth-update-range.mjs",
+    "test:booth-entries": "node scripts/test-booth-entries.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

@@ -60,6 +60,18 @@ export function monthRange(month: string): { start: string; endExclusive: string
   return { start, endExclusive };
 }
 
+/** Clamp a calendar date to an inclusive [start, end] range. */
+export function clampDateToRange(date: string, start: string, end: string): string {
+  if (date < start) return start;
+  if (date > end) return end;
+  return date;
+}
+
+/** Default entry date for a booth: Bangkok today, clamped to the event range. */
+export function defaultBoothEntryDate(startDate: string, endDate: string): string {
+  return clampDateToRange(today(), startDate, endDate);
+}
+
 /** Add `days` to a "YYYY-MM-DD" string, returning "YYYY-MM-DD". */
 export function addDays(date: string, days: number): string {
   const [y, m, d] = date.split("-").map(Number);
