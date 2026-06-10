@@ -1,14 +1,20 @@
 import Link from "next/link";
-import { dailySummary, listIncomeByDate, listExpenseByDate } from "@/lib/queries";
+import {
+  allTimeSummary,
+  dailySummary,
+  listIncomeByDate,
+  listExpenseByDate,
+} from "@/lib/queries";
 import { today } from "@/lib/date";
-import { ProfitCard } from "@/components/ProfitCard";
+import { TodayBalanceCard } from "@/components/TodayBalanceCard";
 import { EntryList, type EntryRow } from "@/components/EntryList";
 import type { User } from "@/types";
 
-/** Regular-shop Today — must stay identical to pre–Mode Even behavior. */
+/** Regular-shop Today — cumulative hero + today's breakdown; booth mode unchanged. */
 export async function RegularToday({ user }: { user: User }) {
   const date = today();
-  const [summary, incomes, expenses] = await Promise.all([
+  const [allTime, summary, incomes, expenses] = await Promise.all([
+    allTimeSummary(user.id),
     dailySummary(user.id, date),
     listIncomeByDate(user.id, date),
     listExpenseByDate(user.id, date),
@@ -34,10 +40,11 @@ export async function RegularToday({ user }: { user: User }) {
 
   return (
     <>
-      <ProfitCard
-        profit={summary.profit}
-        income={summary.income}
-        expense={summary.expense}
+      <TodayBalanceCard
+        cumulativeProfit={allTime.profit}
+        todayProfit={summary.profit}
+        todayIncome={summary.income}
+        todayExpense={summary.expense}
         currency={user.currency}
       />
 

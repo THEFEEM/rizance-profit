@@ -67,6 +67,15 @@ export type DailySummary = {
   expenseCount: number;
 };
 
+/** All-time regular-shop totals — computed on read, never stored. */
+export type AllTimeSummary = {
+  income: string;
+  expense: string;
+  profit: string;
+  incomeCount: number;
+  expenseCount: number;
+};
+
 export type MonthlyDay = {
   date: string;
   income: string;

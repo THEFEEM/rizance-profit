@@ -1,6 +1,7 @@
 import { query } from "@/lib/db";
 import { computeProfit, sumDecimals } from "@/lib/money";
 import type {
+  AllTimeSummary,
   DailySummary,
   Expense,
   ExpenseCategory,
@@ -179,6 +180,30 @@ export async function deleteExpense(userId: string, id: string): Promise<boolean
 }
 
 // ---- summaries (computed, never stored) -----------------------------------
+
+export async function allTimeSummary(userId: string): Promise<AllTimeSummary> {
+  const { rows } = await query<{
+    income: string;
+    expense: string;
+    income_count: string;
+    expense_count: string;
+  }>(
+    `SELECT
+       COALESCE((SELECT SUM(amount) FROM income_entries  WHERE user_id = $1), 0)::text AS income,
+       COALESCE((SELECT SUM(amount) FROM expense_entries WHERE user_id = $1), 0)::text AS expense,
+       (SELECT COUNT(*) FROM income_entries  WHERE user_id = $1)::text AS income_count,
+       (SELECT COUNT(*) FROM expense_entries WHERE user_id = $1)::text AS expense_count`,
+    [userId],
+  );
+  const r = rows[0];
+  return {
+    income: r.income,
+    expense: r.expense,
+    profit: computeProfit(r.income, r.expense),
+    incomeCount: Number(r.income_count),
+    expenseCount: Number(r.expense_count),
+  };
+}
 
 export async function periodSummary(userId: string, period: PeriodKey): Promise<PeriodSummary> {
   const { start, end } = periodRange(period);
