@@ -88,3 +88,8 @@ export type BoothUpdateResult =
       reason: "booth_not_found" | "booth_closed" | "entries_outside_new_range";
       count?: number;
     };
+
+/** Close is permanent in v1 — no reopen. */
+export type BoothCloseResult =
+  | { ok: true; booth: Booth }
+  | { ok: false; reason: "booth_not_found" | "already_closed" };

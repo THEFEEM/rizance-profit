@@ -12,6 +12,7 @@ import type {
   BoothIncome,
   BoothMember,
   BoothStatus,
+  BoothCloseResult,
   BoothSummary,
   BoothUpdateResult,
   PaymentMethod,
@@ -203,15 +204,20 @@ export async function updateBooth(
   return { ok: true, booth: mapBooth(rows[0]) };
 }
 
-/** Close a booth (permanent in v1). Returns the closed booth or null. */
-export async function closeBooth(userId: string, id: string): Promise<Booth | null> {
+/** Close a booth (permanent in v1). No reopen — double-close returns already_closed. */
+export async function closeBooth(userId: string, id: string): Promise<BoothCloseResult> {
+  const existing = await getBooth(userId, id);
+  if (!existing) return { ok: false, reason: "booth_not_found" };
+  if (existing.status === "closed") return { ok: false, reason: "already_closed" };
+
   const { rows } = await query<BoothRow>(
     `UPDATE booths SET status = 'closed', closed_at = now(), updated_at = now()
      WHERE user_id = $1 AND id = $2 AND status = 'open'
      RETURNING ${BOOTH_COLS}`,
     [userId, id],
   );
-  return rows[0] ? mapBooth(rows[0]) : null;
+  if (!rows[0]) return { ok: false, reason: "already_closed" };
+  return { ok: true, booth: mapBooth(rows[0]) };
 }
 
 // ---- entry-date rule (app layer) -------------------------------------------

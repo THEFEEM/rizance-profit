@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
-import { getBooth } from "@/lib/booth-queries";
+import { boothSummary, getBooth } from "@/lib/booth-queries";
 import { BoothBack } from "@/components/booth/BoothBack";
+import { BoothCloseButton } from "@/components/booth/BoothCloseButton";
+import { BoothSummaryCard } from "@/components/booth/BoothSummaryCard";
 import { formatDayShort } from "@/lib/date";
 import { formatMoney } from "@/lib/money";
 
@@ -16,6 +18,7 @@ export default async function BoothHubPage({ params }: { params: Promise<{ id: s
   if (!booth) notFound();
 
   const closed = booth.status === "closed";
+  const summary = await boothSummary(user.id, id);
 
   return (
     <div className="px-4 pb-6">
@@ -26,7 +29,7 @@ export default async function BoothHubPage({ params }: { params: Promise<{ id: s
         {booth.endDate !== booth.startDate && ` – ${formatDayShort(booth.endDate)}`}
         {" · "}
         งบ {formatMoney(booth.startingBudget, user.currency)}
-        {closed && " · ปิดแล้ว"}
+        {closed ? " · ปิดแล้ว" : " · เปิดอยู่"}
       </p>
 
       {closed && (
@@ -35,24 +38,42 @@ export default async function BoothHubPage({ params }: { params: Promise<{ id: s
         </p>
       )}
 
-      <div className="mt-6 grid grid-cols-2 gap-3">
-        <HubAction
-          href={`/booth/${id}/income`}
-          label="+ รายรับ"
-          tone="income"
-          disabled={closed}
-        />
-        <HubAction
-          href={`/booth/${id}/expense`}
-          label="− รายจ่าย"
-          tone="expense"
-          disabled={closed}
-        />
-      </div>
+      {!closed && (
+        <div className="mt-6 grid grid-cols-2 gap-3">
+          <HubAction href={`/booth/${id}/income`} label="+ รายรับ" tone="income" />
+          <HubAction href={`/booth/${id}/expense`} label="− รายจ่าย" tone="expense" />
+        </div>
+      )}
 
-      <p className="mt-6 rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
-        สรุปกำไรบูธจะมาใน Step ถัดไป
-      </p>
+      {summary && (
+        <div className="mt-6">
+          {closed ? (
+            <BoothSummaryCard summary={summary} currency={user.currency} compact />
+          ) : (
+            <Link
+              href={`/booth/${id}/summary`}
+              className="tap-target block rounded-2xl border border-slate-200 bg-white px-4 py-4 text-center text-sm font-semibold text-slate-700 shadow-sm active:bg-slate-50"
+            >
+              ดูสรุปกำไรบูธ
+            </Link>
+          )}
+        </div>
+      )}
+
+      {closed && summary && (
+        <Link
+          href={`/booth/${id}/summary`}
+          className="tap-target mt-3 block text-center text-sm font-medium text-slate-500 underline"
+        >
+          เปิดหน้าสรุปเต็ม
+        </Link>
+      )}
+
+      {!closed && (
+        <div className="mt-8">
+          <BoothCloseButton boothId={id} />
+        </div>
+      )}
     </div>
   );
 }
@@ -61,28 +82,15 @@ function HubAction({
   href,
   label,
   tone,
-  disabled,
 }: {
   href: string;
   label: string;
   tone: "income" | "expense";
-  disabled: boolean;
 }) {
   const colors =
     tone === "income"
       ? "bg-emerald-600 text-white active:bg-emerald-700"
       : "bg-red-600 text-white active:bg-red-700";
-
-  if (disabled) {
-    return (
-      <span
-        aria-disabled
-        className={`tap-target flex h-14 items-center justify-center rounded-2xl text-base font-bold opacity-40 ${colors}`}
-      >
-        {label}
-      </span>
-    );
-  }
 
   return (
     <Link
