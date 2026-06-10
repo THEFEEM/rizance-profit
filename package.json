@@ -13,7 +13,8 @@
     "test:colors": "node scripts/profit-colors-check.mjs",
     "test:pricing-units": "node scripts/test-pricing-units.mjs",
     "test:pricing-edge": "node scripts/test-pricing-edge.mjs",
-    "test:period-ranges": "node scripts/test-period-ranges.mjs"
+    "test:period-ranges": "node scripts/test-period-ranges.mjs",
+    "test:booth-isolation": "node scripts/test-booth-isolation.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
