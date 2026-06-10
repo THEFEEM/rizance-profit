@@ -473,6 +473,39 @@ export async function deleteBoothMember(
   return (rowCount ?? 0) > 0;
 }
 
+// ---- booth net for a calendar period (combined Stats, regular mode only) ----
+// Counts entries whose entry_date falls within [periodStart, periodEnd] AND the
+// owning booth's [start_date, end_date]. Booths with no overlap contribute 0.
+
+export async function boothNetForPeriod(
+  userId: string,
+  periodStart: string,
+  periodEnd: string,
+): Promise<string> {
+  const { rows } = await query<{ income: string; expense: string }>(
+    `SELECT
+       COALESCE((
+         SELECT SUM(i.amount)
+         FROM booth_income_entries i
+         JOIN booths b ON b.id = i.booth_id
+         WHERE b.user_id = $1
+           AND i.entry_date >= $2::date AND i.entry_date <= $3::date
+           AND i.entry_date >= b.start_date AND i.entry_date <= b.end_date
+       ), 0)::text AS income,
+       COALESCE((
+         SELECT SUM(e.amount)
+         FROM booth_expense_entries e
+         JOIN booths b ON b.id = e.booth_id
+         WHERE b.user_id = $1
+           AND e.entry_date >= $2::date AND e.entry_date <= $3::date
+           AND e.entry_date >= b.start_date AND e.entry_date <= b.end_date
+       ), 0)::text AS expense`,
+    [userId, periodStart, periodEnd],
+  );
+  const r = rows[0];
+  return computeProfit(r.income, r.expense);
+}
+
 // ---- booth summary (fully derived, never stored) ----------------------------
 
 export async function boothSummary(userId: string, boothId: string): Promise<BoothSummary | null> {

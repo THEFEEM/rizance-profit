@@ -14,9 +14,12 @@ import {
   currentMonth,
   type PeriodKey,
 } from "@/lib/date";
+import { boothNetForPeriod } from "@/lib/booth-queries";
+import { sumDecimals } from "@/lib/money";
 import { PeriodSelector } from "@/components/PeriodSelector";
 import { DateNav } from "@/components/DateNav";
 import { SummaryRows } from "@/components/SummaryRows";
+import { CombinedProfitCard } from "@/components/CombinedProfitCard";
 import { EntryList, type EntryRow } from "@/components/EntryList";
 import type { User } from "@/types";
 
@@ -42,12 +45,14 @@ export async function RegularStatsSummary({
   period: PeriodKey;
   closeDate: string;
 }) {
-  const [periodData, closeOut, incomes, expenses] = await Promise.all([
-    periodSummary(user.id, period),
+  const periodData = await periodSummary(user.id, period);
+  const [closeOut, incomes, expenses, boothProfit] = await Promise.all([
     dailySummary(user.id, closeDate),
     listIncomeByDate(user.id, closeDate),
     listExpenseByDate(user.id, closeDate),
+    boothNetForPeriod(user.id, periodData.start, periodData.end),
   ]);
+  const combinedProfit = sumDecimals(periodData.profit, boothProfit);
 
   const entries: EntryRow[] = [
     ...incomes.map((i) => ({
@@ -120,6 +125,13 @@ export async function RegularStatsSummary({
             : "ยังไม่มีรายการในวันนี้"}
         </p>
       </div>
+
+      <CombinedProfitCard
+        regularProfit={periodData.profit}
+        boothProfit={boothProfit}
+        combinedProfit={combinedProfit}
+        currency={user.currency}
+      />
 
       <div className="mt-6">
         <h2 className="px-4 pb-1 text-sm font-semibold text-slate-500">รายการ</h2>
