@@ -1,8 +1,6 @@
-// Booth entry guard + summary test.
-// Verifies date_out_of_range → 422, booth_closed → 409 (HTTP when dev server up),
-// and cash/transfer + fixed/variable sums in boothSummary SQL.
-// Usage: npm run test:booth-entries
-// Optional: npm run dev in another terminal for full HTTP assertions.
+// Booth entry end-to-end test via HTTP API (requires dev server).
+// Exercises guardBoothEntry mapping, boothSummary buckets, and profit derivation.
+// Usage: npm run dev (terminal 1), then npm run test:booth-entries (terminal 2)
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -29,31 +27,22 @@ for (const file of [".env.local", ".env"]) {
   }
 }
 
-/** Mirrors lib/booth-errors.ts boothEntryHttpStatus */
-function boothEntryHttpStatus(reason) {
-  if (reason === "booth_not_found") return 404;
-  if (reason === "booth_closed") return 409;
-  if (reason === "date_out_of_range") return 422;
-  return 500;
+function toCents(v) {
+  return Math.round(Number(v) * 100);
 }
 
-/** Mirrors guardBoothEntry in lib/booth-queries.ts */
-async function guardBoothEntry(client, userId, boothId, entryDate) {
-  const { rows } = await client.query(
-    `SELECT id, start_date::text AS start_date, end_date::text AS end_date, status
-     FROM booths WHERE user_id = $1 AND id = $2`,
-    [userId, boothId],
-  );
-  if (!rows[0]) return { ok: false, reason: "booth_not_found" };
-  const booth = rows[0];
-  if (booth.status !== "open") return { ok: false, reason: "booth_closed" };
-  if (entryDate < booth.start_date || entryDate > booth.end_date) {
-    return { ok: false, reason: "date_out_of_range" };
-  }
-  return { ok: true, booth };
+function sumDecimals(...values) {
+  const total = values.reduce((acc, v) => acc + toCents(v), 0);
+  return (total / 100).toFixed(2);
 }
 
-async function boothSummarySql(client, boothId) {
+/** Mirrors lib/money.ts computeProfit */
+function computeProfit(income, expense) {
+  return ((toCents(income) - toCents(expense)) / 100).toFixed(2);
+}
+
+/** Mirrors lib/booth-queries.ts boothSummary SQL + profit */
+async function boothSummary(client, boothId) {
   const { rows } = await client.query(
     `SELECT
        COALESCE((SELECT SUM(amount) FROM booth_income_entries
@@ -63,7 +52,30 @@ async function boothSummarySql(client, boothId) {
        COALESCE((SELECT SUM(amount) FROM booth_expense_entries
                  WHERE booth_id = $1 AND cost_type = 'fixed'), 0)::text AS fixed_expense,
        COALESCE((SELECT SUM(amount) FROM booth_expense_entries
-                 WHERE booth_id = $1 AND cost_type = 'variable'), 0)::text AS variable_expense`,
+                 WHERE booth_id = $1 AND cost_type = 'variable'), 0)::text AS variable_expense,
+       (SELECT starting_budget::text FROM booths WHERE id = $1) AS starting_budget`,
+    [boothId],
+  );
+  const r = rows[0];
+  const totalIncome = sumDecimals(r.cash_income, r.transfer_income);
+  const totalExpense = sumDecimals(r.fixed_expense, r.variable_expense);
+  return {
+    cashIncome: r.cash_income,
+    transferIncome: r.transfer_income,
+    totalIncome,
+    fixedExpense: r.fixed_expense,
+    variableExpense: r.variable_expense,
+    totalExpense,
+    profit: computeProfit(totalIncome, totalExpense),
+    startingBudget: r.starting_budget,
+  };
+}
+
+async function countEntries(client, boothId) {
+  const { rows } = await client.query(
+    `SELECT
+       (SELECT COUNT(*)::int FROM booth_income_entries WHERE booth_id = $1) AS income,
+       (SELECT COUNT(*)::int FROM booth_expense_entries WHERE booth_id = $1) AS expense`,
     [boothId],
   );
   return rows[0];
@@ -92,7 +104,7 @@ async function detectBase() {
         headers: { Cookie: cookie },
         signal: AbortSignal.timeout(3000),
       });
-      if (res.status === 200 || res.status === 401) return base;
+      if (res.status === 200) return base;
     } catch {
       // try next
     }
@@ -116,129 +128,224 @@ async function apiPost(base, path, body) {
 }
 
 let failed = 0;
-function assert(label, ok, detail = "") {
+
+function assertEq(label, actual, expected) {
+  const ok = actual === expected;
+  console.log(`  ${ok ? "✓" : "✗"} ${label}`);
+  console.log(`      expected: ${expected}`);
+  console.log(`      actual:   ${actual}`);
+  if (!ok) failed++;
+  return ok;
+}
+
+function assertOk(label, ok, detail = "") {
   console.log(`  ${ok ? "✓" : "✗"} ${label}${detail ? ` — ${detail}` : ""}`);
   if (!ok) failed++;
 }
 
 const client = new pg.Client(pgClientOptions(process.env.DATABASE_URL));
-let userId = null;
+const userIds = [];
 
 try {
   await client.connect();
-  console.log("=== BOOTH ENTRY GUARD + SUMMARY TEST ===\n");
+  console.log("=== BOOTH ENTRY E2E TEST (API + boothSummary) ===\n");
 
-  const email = `booth-entry-${Date.now()}@rizance.test`;
+  const email = `booth-e2e-${Date.now()}@rizance.test`;
   const { rows: users } = await client.query(
     `INSERT INTO users (email, password_hash, shop_name)
-     VALUES ($1, 'booth-entry-test', 'Entry Test') RETURNING id`,
+     VALUES ($1, 'booth-e2e-test', 'E2E Booth Test') RETURNING id`,
     [email],
   );
-  userId = users[0].id;
+  const userId = users[0].id;
+  userIds.push(userId);
   await makeSessionCookie(userId);
 
-  const inRange = "2026-06-10";
-  const { rows: openBooths } = await client.query(
-    `INSERT INTO booths (user_id, name, starting_budget, start_date, end_date)
-     VALUES ($1, 'งานเปิด', 1000.00, '2026-06-09'::date, '2026-06-11'::date)
-     RETURNING id`,
-    [userId],
-  );
-  const openBoothId = openBooths[0].id;
-
-  const { rows: closedBooths } = await client.query(
-    `INSERT INTO booths (user_id, name, starting_budget, start_date, end_date, status, closed_at)
-     VALUES ($1, 'งานปิด', 500.00, '2026-06-09'::date, '2026-06-11'::date, 'closed', now())
-     RETURNING id`,
-    [userId],
-  );
-  const closedBoothId = closedBooths[0].id;
-
-  // 1) Guard: date outside range
-  console.log("1) date_out_of_range guard");
-  const outBefore = await guardBoothEntry(client, userId, openBoothId, "2026-06-08");
-  assert("before start_date rejected", !outBefore.ok && outBefore.reason === "date_out_of_range");
-  assert("maps to HTTP 422", boothEntryHttpStatus(outBefore.reason) === 422);
-
-  const outAfter = await guardBoothEntry(client, userId, openBoothId, "2026-06-12");
-  assert("after end_date rejected", !outAfter.ok && outAfter.reason === "date_out_of_range");
-  assert("maps to HTTP 422", boothEntryHttpStatus(outAfter.reason) === 422);
-  console.log("");
-
-  // 2) Guard: closed booth
-  console.log("2) booth_closed guard");
-  const closedGuard = await guardBoothEntry(client, userId, closedBoothId, inRange);
-  assert("closed booth rejected", !closedGuard.ok && closedGuard.reason === "booth_closed");
-  assert("maps to HTTP 409", boothEntryHttpStatus(closedGuard.reason) === 409);
-  console.log("");
-
-  // 3) Valid entries → boothSummary buckets
-  console.log("3) boothSummary cash/transfer + fixed/variable");
-  await client.query(
-    `INSERT INTO booth_income_entries (booth_id, user_id, amount, payment_method, entry_date)
-     VALUES ($1, $2, 150.50, 'cash', $3::date),
-            ($1, $2, 49.50, 'transfer', $3::date)`,
-    [openBoothId, userId, inRange],
-  );
-  await client.query(
-    `INSERT INTO booth_expense_entries (booth_id, user_id, amount, cost_type, label, entry_date)
-     VALUES ($1, $2, 300.00, 'fixed', 'ค่าที่', $3::date),
-            ($1, $2, 25.25, 'variable', 'นม', $3::date)`,
-    [openBoothId, userId, inRange],
-  );
-  const sum = await boothSummarySql(client, openBoothId);
-  assert("cash income = 150.50", sum.cash_income === "150.50", `got ${sum.cash_income}`);
-  assert("transfer income = 49.50", sum.transfer_income === "49.50", `got ${sum.transfer_income}`);
-  assert("fixed expense = 300.00", sum.fixed_expense === "300.00", `got ${sum.fixed_expense}`);
-  assert("variable expense = 25.25", sum.variable_expense === "25.25", `got ${sum.variable_expense}`);
-  assert(
-    "total income 200.00",
-    Number(sum.cash_income) + Number(sum.transfer_income) === 200,
-  );
-  assert(
-    "total expense 325.25",
-    Number(sum.fixed_expense) + Number(sum.variable_expense) === 325.25,
-  );
-  console.log("");
-
-  // 4) HTTP API (when dev server available)
-  console.log("4) HTTP POST guard mapping");
   const base = await detectBase();
   if (!base) {
-    console.log("  (skip — no dev server; guard + SQL assertions above are sufficient)");
-  } else {
-    console.log(`  using ${base}`);
-    const badDate = await apiPost(base, `/api/booths/${openBoothId}/income`, {
-      amount: 10,
-      paymentMethod: "cash",
-      entryDate: "2026-06-01",
-    });
-    assert("POST out-of-range date → 422", badDate.status === 422, `got ${badDate.status}`);
-    assert(
-      "Thai message present",
-      badDate.json?.error?.reason === "date_out_of_range" &&
-        typeof badDate.json?.error?.message === "string" &&
-        badDate.json.error.message.includes("ช่วงงานบูธ"),
-    );
-
-    const closedPost = await apiPost(base, `/api/booths/${closedBoothId}/income`, {
-      amount: 10,
-      paymentMethod: "cash",
-      entryDate: inRange,
-    });
-    assert("POST closed booth → 409", closedPost.status === 409, `got ${closedPost.status}`);
-    assert(
-      "closed reason in body",
-      closedPost.json?.error?.reason === "booth_closed",
-    );
-
-    const okPost = await apiPost(base, `/api/booths/${openBoothId}/income`, {
-      amount: 88,
-      paymentMethod: "transfer",
-      entryDate: inRange,
-    });
-    assert("POST valid entry → 201", okPost.status === 201, `got ${okPost.status}`);
+    throw new Error("Dev server not detected — run: npm run dev");
   }
+  console.log(`API base: ${base}\n`);
+
+  const startDate = "2026-06-09";
+  const endDate = "2026-06-11";
+  const midDate = "2026-06-10";
+
+  const { rows: booths } = await client.query(
+    `INSERT INTO booths (user_id, name, starting_budget, start_date, end_date)
+     VALUES ($1, 'งาน E2E', 1000.00, $2::date, $3::date)
+     RETURNING id`,
+    [userId, startDate, endDate],
+  );
+  const boothId = booths[0].id;
+
+  // (a) Income split
+  console.log("(a) Income split: cash ฿100 + transfer ฿50");
+  let res = await apiPost(base, `/api/booths/${boothId}/income`, {
+    amount: 100,
+    paymentMethod: "cash",
+    entryDate: midDate,
+  });
+  assertOk("POST cash ฿100 → 201", res.status === 201, `got ${res.status}`);
+  res = await apiPost(base, `/api/booths/${boothId}/income`, {
+    amount: 50,
+    paymentMethod: "transfer",
+    entryDate: midDate,
+  });
+  assertOk("POST transfer ฿50 → 201", res.status === 201, `got ${res.status}`);
+
+  let summary = await boothSummary(client, boothId);
+  assertEq("(a) cashIncome", summary.cashIncome, "100.00");
+  assertEq("(a) transferIncome", summary.transferIncome, "50.00");
+  assertEq("(a) totalIncome", summary.totalIncome, "150.00");
+  console.log("");
+
+  // (b) Expense split
+  console.log("(b) Expense split: fixed ฿80 + variable ฿20");
+  res = await apiPost(base, `/api/booths/${boothId}/expense`, {
+    amount: 80,
+    costType: "fixed",
+    label: "ค่าที่",
+    entryDate: midDate,
+  });
+  assertOk("POST fixed ฿80 → 201", res.status === 201, `got ${res.status}`);
+  res = await apiPost(base, `/api/booths/${boothId}/expense`, {
+    amount: 20,
+    costType: "variable",
+    label: "นม",
+    entryDate: midDate,
+  });
+  assertOk("POST variable ฿20 → 201", res.status === 201, `got ${res.status}`);
+
+  summary = await boothSummary(client, boothId);
+  assertEq("(b) fixedExpense", summary.fixedExpense, "80.00");
+  assertEq("(b) variableExpense", summary.variableExpense, "20.00");
+  assertEq("(b) totalExpense", summary.totalExpense, "100.00");
+  console.log("");
+
+  // (c) Profit = income − expense (budget NOT subtracted)
+  console.log("(c) Profit = totalIncome − totalExpense (budget excluded)");
+  summary = await boothSummary(client, boothId);
+  assertEq("(c) profit", summary.profit, "50.00");
+  assertEq("(c) startingBudget unchanged (not in profit)", summary.startingBudget, "1000.00");
+  assertOk(
+    "(c) profit is NOT startingBudget − expense",
+    summary.profit !== computeProfit(summary.startingBudget, summary.totalExpense),
+    `profit=${summary.profit}`,
+  );
+  console.log("");
+
+  // (d) date_out_of_range — no rows inserted
+  console.log("(d) GUARD date_out_of_range → 422, no insert");
+  const before = await countEntries(client, boothId);
+  res = await apiPost(base, `/api/booths/${boothId}/income`, {
+    amount: 99,
+    paymentMethod: "cash",
+    entryDate: "2026-06-08",
+  });
+  assertEq("(d) before start_date HTTP status", String(res.status), "422");
+  assertEq("(d) before start_date reason", res.json?.error?.reason ?? "missing", "date_out_of_range");
+  const afterBefore = await countEntries(client, boothId);
+  assertEq("(d) income row count unchanged (before)", String(afterBefore.income), String(before.income));
+
+  res = await apiPost(base, `/api/booths/${boothId}/income`, {
+    amount: 99,
+    paymentMethod: "transfer",
+    entryDate: "2026-06-12",
+  });
+  assertEq("(d) after end_date HTTP status", String(res.status), "422");
+  assertEq("(d) after end_date reason", res.json?.error?.reason ?? "missing", "date_out_of_range");
+  const afterAfter = await countEntries(client, boothId);
+  assertEq("(d) income row count unchanged (after)", String(afterAfter.income), String(before.income));
+  console.log("");
+
+  // (e) booth_closed — income + expense both 409
+  console.log("(e) GUARD booth_closed → 409 after close");
+  await client.query(
+    `UPDATE booths SET status = 'closed', closed_at = now() WHERE id = $1`,
+    [boothId],
+  );
+  res = await apiPost(base, `/api/booths/${boothId}/income`, {
+    amount: 10,
+    paymentMethod: "cash",
+    entryDate: midDate,
+  });
+  assertEq("(e) closed booth income HTTP status", String(res.status), "409");
+  assertEq("(e) closed booth income reason", res.json?.error?.reason ?? "missing", "booth_closed");
+
+  res = await apiPost(base, `/api/booths/${boothId}/expense`, {
+    amount: 10,
+    costType: "fixed",
+    entryDate: midDate,
+  });
+  assertEq("(e) closed booth expense HTTP status", String(res.status), "409");
+  assertEq("(e) closed booth expense reason", res.json?.error?.reason ?? "missing", "booth_closed");
+  console.log("");
+
+  // (f) booth_not_found — other user's booth → 404
+  console.log("(f) GUARD booth_not_found → 404 (user_id scoping)");
+  const { rows: otherUsers } = await client.query(
+    `INSERT INTO users (email, password_hash, shop_name)
+     VALUES ($1, 'other-user', 'Other Shop') RETURNING id`,
+    [`booth-other-${Date.now()}@rizance.test`],
+  );
+  const otherUserId = otherUsers[0].id;
+  userIds.push(otherUserId);
+
+  const { rows: otherBooths } = await client.query(
+    `INSERT INTO booths (user_id, name, starting_budget, start_date, end_date)
+     VALUES ($1, 'งานคนอื่น', 200.00, $2::date, $3::date) RETURNING id`,
+    [otherUserId, startDate, endDate],
+  );
+  const otherBoothId = otherBooths[0].id;
+
+  res = await apiPost(base, `/api/booths/${otherBoothId}/income`, {
+    amount: 10,
+    paymentMethod: "cash",
+    entryDate: midDate,
+  });
+  assertEq("(f) other-user booth income HTTP status", String(res.status), "404");
+  assertEq("(f) other-user booth income reason", res.json?.error?.reason ?? "missing", "booth_not_found");
+
+  const fakeId = "00000000-0000-4000-8000-000000000099";
+  res = await apiPost(base, `/api/booths/${fakeId}/income`, {
+    amount: 10,
+    paymentMethod: "cash",
+    entryDate: midDate,
+  });
+  assertEq("(f) random booth id HTTP status", String(res.status), "404");
+  assertEq("(f) random booth id reason", res.json?.error?.reason ?? "missing", "booth_not_found");
+  console.log("");
+
+  // (g) Boundary inclusive: start_date and end_date both succeed
+  console.log("(g) Boundary inclusive: entries on start_date and end_date");
+  const { rows: boundaryBooths } = await client.query(
+    `INSERT INTO booths (user_id, name, starting_budget, start_date, end_date)
+     VALUES ($1, 'งานขอบเขต', 500.00, $2::date, $3::date) RETURNING id`,
+    [userId, startDate, endDate],
+  );
+  const boundaryBoothId = boundaryBooths[0].id;
+
+  res = await apiPost(base, `/api/booths/${boundaryBoothId}/income`, {
+    amount: 1,
+    paymentMethod: "cash",
+    entryDate: startDate,
+  });
+  assertEq("(g) income on start_date HTTP status", String(res.status), "201");
+
+  res = await apiPost(base, `/api/booths/${boundaryBoothId}/income`, {
+    amount: 2,
+    paymentMethod: "transfer",
+    entryDate: endDate,
+  });
+  assertEq("(g) income on end_date HTTP status", String(res.status), "201");
+
+  const { rows: boundaryRows } = await client.query(
+    `SELECT entry_date::text AS entry_date FROM booth_income_entries
+     WHERE booth_id = $1 ORDER BY entry_date`,
+    [boundaryBoothId],
+  );
+  assertEq("(g) rows on start_date", boundaryRows[0]?.entry_date ?? "missing", startDate);
+  assertEq("(g) rows on end_date", boundaryRows[1]?.entry_date ?? "missing", endDate);
   console.log("");
 
   if (failed === 0) {
@@ -251,9 +358,11 @@ try {
   console.error("Test failed:", err.message);
   process.exitCode = 1;
 } finally {
-  if (userId) {
-    await client.query(`DELETE FROM users WHERE id = $1`, [userId]);
-    console.log("(test user and data cleaned up — CASCADE)");
+  for (const id of userIds) {
+    await client.query(`DELETE FROM users WHERE id = $1`, [id]);
+  }
+  if (userIds.length) {
+    console.log(`(cleaned up ${userIds.length} test user(s) — CASCADE)`);
   }
   await client.end();
 }
