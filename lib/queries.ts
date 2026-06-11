@@ -1,7 +1,9 @@
 import { query } from "@/lib/db";
-import { computeProfit, sumDecimals } from "@/lib/money";
+import { computeProfit, sumDecimals, toCents } from "@/lib/money";
 import type {
   AllTimeSummary,
+  CategoryBreakdown,
+  CategoryBreakdownItem,
   DailySummary,
   Expense,
   ExpenseCategory,
@@ -141,6 +143,21 @@ export async function listIncomeByDate(userId: string, date: string): Promise<In
   return rows.map(mapIncome);
 }
 
+export async function listIncomeInPeriod(
+  userId: string,
+  start: string,
+  end: string,
+): Promise<Income[]> {
+  const { rows } = await query<IncomeRow>(
+    `SELECT id, amount, category, note, entry_date::text AS entry_date, created_at
+     FROM income_entries
+     WHERE user_id = $1 AND entry_date >= $2 AND entry_date <= $3
+     ORDER BY entry_date DESC, created_at DESC`,
+    [userId, start, end],
+  );
+  return rows.map(mapIncome);
+}
+
 /** Delete an income row scoped to the owner. Returns true if a row was removed. */
 export async function deleteIncome(userId: string, id: string): Promise<boolean> {
   const { rowCount } = await query(
@@ -170,6 +187,21 @@ export async function listExpenseByDate(userId: string, date: string): Promise<E
      WHERE user_id = $1 AND entry_date = $2
      ORDER BY created_at DESC`,
     [userId, date],
+  );
+  return rows.map(mapExpense);
+}
+
+export async function listExpenseInPeriod(
+  userId: string,
+  start: string,
+  end: string,
+): Promise<Expense[]> {
+  const { rows } = await query<ExpenseRow>(
+    `SELECT id, amount, category, note, entry_date::text AS entry_date, created_at
+     FROM expense_entries
+     WHERE user_id = $1 AND entry_date >= $2 AND entry_date <= $3
+     ORDER BY entry_date DESC, created_at DESC`,
+    [userId, start, end],
   );
   return rows.map(mapExpense);
 }
@@ -237,6 +269,54 @@ export async function periodSummary(userId: string, period: PeriodKey): Promise<
     profit: computeProfit(r.income, r.expense),
     incomeCount: Number(r.income_count),
     expenseCount: Number(r.expense_count),
+  };
+}
+
+function mapBreakdownRows(
+  rows: { category: string; amount: string; count: string }[],
+): CategoryBreakdownItem[] {
+  return rows
+    .map((r) => ({
+      category: r.category,
+      amount: r.amount,
+      count: Number(r.count),
+    }))
+    .filter((r) => r.count > 0 && toCents(r.amount) !== 0)
+    .sort((a, b) => toCents(b.amount) - toCents(a.amount));
+}
+
+/** Per-category income/expense totals for a date range — regular tables only. */
+export async function categoryBreakdown(
+  userId: string,
+  start: string,
+  end: string,
+): Promise<CategoryBreakdown> {
+  const [incomeRes, expenseRes] = await Promise.all([
+    query<{ category: string; amount: string; count: string }>(
+      `SELECT category,
+              COALESCE(SUM(amount), 0)::text AS amount,
+              COUNT(*)::text AS count
+       FROM income_entries
+       WHERE user_id = $1 AND entry_date >= $2 AND entry_date <= $3
+       GROUP BY category`,
+      [userId, start, end],
+    ),
+    query<{ category: string; amount: string; count: string }>(
+      `SELECT category,
+              COALESCE(SUM(amount), 0)::text AS amount,
+              COUNT(*)::text AS count
+       FROM expense_entries
+       WHERE user_id = $1 AND entry_date >= $2 AND entry_date <= $3
+       GROUP BY category`,
+      [userId, start, end],
+    ),
+  ]);
+
+  return {
+    start,
+    end,
+    income: mapBreakdownRows(incomeRes.rows),
+    expense: mapBreakdownRows(expenseRes.rows),
   };
 }
 
