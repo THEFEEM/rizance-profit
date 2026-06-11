@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { PRICING_LABELS } from "@/types/pricing";
+import { BreakEvenOverview } from "@/components/pricing/BreakEvenDisplay";
+import { PRICING_LABELS, type PricingSummary } from "@/types/pricing";
 
 const SECTIONS = [
   { href: "/pricing/ingredients", title: PRICING_LABELS.ingredients, icon: "🥛" },
@@ -8,7 +9,7 @@ const SECTIONS = [
   { href: "/pricing/calculate", title: PRICING_LABELS.calculate, icon: "💰" },
 ] as const;
 
-export function PricingHub() {
+export function PricingHub({ summary }: { summary: PricingSummary }) {
   return (
     <div className="px-4 py-6">
       <h1 className="text-xl font-bold text-slate-900">{PRICING_LABELS.module}</h1>
@@ -26,6 +27,13 @@ export function PricingHub() {
           </Link>
         ))}
       </div>
+
+      <BreakEvenOverview
+        monthlyOverheadTotal={summary.monthlyOverheadTotal}
+        needsSetup={summary.breakEvenNeedsSetup}
+        estimatedCupsPerMonth={summary.settings.estimatedCupsPerMonth}
+        rows={summary.rows.map((r) => r.breakEven)}
+      />
     </div>
   );
 }
