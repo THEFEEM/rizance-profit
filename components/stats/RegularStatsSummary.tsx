@@ -1,8 +1,11 @@
 import Link from "next/link";
 import {
+  categoryBreakdown,
   dailySummary,
   listIncomeByDate,
   listExpenseByDate,
+  listIncomeInPeriod,
+  listExpenseInPeriod,
   periodSummary,
 } from "@/lib/queries";
 import {
@@ -20,8 +23,18 @@ import { PeriodSelector } from "@/components/PeriodSelector";
 import { DateNav } from "@/components/DateNav";
 import { SummaryRows } from "@/components/SummaryRows";
 import { CombinedProfitCard } from "@/components/CombinedProfitCard";
+import {
+  CategoryBreakdownPanel,
+  type CategoryBreakdownEntry,
+  type CategoryBreakdownRow,
+} from "@/components/stats/CategoryBreakdownPanel";
 import { EntryList, type EntryRow } from "@/components/EntryList";
-import type { User } from "@/types";
+import {
+  EXPENSE_CATEGORY_OPTIONS,
+  INCOME_CATEGORY_OPTIONS,
+  type CategoryBreakdownItem,
+  type User,
+} from "@/types";
 
 const PERIOD_SUMMARY_LABELS = {
   income: "สรุปรายรับ",
@@ -46,12 +59,16 @@ export async function RegularStatsSummary({
   closeDate: string;
 }) {
   const periodData = await periodSummary(user.id, period);
-  const [closeOut, incomes, expenses, boothProfit] = await Promise.all([
-    dailySummary(user.id, closeDate),
-    listIncomeByDate(user.id, closeDate),
-    listExpenseByDate(user.id, closeDate),
-    boothNetForPeriod(user.id, periodData.start, periodData.end),
-  ]);
+  const [closeOut, incomes, expenses, boothProfit, breakdown, periodIncomes, periodExpenses] =
+    await Promise.all([
+      dailySummary(user.id, closeDate),
+      listIncomeByDate(user.id, closeDate),
+      listExpenseByDate(user.id, closeDate),
+      boothNetForPeriod(user.id, periodData.start, periodData.end),
+      categoryBreakdown(user.id, periodData.start, periodData.end),
+      listIncomeInPeriod(user.id, periodData.start, periodData.end),
+      listExpenseInPeriod(user.id, periodData.start, periodData.end),
+    ]);
   const combinedProfit = sumDecimals(periodData.profit, boothProfit);
 
   const entries: EntryRow[] = [
@@ -74,6 +91,11 @@ export async function RegularStatsSummary({
   ].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 
   const entryTotal = periodData.incomeCount + periodData.expenseCount;
+
+  const incomeRows = toBreakdownRows(breakdown.income, INCOME_CATEGORY_OPTIONS);
+  const expenseRows = toBreakdownRows(breakdown.expense, EXPENSE_CATEGORY_OPTIONS);
+  const incomeEntries = groupEntriesByCategory(periodIncomes);
+  const expenseEntries = groupEntriesByCategory(periodExpenses);
 
   return (
     <>
@@ -104,6 +126,14 @@ export async function RegularStatsSummary({
           </p>
         )}
       </div>
+
+      <CategoryBreakdownPanel
+        incomeRows={incomeRows}
+        expenseRows={expenseRows}
+        incomeEntries={incomeEntries}
+        expenseEntries={expenseEntries}
+        currency={user.currency}
+      />
 
       <div className="mt-8">
         <h2 className="px-4 text-base font-bold text-slate-900">ปิดร้าน</h2>
@@ -147,6 +177,35 @@ export async function RegularStatsSummary({
       </div>
     </>
   );
+}
+
+function toBreakdownRows(
+  items: CategoryBreakdownItem[],
+  options: readonly { value: string; label: string; icon: string }[],
+): CategoryBreakdownRow[] {
+  const byValue = Object.fromEntries(options.map((o) => [o.value, o]));
+  return items.map((item) => ({
+    category: item.category,
+    label: byValue[item.category]?.label ?? item.category,
+    icon: byValue[item.category]?.icon ?? "•",
+    amount: item.amount,
+    count: item.count,
+  }));
+}
+
+function groupEntriesByCategory(
+  entries: { id: string; category: string; entryDate: string; amount: string; note: string | null }[],
+): Record<string, CategoryBreakdownEntry[]> {
+  const map: Record<string, CategoryBreakdownEntry[]> = {};
+  for (const e of entries) {
+    (map[e.category] ??= []).push({
+      id: e.id,
+      entryDate: e.entryDate,
+      amount: e.amount,
+      note: e.note,
+    });
+  }
+  return map;
 }
 
 export function parseRegularStatsParams(params: { period?: string; date?: string }) {
