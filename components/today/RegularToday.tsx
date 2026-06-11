@@ -7,7 +7,9 @@ import {
 import { today } from "@/lib/date";
 import { TodayBalanceCard } from "@/components/TodayBalanceCard";
 import { TodayStatCards } from "@/components/TodayStatCards";
+import { TodayCategoryMiniList } from "@/components/today/TodayCategoryMiniList";
 import { EntryList, type EntryRow } from "@/components/EntryList";
+import { buildTodayCategoryGroups } from "@/lib/today-category-groups";
 import type { User } from "@/types";
 
 /** Regular-shop Today — cumulative hero + today's breakdown; booth mode unchanged. */
@@ -39,6 +41,8 @@ export async function RegularToday({ user }: { user: User }) {
     })),
   ].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 
+  const categoryGroups = buildTodayCategoryGroups(entries);
+
   return (
     <>
       <TodayBalanceCard
@@ -52,6 +56,8 @@ export async function RegularToday({ user }: { user: User }) {
         expense={summary.expense}
         currency={user.currency}
       />
+
+      <TodayCategoryMiniList groups={categoryGroups} currency={user.currency} />
 
       <div className="mt-6">
         <h2 className="px-4 pb-1 text-sm font-semibold text-slate-500">Recent today</h2>

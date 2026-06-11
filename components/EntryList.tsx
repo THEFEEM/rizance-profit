@@ -20,6 +20,12 @@ export type EntryRow = {
   createdAt: string;
 };
 
+function entryCategoryKey(e: EntryRow): string {
+  const category =
+    e.category ?? (e.kind === "income" ? "storefront" : "other");
+  return `${e.kind}:${category}`;
+}
+
 function entryTitle(e: EntryRow): string {
   if (e.kind === "income") {
     const label = INCOME_CATEGORY_LABELS[(e.category as IncomeCategory) ?? "storefront"];
@@ -81,7 +87,11 @@ export function EntryList({
           const title = entryTitle(e);
           const displayAmount = `${isIncome ? "+ " : "− "}${formatMoney(e.amount, currency)}`;
           return (
-            <li key={e.id} className="flex items-center gap-3 px-4 py-3">
+            <li
+              key={e.id}
+              data-cat-group={entryCategoryKey(e)}
+              className="flex items-center gap-3 px-4 py-3"
+            >
               <span className="text-xl" aria-hidden>
                 {isIncome ? "💰" : "🧾"}
               </span>
