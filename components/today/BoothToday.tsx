@@ -1,10 +1,12 @@
 import Link from "next/link";
 import {
   boothDaySummary,
+  boothSummary,
   listBoothExpenseByDate,
   listBoothIncomeByDate,
 } from "@/lib/booth-queries";
 import { ProfitCard } from "@/components/ProfitCard";
+import { BoothBudgetBar } from "@/components/today/BoothBudgetBar";
 import { BoothDayEntryList } from "@/components/BoothDayEntryList";
 import type { Booth } from "@/types/booth";
 import type { User } from "@/types";
@@ -18,16 +20,23 @@ export async function BoothToday({
   booth: Booth;
   date: string;
 }) {
-  const [summary, incomes, expenses] = await Promise.all([
+  const [summary, incomes, expenses, eventSummary] = await Promise.all([
     boothDaySummary(user.id, booth.id, date),
     listBoothIncomeByDate(user.id, booth.id, date),
     listBoothExpenseByDate(user.id, booth.id, date),
+    boothSummary(user.id, booth.id),
   ]);
 
   const day = summary ?? { income: "0.00", expense: "0.00", profit: "0.00" };
 
   return (
     <>
+      <BoothBudgetBar
+        startingBudget={booth.startingBudget}
+        totalExpense={eventSummary?.totalExpense ?? "0.00"}
+        currency={user.currency}
+      />
+
       <ProfitCard
         profit={day.profit}
         income={day.income}
