@@ -98,3 +98,69 @@ export function formatSellingPriceDisplay(exact) {
   const wholeBaht = Math.round(cents / 100);
   return `฿${new Intl.NumberFormat("en-US").format(wholeBaht)}`;
 }
+
+/** Keep in sync with lib/break-even.ts */
+export function computeProfit(income, expense) {
+  return centsToDecimalString(toCents(income) - toCents(expense));
+}
+
+export function computeContributionPerCup(sellingPriceExact, ingredientCostPerCup) {
+  return computeProfit(sellingPriceExact, ingredientCostPerCup);
+}
+
+export function breakEvenNeedsSetup(fixedCostsMonthly) {
+  return toCents(fixedCostsMonthly) <= 0;
+}
+
+export function computeBreakEvenCups(fixedCostsMonthly, contributionPerCup) {
+  const contribCents = toCents(contributionPerCup);
+  if (contribCents <= 0) return null;
+  return Math.ceil(toCents(fixedCostsMonthly) / contribCents);
+}
+
+export function computeBreakEvenItem(
+  fixedCostsMonthly,
+  ingredientCostPerCup,
+  sellingPriceExact,
+  estimatedCupsPerMonth,
+  needsSetup,
+) {
+  const contributionPerCup = computeContributionPerCup(sellingPriceExact, ingredientCostPerCup);
+  const contribCents = toCents(contributionPerCup);
+
+  if (contribCents <= 0) {
+    return {
+      contributionPerCup,
+      breakEvenCups: null,
+      noBreakEven: true,
+      warning: "ราคานี้ไม่ถึงจุดคุ้มทุน — กำไรต่อแก้วติดลบ/ศูนย์",
+      comparison: null,
+    };
+  }
+
+  if (needsSetup) {
+    return {
+      contributionPerCup,
+      breakEvenCups: null,
+      noBreakEven: false,
+      warning: null,
+      comparison: null,
+    };
+  }
+
+  const breakEvenCups = computeBreakEvenCups(fixedCostsMonthly, contributionPerCup);
+  let comparison = null;
+  if (estimatedCupsPerMonth > 0 && breakEvenCups !== null) {
+    if (estimatedCupsPerMonth > breakEvenCups) comparison = "above";
+    else if (estimatedCupsPerMonth < breakEvenCups) comparison = "below";
+    else comparison = "at";
+  }
+
+  return {
+    contributionPerCup,
+    breakEvenCups,
+    noBreakEven: false,
+    warning: null,
+    comparison,
+  };
+}

@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { BreakEvenRowCard } from "@/components/pricing/BreakEvenDisplay";
 import { formatMoney } from "@/lib/money";
 import { PRICING_LABELS, type PricingSummary } from "@/types/pricing";
 
 export function PricingSummaryTable({ summary }: { summary: PricingSummary }) {
-  const { settings, monthlyOverheadTotal, overheadPerCup, rows } = summary;
+  const { settings, monthlyOverheadTotal, overheadPerCup, breakEvenNeedsSetup, rows } = summary;
 
   return (
     <div className="px-4 pb-8">
@@ -72,6 +73,22 @@ export function PricingSummaryTable({ summary }: { summary: PricingSummary }) {
             ราคาขายปัดเป็นจำนวนเต็มบาท (แสดงผลเท่านั้น) · คำนวณภายในใช้ทศนิยม 2 ตำแหน่ง
           </p>
         </div>
+      )}
+
+      {rows.length > 0 && (
+        <section className="mt-6">
+          <h2 className="mb-3 text-base font-bold text-slate-900">{PRICING_LABELS.breakEven}</h2>
+          <div className="grid gap-3">
+            {rows.map((r) => (
+              <BreakEvenRowCard
+                key={r.menuItemId}
+                row={r.breakEven}
+                estimatedCupsPerMonth={settings.estimatedCupsPerMonth}
+                needsSetup={breakEvenNeedsSetup}
+              />
+            ))}
+          </div>
+        </section>
       )}
     </div>
   );
