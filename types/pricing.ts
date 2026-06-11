@@ -34,6 +34,15 @@ export const PRICING_LABELS = {
   sellingPrice: "ราคาขาย",
   cupsPerMonth: "จำนวนแก้วต่อเดือน (ประมาณ)",
   defaultProfit: "กำไรต่อแก้ว (ค่าเริ่มต้น)",
+  breakEven: "จุดคุ้มทุน",
+  breakEvenSingleMenu: "ถ้าขายเมนูนี้อย่างเดียว",
+  contributionPerCup: "กำไรต่อแก้ว (หลังหักต้นทุนวัตถุดิบ)",
+  breakEvenCups: "แก้ว/เดือนที่ต้องขาย",
+  targetCups: "เป้าที่ตั้งไว้",
+  aboveBreakEven: "เกินจุดคุ้มทุน",
+  belowBreakEven: "ต่ำกว่าจุดคุ้มทุน",
+  atBreakEven: "เท่าจุดคุ้มทุน",
+  needsFixedCosts: "ยังไม่ได้กรอกต้นทุนคงที่",
 } as const;
 
 export const OVERHEAD_CATEGORY_LABELS: Record<OverheadCategory, string> = {
@@ -91,6 +100,18 @@ export type PricingSettings = {
   updatedAt: string;
 };
 
+export type BreakEvenComparison = "above" | "below" | "at" | null;
+
+export type BreakEvenRow = {
+  menuItemId: string;
+  menuName: string;
+  contributionPerCup: string;
+  breakEvenCups: number | null;
+  noBreakEven: boolean;
+  warning: string | null;
+  comparison: BreakEvenComparison;
+};
+
 export type PricingSummaryRow = {
   menuItemId: string;
   menuName: string;
@@ -100,6 +121,7 @@ export type PricingSummaryRow = {
   profitPerCup: string;
   sellingPriceExact: string;
   sellingPriceDisplay: string;
+  breakEven: BreakEvenRow;
 };
 
 export type PricingSummary = {
@@ -108,5 +130,7 @@ export type PricingSummary = {
   overheadPerCup: string | null;
   /** True when cups/month is unset or zero — overhead per cup cannot be computed. */
   needsCupsPerMonth: boolean;
+  /** True when monthly fixed costs sum to zero — break-even cannot be computed. */
+  breakEvenNeedsSetup: boolean;
   rows: PricingSummaryRow[];
 };

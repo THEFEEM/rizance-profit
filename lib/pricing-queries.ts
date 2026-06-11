@@ -9,6 +9,7 @@ import {
   resolveProfitPerCup,
   sumLineCosts,
 } from "@/lib/pricing-math";
+import { breakEvenNeedsSetup, computeBreakEvenItem } from "@/lib/break-even";
 import { sumDecimals } from "@/lib/money";
 import type {
   Ingredient,
@@ -458,12 +459,20 @@ export async function getPricingSummary(userId: string): Promise<PricingSummary>
     listMenuItems(userId),
   ]);
   const needsCupsPerMonth = settings.estimatedCupsPerMonth <= 0;
+  const needsSetup = breakEvenNeedsSetup(monthlyTotal);
   const overheadPerCup = computeOverheadPerCup(monthlyTotal, settings.estimatedCupsPerMonth);
 
   const rows: PricingSummaryRow[] = menuItems.map((m) => {
     const totalCost = computeTotalCostPerCup(m.ingredientCostPerCup, overheadPerCup);
     const profit = resolveProfitPerCup(m.desiredProfit, settings.defaultProfitPerCup);
     const sellingExact = computeSellingPriceExact(totalCost, profit);
+    const be = computeBreakEvenItem(
+      monthlyTotal,
+      m.ingredientCostPerCup,
+      sellingExact,
+      settings.estimatedCupsPerMonth,
+      needsSetup,
+    );
     return {
       menuItemId: m.id,
       menuName: m.name,
@@ -473,6 +482,11 @@ export async function getPricingSummary(userId: string): Promise<PricingSummary>
       profitPerCup: profit,
       sellingPriceExact: sellingExact,
       sellingPriceDisplay: formatSellingPriceDisplay(sellingExact),
+      breakEven: {
+        menuItemId: m.id,
+        menuName: m.name,
+        ...be,
+      },
     };
   });
 
@@ -481,6 +495,7 @@ export async function getPricingSummary(userId: string): Promise<PricingSummary>
     monthlyOverheadTotal: monthlyTotal,
     overheadPerCup,
     needsCupsPerMonth,
+    breakEvenNeedsSetup: needsSetup,
     rows,
   };
 }
