@@ -91,6 +91,19 @@ export type PeriodSummary = {
   expenseCount: number;
 };
 
+export type CategoryBreakdownItem = {
+  category: string;
+  amount: string;
+  count: number;
+};
+
+export type CategoryBreakdown = {
+  start: string;
+  end: string;
+  income: CategoryBreakdownItem[];
+  expense: CategoryBreakdownItem[];
+};
+
 export type DailySummary = {
   date: string; // YYYY-MM-DD
   income: string;
