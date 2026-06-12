@@ -297,35 +297,59 @@ export function BoothSetup({
   );
 }
 
-/** Compact remaining-budget strip for expense form. */
-export function BoothRemainingBar({
+/** Shared งบคงเหลือ = totalBudget − totalExpense (incl. wages). */
+export function BoothRemainingBudget({
   totalBudget,
   totalExpense,
   currency = "THB",
+  variant = "bar",
 }: {
   totalBudget: string;
   totalExpense: string;
   currency?: string;
+  /** bar = expense form strip; inline = summary capital section */
+  variant?: "bar" | "inline";
 }) {
   const remaining = computeProfit(totalBudget, totalExpense);
   const sign = moneySign(remaining);
   const color =
     sign < 0 ? "text-red-600" : sign > 0 ? "text-emerald-700" : "text-slate-700";
 
-  return (
-    <div className="mx-4 mb-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs text-slate-500">งบคงเหลือ</p>
-          <p className="text-xs text-slate-400">
-            งบรวม {formatMoney(totalBudget, currency)} − ใช้ไป{" "}
-            {formatMoney(totalExpense, currency)}
-          </p>
-        </div>
-        <p className={`text-xl font-bold tabular-nums ${color}`}>
-          {formatMoney(remaining, currency)}
+  const body = (
+    <div className="flex items-center justify-between gap-3">
+      <div>
+        <p className={variant === "inline" ? "text-sm text-slate-600" : "text-xs text-slate-500"}>
+          งบคงเหลือ
+        </p>
+        <p className="text-xs text-slate-400">
+          งบรวม {formatMoney(totalBudget, currency)} − ใช้ไป{" "}
+          {formatMoney(totalExpense, currency)}
         </p>
       </div>
+      <p
+        className={`font-bold tabular-nums ${color} ${variant === "inline" ? "text-base" : "text-xl"}`}
+      >
+        {formatMoney(remaining, currency)}
+      </p>
     </div>
   );
+
+  if (variant === "inline") {
+    return <div className="mt-3 border-t border-slate-100 pt-3">{body}</div>;
+  }
+
+  return (
+    <div className="mx-4 mb-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+      {body}
+    </div>
+  );
+}
+
+/** Compact remaining-budget strip for expense form. */
+export function BoothRemainingBar(props: {
+  totalBudget: string;
+  totalExpense: string;
+  currency?: string;
+}) {
+  return <BoothRemainingBudget {...props} variant="bar" />;
 }

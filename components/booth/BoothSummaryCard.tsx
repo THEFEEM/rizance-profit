@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BoothRemainingBudget } from "@/components/booth/BoothSetup";
 import { formatMoney, moneySign } from "@/lib/money";
 import type { BoothSummary, SplitProfitResult } from "@/types/booth";
 import { PROFIT_SPLIT_METHOD_LABELS } from "@/types/booth";
@@ -100,6 +101,12 @@ export function BoothSummaryCard({
             <p className="text-xs text-emerald-700">กองกลางรับส่วนแบ่งกำไร</p>
           )}
           <p className="text-xs text-slate-400">แสดงเพื่ออ้างอิง — ไม่หักจากกำไร</p>
+          <BoothRemainingBudget
+            totalBudget={booth.totalBudget}
+            totalExpense={summary.totalExpense}
+            currency={currency}
+            variant="inline"
+          />
         </div>
 
         <div className="border-b border-slate-100 px-4 py-1">
