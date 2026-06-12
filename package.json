@@ -14,6 +14,7 @@
     "test:pricing-units": "node scripts/test-pricing-units.mjs",
     "test:pricing-edge": "node scripts/test-pricing-edge.mjs",
     "test:break-even": "node scripts/test-break-even.mjs",
+    "test:booth-split": "node scripts/test-booth-split.mjs",
     "test:period-ranges": "node scripts/test-period-ranges.mjs",
     "test:booth-isolation": "node scripts/test-booth-isolation.mjs",
     "test:booth-update-range": "node scripts/test-booth-update-range.mjs",
