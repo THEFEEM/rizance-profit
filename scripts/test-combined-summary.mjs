@@ -26,6 +26,28 @@ for (const file of [".env.local", ".env"]) {
   }
 }
 
+/** Keep in sync with lib/date.ts — Asia/Bangkok calendar dates */
+function bkkToday() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function addDays(date, days) {
+  const [y, m, d] = date.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return dt.toISOString().slice(0, 10);
+}
+
+/** Mirrors lib/date.ts periodRange for last_7 */
+function periodRangeLast7(anchor = bkkToday()) {
+  return { start: addDays(anchor, -6), end: anchor };
+}
+
 function toCents(v) {
   return Math.round(Number(v) * 100);
 }
@@ -150,38 +172,46 @@ try {
   const base = await detectBase();
   if (!base) throw new Error("Dev server not detected — run: npm run dev");
 
-  // Period last_7 anchored to 2026-06-10 → 2026-06-04 .. 2026-06-10
-  const periodStart = "2026-06-04";
-  const periodEnd = "2026-06-10";
+  // Anchor all dates to Bangkok today — same window as API period=last_7
+  const anchor = bkkToday();
+  const { start: periodStart, end: periodEnd } = periodRangeLast7(anchor);
+  console.log(`Anchor (Bangkok today): ${anchor}`);
+  console.log(`last_7 window: ${periodStart} .. ${periodEnd}\n`);
+
+  // Booth spans into period but ends before anchor (so we can test out-of-booth entries)
+  const boothStart = addDays(anchor, -10);
+  const boothEnd = addDays(anchor, -3);
+  const inRangeDate = addDays(anchor, -4); // in period ∩ booth range
+  const outsideBoothDate = addDays(anchor, -2); // in period but after booth end
 
   await client.query(
     `INSERT INTO income_entries (user_id, amount, entry_date) VALUES ($1, 100.00, $2::date)`,
-    [userId, "2026-06-10"],
+    [userId, periodEnd],
   );
 
   const { rows: booths } = await client.query(
-    `INSERT INTO booths (user_id, name, starting_budget, start_date, end_date)
-     VALUES ($1, 'งานทับซ้อน', 500.00, '2026-06-01'::date, '2026-06-08'::date) RETURNING id`,
-    [userId],
+    `INSERT INTO booths (user_id, name, pool_budget, start_date, end_date)
+     VALUES ($1, 'งานทับซ้อน', 500.00, $2::date, $3::date) RETURNING id`,
+    [userId, boothStart, boothEnd],
   );
   const boothId = booths[0].id;
 
   // In period AND booth range → counts
   await client.query(
     `INSERT INTO booth_income_entries (booth_id, user_id, amount, payment_method, entry_date)
-     VALUES ($1, $2, 500.00, 'cash', '2026-06-05'::date)`,
-    [boothId, userId],
+     VALUES ($1, $2, 500.00, 'cash', $3::date)`,
+    [boothId, userId, inRangeDate],
   );
   // In period but OUTSIDE booth end_date → must NOT count
   await client.query(
     `INSERT INTO booth_income_entries (booth_id, user_id, amount, payment_method, entry_date)
-     VALUES ($1, $2, 200.00, 'cash', '2026-06-09'::date)`,
-    [boothId, userId],
+     VALUES ($1, $2, 200.00, 'cash', $3::date)`,
+    [boothId, userId, outsideBoothDate],
   );
   await client.query(
     `INSERT INTO booth_expense_entries (booth_id, user_id, amount, cost_type, entry_date)
-     VALUES ($1, $2, 100.00, 'fixed', '2026-06-05'::date)`,
-    [boothId, userId],
+     VALUES ($1, $2, 100.00, 'fixed', $3::date)`,
+    [boothId, userId, inRangeDate],
   );
 
   console.log("1) Partial booth/period overlap — only in-range entries count");
@@ -190,7 +220,7 @@ try {
   const combined = sumDecimals(regular.profit, boothNet);
 
   assertEq("regular profit", regular.profit, "100.00");
-  assertEq("booth net (500-100, not 200 on Jun 9)", boothNet, "400.00");
+  assertEq("booth net (500-100, not 200 outside booth)", boothNet, "400.00");
   assertEq("combined", combined, "500.00");
   console.log("");
 
@@ -200,6 +230,8 @@ try {
   });
   const body = await res.json();
   assertEq("API status", String(res.status), "200");
+  assertEq("API period start matches fixture", body?.data?.start ?? "missing", periodStart);
+  assertEq("API period end matches fixture", body?.data?.end ?? "missing", periodEnd);
   assertEq("API regularProfit", body?.data?.regularProfit ?? "missing", regular.profit);
   assertEq("API boothProfit", body?.data?.boothProfit ?? "missing", boothNet);
   assertEq("API combinedProfit", body?.data?.combinedProfit ?? "missing", combined);

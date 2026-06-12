@@ -151,7 +151,7 @@ try {
   await makeSessionCookie(userId);
 
   const { rows: booths } = await client.query(
-    `INSERT INTO booths (user_id, name, starting_budget, start_date, end_date)
+    `INSERT INTO booths (user_id, name, pool_budget, start_date, end_date)
      VALUES ($1, 'งานบูธ', 1000, $2::date, $3::date) RETURNING id`,
     [userId, start, addDays(end, 2)],
   );

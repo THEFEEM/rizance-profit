@@ -166,7 +166,7 @@ try {
   );
 
   const { rows: booths } = await client.query(
-    `INSERT INTO booths (user_id, name, starting_budget, start_date, end_date)
+    `INSERT INTO booths (user_id, name, pool_budget, start_date, end_date)
      VALUES ($1, 'งานบูธ A', 1000.00, '2026-06-09'::date, '2026-06-11'::date)
      RETURNING id`,
     [userId],
@@ -245,7 +245,7 @@ try {
 
   console.log("6) Invalid/deleted booth → safe fallback to regular");
   const { rows: booth2 } = await client.query(
-    `INSERT INTO booths (user_id, name, starting_budget, start_date, end_date)
+    `INSERT INTO booths (user_id, name, pool_budget, start_date, end_date)
      VALUES ($1, 'งานชั่วคราว', 100.00, '2026-06-09'::date, '2026-06-11'::date) RETURNING id`,
     [userId],
   );
