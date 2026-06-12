@@ -17,27 +17,24 @@ export function ModeSwitcher({
   boothName?: string;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [booths, setBooths] = useState<Booth[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [switching, setSwitching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const label = mode === "regular" ? "ร้านประจำ" : (boothName ?? "งานบูธ");
-
-  async function openSheet() {
-    setOpen(true);
-    setError(null);
-    if (booths !== null) return;
+  async function loadBooths(): Promise<Booth[]> {
+    if (booths !== null) return booths;
     setLoading(true);
     const res = await apiFetch<Booth[]>("/api/booths");
     setLoading(false);
     if (res.ok) {
       setBooths(res.data);
-    } else {
-      setError(res.message);
-      setBooths([]);
+      return res.data;
     }
+    setError(res.message);
+    setBooths([]);
+    return [];
   }
 
   async function selectContext(body: { mode: "regular" } | { mode: "booth"; boothId: string }) {
@@ -49,46 +46,94 @@ export function ModeSwitcher({
     });
     setSwitching(false);
     if (res.ok) {
-      setOpen(false);
+      setPickerOpen(false);
       router.refresh();
     } else {
       setError(res.message);
     }
   }
 
+  async function switchToRegular() {
+    if (mode === "regular" || switching) return;
+    await selectContext({ mode: "regular" });
+  }
+
+  async function switchToBooth() {
+    if (switching) return;
+    if (mode === "booth") {
+      setPickerOpen(true);
+      setError(null);
+      await loadBooths();
+      return;
+    }
+
+    const list = await loadBooths();
+    const open = list.filter((b) => b.status === "open");
+    if (open.length === 1) {
+      await selectContext({ mode: "booth", boothId: open[0].id });
+      return;
+    }
+    setPickerOpen(true);
+  }
+
   return (
     <>
       <div className="px-4 pt-3">
-        <button
-          type="button"
-          onClick={openSheet}
-          className="tap-target flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm active:bg-slate-50"
-          aria-haspopup="dialog"
-          aria-expanded={open}
+        <div
+          className="flex rounded-full bg-slate-100 p-1"
+          role="tablist"
+          aria-label="สลับโหมด"
         >
-          <span className="text-sm font-semibold text-slate-900">{label}</span>
-          <span className="text-slate-400" aria-hidden>
-            ▾
-          </span>
-        </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "regular"}
+            disabled={switching}
+            onClick={switchToRegular}
+            className={`tap-target flex-1 rounded-full py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 ${
+              mode === "regular"
+                ? "bg-white text-emerald-700 shadow-sm"
+                : "text-slate-600 active:bg-slate-200/60"
+            }`}
+          >
+            ร้านค้า
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "booth"}
+            disabled={switching}
+            onClick={switchToBooth}
+            className={`tap-target flex-1 rounded-full py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 ${
+              mode === "booth"
+                ? "bg-white text-emerald-700 shadow-sm"
+                : "text-slate-600 active:bg-slate-200/60"
+            }`}
+          >
+            บูธ
+          </button>
+        </div>
+        {mode === "booth" && boothName && (
+          <p className="mt-1.5 truncate text-center text-xs text-slate-500">{boothName}</p>
+        )}
       </div>
 
-      {open && (
+      {pickerOpen && (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="mode-switcher-title"
-          onClick={() => !switching && setOpen(false)}
+          aria-labelledby="booth-picker-title"
+          onClick={() => !switching && setPickerOpen(false)}
         >
           <div
             className="max-h-[80dvh] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-4 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 id="mode-switcher-title" className="text-lg font-bold text-slate-900">
-              สลับโหมด
+            <h2 id="booth-picker-title" className="text-lg font-bold text-slate-900">
+              เลือกงานบูธ
             </h2>
-            <p className="mt-1 text-sm text-slate-500">เลือกร้านประจำหรืองานบูธ</p>
+            <p className="mt-1 text-sm text-slate-500">เลือกงานบูธที่เปิดอยู่</p>
 
             {error && (
               <p className="mt-3 text-sm text-red-600" role="alert">
@@ -97,19 +142,6 @@ export function ModeSwitcher({
             )}
 
             <ul className="mt-4 divide-y divide-slate-100">
-              <li>
-                <button
-                  type="button"
-                  disabled={switching}
-                  onClick={() => selectContext({ mode: "regular" })}
-                  className={`tap-target w-full px-2 py-3 text-left text-sm font-medium ${
-                    mode === "regular" ? "text-emerald-700" : "text-slate-700"
-                  } disabled:opacity-50`}
-                >
-                  ร้านประจำ {mode === "regular" && "✓"}
-                </button>
-              </li>
-
               {loading && (
                 <li className="px-2 py-3 text-sm text-slate-400">กำลังโหลดงานบูธ…</li>
               )}
@@ -136,11 +168,15 @@ export function ModeSwitcher({
                   </li>
                 );
               })}
+
+              {!loading && booths?.every((b) => b.status !== "open") && (
+                <li className="px-2 py-3 text-sm text-slate-400">ยังไม่มีงานบูธที่เปิดอยู่</li>
+              )}
             </ul>
 
             <Link
               href="/booth/new"
-              onClick={() => setOpen(false)}
+              onClick={() => setPickerOpen(false)}
               className="tap-target mt-4 flex w-full items-center justify-center rounded-2xl border border-dashed border-slate-300 py-3 text-sm font-semibold text-slate-600 active:bg-slate-50"
             >
               + สร้างงานบูธ
@@ -148,7 +184,7 @@ export function ModeSwitcher({
 
             <button
               type="button"
-              onClick={() => setOpen(false)}
+              onClick={() => setPickerOpen(false)}
               disabled={switching}
               className="tap-target mt-3 w-full py-2 text-sm font-medium text-slate-500"
             >
