@@ -1,7 +1,13 @@
 // Mode Even (booth/event) data access. Booth data lives in separate tables —
-// nothing in here touches income_entries / expense_entries, so regular-shop
-// queries in lib/queries.ts stay isolated by construction.
+// nothing in here touches income_entries / expense_entries.
 import { query } from "@/lib/db";
+import {
+  computeSplitProfit,
+  computeEmployeeCost,
+  inclusiveEventDays,
+  type SplitProfitResult,
+} from "@/lib/booth-split";
+import { validateInvestorSplitPercents } from "@/lib/booth-validation";
 import { computeProfit, sumDecimals } from "@/lib/money";
 import { today } from "@/lib/date";
 import type {
@@ -11,14 +17,17 @@ import type {
   BoothExpense,
   BoothIncome,
   BoothMember,
+  BoothMemberResult,
   BoothStatus,
   BoothCloseResult,
   BoothSummary,
   BoothUpdateResult,
+  MemberRole,
   PaymentMethod,
+  WageType,
 } from "@/types/booth";
 
-// ---- row → domain mappers -------------------------------------------------
+const ADVANCE_NOTE = "ออกเงินก่อน";
 
 function toIso(v: Date | string): string {
   return v instanceof Date ? v.toISOString() : String(v);
@@ -27,7 +36,9 @@ function toIso(v: Date | string): string {
 type BoothRow = {
   id: string;
   name: string;
-  starting_budget: string;
+  pool_budget: string;
+  profit_split_method: string;
+  member_equity: string;
   start_date: string;
   end_date: string;
   status: string;
@@ -38,10 +49,14 @@ type BoothRow = {
 };
 
 function mapBooth(r: BoothRow): Booth {
+  const memberEquity = r.member_equity ?? "0.00";
   return {
     id: r.id,
     name: r.name,
-    startingBudget: r.starting_budget,
+    poolBudget: r.pool_budget,
+    profitSplitMethod: r.profit_split_method as Booth["profitSplitMethod"],
+    memberEquity,
+    totalBudget: sumDecimals(r.pool_budget, memberEquity),
     startDate: r.start_date,
     endDate: r.end_date,
     status: r.status as BoothStatus,
@@ -51,6 +66,17 @@ function mapBooth(r: BoothRow): Booth {
     updatedAt: toIso(r.updated_at),
   };
 }
+
+const MEMBER_EQUITY_SQL = `COALESCE((
+  SELECT SUM(m.investment_amount)
+  FROM booth_members m
+  WHERE m.booth_id = b.id AND m.role = 'investor'
+), 0)::text AS member_equity`;
+
+const BOOTH_COLS = `b.id, b.name, b.pool_budget, b.profit_split_method,
+  ${MEMBER_EQUITY_SQL},
+  b.start_date::text AS start_date, b.end_date::text AS end_date,
+  b.status, b.closed_at, b.note, b.created_at, b.updated_at`;
 
 type BoothIncomeRow = {
   id: string;
@@ -81,6 +107,7 @@ type BoothExpenseRow = {
   cost_type: string;
   label: string | null;
   note: string | null;
+  payer_member_id: string | null;
   entry_date: string;
   created_at: Date | string;
 };
@@ -93,19 +120,50 @@ function mapBoothExpense(r: BoothExpenseRow): BoothExpense {
     costType: r.cost_type as BoothCostType,
     label: r.label,
     note: r.note,
+    payerMemberId: r.payer_member_id,
     entryDate: r.entry_date,
     createdAt: toIso(r.created_at),
   };
 }
 
-const BOOTH_COLS = `id, name, starting_budget, start_date::text AS start_date,
-  end_date::text AS end_date, status, closed_at, note, created_at, updated_at`;
+type BoothMemberRow = {
+  id: string;
+  booth_id: string;
+  name: string;
+  role: string;
+  investment_amount: string;
+  split_percent: string | null;
+  wage_amount: string | null;
+  wage_type: string | null;
+  created_at: Date | string;
+};
+
+function mapBoothMember(r: BoothMemberRow): BoothMember {
+  return {
+    id: r.id,
+    boothId: r.booth_id,
+    name: r.name,
+    role: r.role as MemberRole,
+    investmentAmount: r.investment_amount,
+    splitPercent: r.split_percent,
+    wageAmount: r.wage_amount,
+    wageType: r.wage_type as WageType | null,
+    createdAt: toIso(r.created_at),
+  };
+}
+
+const EXPENSE_RETURN = `id, booth_id, amount, cost_type, label, note, payer_member_id,
+  entry_date::text AS entry_date, created_at`;
+
+const MEMBER_RETURN = `id, booth_id, name, role, investment_amount, split_percent::text AS split_percent,
+  wage_amount, wage_type, created_at`;
 
 // ---- booths ----------------------------------------------------------------
 
 export type BoothInput = {
   name: string;
-  startingBudget: number;
+  poolBudget: number;
+  profitSplitMethod?: Booth["profitSplitMethod"];
   startDate: string;
   endDate: string;
   note?: string;
@@ -113,9 +171,9 @@ export type BoothInput = {
 
 export async function listBooths(userId: string): Promise<Booth[]> {
   const { rows } = await query<BoothRow>(
-    `SELECT ${BOOTH_COLS} FROM booths
-     WHERE user_id = $1
-     ORDER BY status ASC, start_date DESC, created_at DESC`,
+    `SELECT ${BOOTH_COLS} FROM booths b
+     WHERE b.user_id = $1
+     ORDER BY b.status ASC, b.start_date DESC, b.created_at DESC`,
     [userId],
   );
   return rows.map(mapBooth);
@@ -123,30 +181,32 @@ export async function listBooths(userId: string): Promise<Booth[]> {
 
 export async function getBooth(userId: string, id: string): Promise<Booth | null> {
   const { rows } = await query<BoothRow>(
-    `SELECT ${BOOTH_COLS} FROM booths WHERE user_id = $1 AND id = $2`,
+    `SELECT ${BOOTH_COLS} FROM booths b WHERE b.user_id = $1 AND b.id = $2`,
     [userId, id],
   );
   return rows[0] ? mapBooth(rows[0]) : null;
 }
 
 export async function createBooth(userId: string, input: BoothInput): Promise<Booth> {
-  const { rows } = await query<BoothRow>(
-    `INSERT INTO booths (user_id, name, starting_budget, start_date, end_date, note)
-     VALUES ($1, $2, $3, $4::date, $5::date, $6)
-     RETURNING ${BOOTH_COLS}`,
+  const { rows } = await query<{ id: string }>(
+    `INSERT INTO booths (user_id, name, pool_budget, profit_split_method, start_date, end_date, note)
+     VALUES ($1, $2, $3, $4, $5::date, $6::date, $7)
+     RETURNING id`,
     [
       userId,
       input.name,
-      input.startingBudget.toFixed(2),
+      input.poolBudget.toFixed(2),
+      input.profitSplitMethod ?? "equal",
       input.startDate,
       input.endDate,
       input.note ?? null,
     ],
   );
-  return mapBooth(rows[0]);
+  const booth = await getBooth(userId, rows[0].id);
+  if (!booth) throw new Error("Booth create failed");
+  return booth;
 }
 
-/** Count income + expense rows whose entry_date falls outside [start, end]. */
 async function countBoothEntriesOutsideRange(
   boothId: string,
   start: string,
@@ -175,8 +235,7 @@ export async function updateBooth(
 
   const newStart = input.startDate ?? existing.startDate;
   const newEnd = input.endDate ?? existing.endDate;
-  const rangeNarrowed =
-    newStart > existing.startDate || newEnd < existing.endDate;
+  const rangeNarrowed = newStart > existing.startDate || newEnd < existing.endDate;
 
   if (rangeNarrowed) {
     const outside = await countBoothEntriesOutsideRange(id, newStart, newEnd);
@@ -186,15 +245,16 @@ export async function updateBooth(
   }
 
   const { rows } = await query<BoothRow>(
-    `UPDATE booths SET name = $3, starting_budget = $4, start_date = $5::date,
-       end_date = $6::date, note = $7, updated_at = now()
-     WHERE user_id = $1 AND id = $2 AND status = 'open'
+    `UPDATE booths b SET name = $3, pool_budget = $4, profit_split_method = $5,
+       start_date = $6::date, end_date = $7::date, note = $8, updated_at = now()
+     WHERE b.user_id = $1 AND b.id = $2 AND b.status = 'open'
      RETURNING ${BOOTH_COLS}`,
     [
       userId,
       id,
       input.name ?? existing.name,
-      (input.startingBudget ?? Number(existing.startingBudget)).toFixed(2),
+      (input.poolBudget ?? Number(existing.poolBudget)).toFixed(2),
+      input.profitSplitMethod ?? existing.profitSplitMethod,
       newStart,
       newEnd,
       input.note !== undefined ? input.note : existing.note,
@@ -204,15 +264,14 @@ export async function updateBooth(
   return { ok: true, booth: mapBooth(rows[0]) };
 }
 
-/** Close a booth (permanent in v1). No reopen — double-close returns already_closed. */
 export async function closeBooth(userId: string, id: string): Promise<BoothCloseResult> {
   const existing = await getBooth(userId, id);
   if (!existing) return { ok: false, reason: "booth_not_found" };
   if (existing.status === "closed") return { ok: false, reason: "already_closed" };
 
   const { rows } = await query<BoothRow>(
-    `UPDATE booths SET status = 'closed', closed_at = now(), updated_at = now()
-     WHERE user_id = $1 AND id = $2 AND status = 'open'
+    `UPDATE booths b SET status = 'closed', closed_at = now(), updated_at = now()
+     WHERE b.user_id = $1 AND b.id = $2 AND b.status = 'open'
      RETURNING ${BOOTH_COLS}`,
     [userId, id],
   );
@@ -220,11 +279,7 @@ export async function closeBooth(userId: string, id: string): Promise<BoothClose
   return { ok: true, booth: mapBooth(rows[0]) };
 }
 
-// ---- entry-date rule (app layer) -------------------------------------------
-// entry_date must fall within booth.start_date..end_date AND the booth must be
-// open. Enforced HERE (not a DB constraint) because booth dates are editable
-// while open — a CHECK against another table isn't possible in Postgres, and a
-// trigger would hide business logic away from the codebase conventions.
+// ---- entry guards -----------------------------------------------------------
 
 function dateWithinBooth(booth: Booth, entryDate: string): boolean {
   return entryDate >= booth.startDate && entryDate <= booth.endDate;
@@ -234,12 +289,36 @@ async function guardBoothEntry(
   userId: string,
   boothId: string,
   entryDate: string,
-): Promise<{ ok: true; booth: Booth } | { ok: false; reason: "booth_not_found" | "booth_closed" | "date_out_of_range" }> {
+): Promise<
+  | { ok: true; booth: Booth }
+  | { ok: false; reason: "booth_not_found" | "booth_closed" | "date_out_of_range" }
+> {
   const booth = await getBooth(userId, boothId);
   if (!booth) return { ok: false, reason: "booth_not_found" };
   if (booth.status !== "open") return { ok: false, reason: "booth_closed" };
   if (!dateWithinBooth(booth, entryDate)) return { ok: false, reason: "date_out_of_range" };
   return { ok: true, booth };
+}
+
+async function guardBoothMemberWrite(
+  userId: string,
+  boothId: string,
+): Promise<
+  | { ok: true; booth: Booth }
+  | { ok: false; reason: "booth_not_found" | "booth_closed" }
+> {
+  const booth = await getBooth(userId, boothId);
+  if (!booth) return { ok: false, reason: "booth_not_found" };
+  if (booth.status !== "open") return { ok: false, reason: "booth_closed" };
+  return { ok: true, booth };
+}
+
+async function memberBelongsToBooth(boothId: string, memberId: string): Promise<boolean> {
+  const { rows } = await query<{ id: string }>(
+    `SELECT id FROM booth_members WHERE id = $1 AND booth_id = $2`,
+    [memberId, boothId],
+  );
+  return rows.length > 0;
 }
 
 // ---- booth income -----------------------------------------------------------
@@ -275,7 +354,6 @@ export type BoothDaySummary = {
   profit: string;
 };
 
-/** Day-scoped booth P&L for Today booth mode (entry_date = date). */
 export async function boothDaySummary(
   userId: string,
   boothId: string,
@@ -321,7 +399,7 @@ export async function listBoothExpenseByDate(
   date: string,
 ): Promise<BoothExpense[]> {
   const { rows } = await query<BoothExpenseRow>(
-    `SELECT id, booth_id, amount, cost_type, label, note, entry_date::text AS entry_date, created_at
+    `SELECT ${EXPENSE_RETURN}
      FROM booth_expense_entries
      WHERE user_id = $1 AND booth_id = $2 AND entry_date = $3::date
      ORDER BY created_at DESC`,
@@ -361,6 +439,8 @@ export type BoothExpenseInput = {
   label?: string;
   note?: string;
   entryDate?: string;
+  payerMemberId?: string;
+  advancePayment?: boolean;
 };
 
 export async function createBoothExpense(
@@ -372,17 +452,32 @@ export async function createBoothExpense(
   const guard = await guardBoothEntry(userId, boothId, entryDate);
   if (!guard.ok) return guard;
 
+  let payerMemberId: string | null = input.payerMemberId ?? null;
+  if (payerMemberId) {
+    const valid = await memberBelongsToBooth(boothId, payerMemberId);
+    if (!valid) return { ok: false, reason: "invalid_payer" };
+  }
+
+  let note = input.note ?? null;
+  if (input.advancePayment || payerMemberId) {
+    payerMemberId = payerMemberId ?? null;
+    if (payerMemberId && (!note || !note.includes(ADVANCE_NOTE))) {
+      note = note ? `${note} · ${ADVANCE_NOTE}` : ADVANCE_NOTE;
+    }
+  }
+
   const { rows } = await query<BoothExpenseRow>(
-    `INSERT INTO booth_expense_entries (booth_id, user_id, amount, cost_type, label, note, entry_date)
-     VALUES ($1, $2, $3, $4, $5, $6, $7::date)
-     RETURNING id, booth_id, amount, cost_type, label, note, entry_date::text AS entry_date, created_at`,
+    `INSERT INTO booth_expense_entries (booth_id, user_id, amount, cost_type, label, note, payer_member_id, entry_date)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::date)
+     RETURNING ${EXPENSE_RETURN}`,
     [
       boothId,
       userId,
       input.amount.toFixed(2),
       input.costType,
       input.label ?? null,
-      input.note ?? null,
+      note,
+      payerMemberId,
       entryDate,
     ],
   );
@@ -391,7 +486,7 @@ export async function createBoothExpense(
 
 export async function listBoothExpense(userId: string, boothId: string): Promise<BoothExpense[]> {
   const { rows } = await query<BoothExpenseRow>(
-    `SELECT id, booth_id, amount, cost_type, label, note, entry_date::text AS entry_date, created_at
+    `SELECT ${EXPENSE_RETURN}
      FROM booth_expense_entries
      WHERE user_id = $1 AND booth_id = $2
      ORDER BY entry_date DESC, created_at DESC`,
@@ -415,49 +510,128 @@ export async function deleteBoothExpense(
 // ---- booth members ----------------------------------------------------------
 
 export async function listBoothMembers(userId: string, boothId: string): Promise<BoothMember[]> {
-  const { rows } = await query<{
-    id: string;
-    booth_id: string;
-    name: string;
-    role: string | null;
-    created_at: Date | string;
-  }>(
-    `SELECT m.id, m.booth_id, m.name, m.role, m.created_at
+  const { rows } = await query<BoothMemberRow>(
+    `SELECT m.id, m.booth_id, m.name, m.role, m.investment_amount,
+            m.split_percent::text AS split_percent, m.wage_amount, m.wage_type, m.created_at
      FROM booth_members m JOIN booths b ON b.id = m.booth_id
      WHERE b.user_id = $1 AND m.booth_id = $2
      ORDER BY m.created_at ASC`,
     [userId, boothId],
   );
-  return rows.map((r) => ({
-    id: r.id,
-    boothId: r.booth_id,
-    name: r.name,
-    role: r.role,
-    createdAt: toIso(r.created_at),
-  }));
+  return rows.map(mapBoothMember);
 }
 
-export async function addBoothMember(
+export type BoothMemberInput = {
+  name: string;
+  role: MemberRole;
+  investmentAmount?: number;
+  splitPercent?: number;
+  wageAmount?: number;
+  wageType?: WageType;
+};
+
+function memberValues(input: BoothMemberInput): {
+  investment: string;
+  splitPercent: string | null;
+  wageAmount: string | null;
+  wageType: WageType | null;
+} {
+  if (input.role === "investor") {
+    return {
+      investment: (input.investmentAmount ?? 0).toFixed(2),
+      splitPercent: input.splitPercent !== undefined ? input.splitPercent.toFixed(2) : null,
+      wageAmount: null,
+      wageType: null,
+    };
+  }
+  if (input.role === "employee") {
+    return {
+      investment: "0.00",
+      splitPercent: null,
+      wageAmount: (input.wageAmount ?? 0).toFixed(2),
+      wageType: input.wageType ?? null,
+    };
+  }
+  return { investment: "0.00", splitPercent: null, wageAmount: null, wageType: null };
+}
+
+export async function createBoothMember(
   userId: string,
   boothId: string,
-  input: { name: string; role?: string },
-): Promise<BoothMember | null> {
-  const booth = await getBooth(userId, boothId);
-  if (!booth) return null;
-  const { rows } = await query<{
-    id: string;
-    booth_id: string;
-    name: string;
-    role: string | null;
-    created_at: Date | string;
-  }>(
-    `INSERT INTO booth_members (booth_id, name, role)
-     VALUES ($1, $2, $3)
-     RETURNING id, booth_id, name, role, created_at`,
-    [boothId, input.name, input.role ?? null],
+  input: BoothMemberInput,
+): Promise<BoothMemberResult> {
+  const guard = await guardBoothMemberWrite(userId, boothId);
+  if (!guard.ok) return guard;
+
+  const vals = memberValues(input);
+  const existing = await listBoothMembers(userId, boothId);
+  const draft = [
+    ...existing,
+    {
+      role: input.role,
+      splitPercent: vals.splitPercent,
+    } as Pick<BoothMember, "role" | "splitPercent">,
+  ];
+  const splitErr = validateInvestorSplitPercents(draft, guard.booth.profitSplitMethod);
+  if (splitErr) return { ok: false, reason: "invalid_split_percent" };
+
+  const { rows } = await query<BoothMemberRow>(
+    `INSERT INTO booth_members (booth_id, name, role, investment_amount, split_percent, wage_amount, wage_type)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING ${MEMBER_RETURN}`,
+    [boothId, input.name, input.role, vals.investment, vals.splitPercent, vals.wageAmount, vals.wageType],
   );
-  const r = rows[0];
-  return { id: r.id, boothId: r.booth_id, name: r.name, role: r.role, createdAt: toIso(r.created_at) };
+
+  return { ok: true, member: mapBoothMember(rows[0]) };
+}
+
+export async function updateBoothMember(
+  userId: string,
+  boothId: string,
+  memberId: string,
+  input: Partial<BoothMemberInput>,
+): Promise<BoothMemberResult> {
+  const guard = await guardBoothMemberWrite(userId, boothId);
+  if (!guard.ok) return guard;
+
+  const existing = (await listBoothMembers(userId, boothId)).find((m) => m.id === memberId);
+  if (!existing) return { ok: false, reason: "member_not_found" };
+
+  const merged: BoothMemberInput = {
+    name: input.name ?? existing.name,
+    role: input.role ?? existing.role,
+    investmentAmount:
+      input.investmentAmount ??
+      (existing.investmentAmount ? Number(existing.investmentAmount) : 0),
+    splitPercent:
+      input.splitPercent ?? (existing.splitPercent ? Number(existing.splitPercent) : undefined),
+    wageAmount: input.wageAmount ?? (existing.wageAmount ? Number(existing.wageAmount) : undefined),
+    wageType: input.wageType ?? existing.wageType ?? undefined,
+  };
+  const vals = memberValues(merged);
+  const draft = existing
+    .filter((m) => m.id !== memberId)
+    .concat([
+      {
+        role: merged.role,
+        splitPercent: vals.splitPercent,
+      } as Pick<BoothMember, "role" | "splitPercent">,
+    ]);
+  const splitErr = validateInvestorSplitPercents(draft, guard.booth.profitSplitMethod);
+  if (splitErr) return { ok: false, reason: "invalid_split_percent" };
+
+  const { rows } = await query<BoothMemberRow>(
+    `UPDATE booth_members m SET name = $4, role = $5, investment_amount = $6,
+       split_percent = $7, wage_amount = $8, wage_type = $9
+     FROM booths b
+     WHERE m.id = $3 AND m.booth_id = $2 AND b.id = m.booth_id AND b.user_id = $1
+     RETURNING m.id, m.booth_id, m.name, m.role, m.investment_amount,
+               m.split_percent::text AS split_percent, m.wage_amount, m.wage_type, m.created_at`,
+    [userId, boothId, memberId, merged.name, merged.role, vals.investment, vals.splitPercent, vals.wageAmount, vals.wageType],
+  );
+  if (!rows[0]) return { ok: false, reason: "member_not_found" };
+
+  return { ok: true, member: mapBoothMember(rows[0]) };
 }
 
 export async function deleteBoothMember(
@@ -473,9 +647,65 @@ export async function deleteBoothMember(
   return (rowCount ?? 0) > 0;
 }
 
-// ---- booth net for a calendar period (combined Stats, regular mode only) ----
-// Counts entries whose entry_date falls within [periodStart, periodEnd] AND the
-// owning booth's [start_date, end_date]. Booths with no overlap contribute 0.
+// ---- profit split (derived) -------------------------------------------------
+
+async function listBoothAdvances(userId: string, boothId: string) {
+  const { rows } = await query<{
+    payer_member_id: string;
+    member_name: string;
+    amount: string;
+    entry_date: string;
+  }>(
+    `SELECT e.payer_member_id, m.name AS member_name, e.amount, e.entry_date::text AS entry_date
+     FROM booth_expense_entries e
+     JOIN booth_members m ON m.id = e.payer_member_id
+     JOIN booths b ON b.id = e.booth_id
+     WHERE b.user_id = $1 AND e.booth_id = $2 AND e.payer_member_id IS NOT NULL
+     ORDER BY e.entry_date ASC, e.created_at ASC`,
+    [userId, boothId],
+  );
+  return rows.map((r) => ({
+    memberId: r.payer_member_id,
+    memberName: r.member_name,
+    amount: r.amount,
+    entryDate: r.entry_date,
+  }));
+}
+
+export async function splitProfit(
+  userId: string,
+  boothId: string,
+): Promise<SplitProfitResult | null> {
+  const booth = await getBooth(userId, boothId);
+  if (!booth) return null;
+
+  const summary = await boothSummary(userId, boothId);
+  if (!summary) return null;
+
+  const members = await listBoothMembers(userId, boothId);
+  const advances = await listBoothAdvances(userId, boothId);
+
+  return computeSplitProfit({
+    poolBudget: booth.poolBudget,
+    profitSplitMethod: booth.profitSplitMethod,
+    startDate: booth.startDate,
+    endDate: booth.endDate,
+    totalIncome: summary.totalIncome,
+    totalExpense: summary.entryExpense,
+    advances,
+    members: members.map((m) => ({
+      id: m.id,
+      name: m.name,
+      role: m.role,
+      investmentAmount: m.investmentAmount,
+      splitPercent: m.splitPercent,
+      wageAmount: m.wageAmount,
+      wageType: m.wageType,
+    })),
+  });
+}
+
+// ---- booth net for period ---------------------------------------------------
 
 export async function boothNetForPeriod(
   userId: string,
@@ -506,11 +736,26 @@ export async function boothNetForPeriod(
   return computeProfit(r.income, r.expense);
 }
 
-// ---- booth summary (fully derived, never stored) ----------------------------
+// ---- booth summary ----------------------------------------------------------
 
 export async function boothSummary(userId: string, boothId: string): Promise<BoothSummary | null> {
   const booth = await getBooth(userId, boothId);
   if (!booth) return null;
+
+  const members = await listBoothMembers(userId, boothId);
+  const eventDays = inclusiveEventDays(booth.startDate, booth.endDate);
+  const employeeCost = computeEmployeeCost(
+    members.map((m) => ({
+      id: m.id,
+      name: m.name,
+      role: m.role,
+      investmentAmount: m.investmentAmount,
+      splitPercent: m.splitPercent,
+      wageAmount: m.wageAmount,
+      wageType: m.wageType,
+    })),
+    eventDays,
+  );
 
   const { rows } = await query<{
     cash_income: string;
@@ -535,7 +780,8 @@ export async function boothSummary(userId: string, boothId: string): Promise<Boo
   );
   const r = rows[0];
   const totalIncome = sumDecimals(r.cash_income, r.transfer_income);
-  const totalExpense = sumDecimals(r.fixed_expense, r.variable_expense);
+  const entryExpense = sumDecimals(r.fixed_expense, r.variable_expense);
+  const totalExpense = sumDecimals(entryExpense, employeeCost);
 
   return {
     booth,
@@ -544,9 +790,14 @@ export async function boothSummary(userId: string, boothId: string): Promise<Boo
     totalIncome,
     fixedExpense: r.fixed_expense,
     variableExpense: r.variable_expense,
+    entryExpense,
+    employeeCost,
     totalExpense,
     profit: computeProfit(totalIncome, totalExpense),
     incomeCount: Number(r.income_count),
     expenseCount: Number(r.expense_count),
   };
 }
+
+// Legacy aliases
+export const addBoothMember = createBoothMember;

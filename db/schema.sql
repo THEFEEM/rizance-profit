@@ -115,17 +115,19 @@ CREATE TABLE IF NOT EXISTS pricing_settings (
 -- income_entries / expense_entries are never altered.
 -- =========================================================
 CREATE TABLE IF NOT EXISTS booths (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  name            VARCHAR(120) NOT NULL,
-  starting_budget NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (starting_budget >= 0),
-  start_date      DATE NOT NULL,
-  end_date        DATE NOT NULL,
-  status          VARCHAR(20) NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
-  closed_at       TIMESTAMPTZ,
-  note            VARCHAR(255),
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id             UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name                VARCHAR(120) NOT NULL,
+  pool_budget         NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (pool_budget >= 0),
+  profit_split_method VARCHAR(20) NOT NULL DEFAULT 'equal'
+    CHECK (profit_split_method IN ('equal', 'by_equity', 'custom_percent')),
+  start_date          DATE NOT NULL,
+  end_date            DATE NOT NULL,
+  status              VARCHAR(20) NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+  closed_at           TIMESTAMPTZ,
+  note                VARCHAR(255),
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
   CHECK (end_date >= start_date)
 );
 CREATE INDEX IF NOT EXISTS idx_booths_user_status ON booths (user_id, status);
@@ -145,24 +147,33 @@ CREATE INDEX IF NOT EXISTS idx_booth_income_booth_date ON booth_income_entries (
 CREATE INDEX IF NOT EXISTS idx_booth_income_user       ON booth_income_entries (user_id, booth_id);
 
 CREATE TABLE IF NOT EXISTS booth_expense_entries (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  booth_id   UUID NOT NULL REFERENCES booths(id) ON DELETE CASCADE,
-  user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  amount     NUMERIC(12,2) NOT NULL CHECK (amount >= 0),
-  cost_type  VARCHAR(20) NOT NULL CHECK (cost_type IN ('fixed', 'variable')),
-  label      VARCHAR(120),
-  note       VARCHAR(255),
-  entry_date DATE NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  booth_id         UUID NOT NULL REFERENCES booths(id) ON DELETE CASCADE,
+  user_id          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount           NUMERIC(12,2) NOT NULL CHECK (amount >= 0),
+  cost_type        VARCHAR(20) NOT NULL CHECK (cost_type IN ('fixed', 'variable')),
+  label            VARCHAR(120),
+  note             VARCHAR(255),
+  payer_member_id  UUID REFERENCES booth_members(id) ON DELETE SET NULL,
+  entry_date       DATE NOT NULL,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_booth_expense_booth_date ON booth_expense_entries (booth_id, entry_date);
 CREATE INDEX IF NOT EXISTS idx_booth_expense_user       ON booth_expense_entries (user_id, booth_id);
+CREATE INDEX IF NOT EXISTS idx_booth_expense_payer
+  ON booth_expense_entries (payer_member_id) WHERE payer_member_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS booth_members (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  booth_id   UUID NOT NULL REFERENCES booths(id) ON DELETE CASCADE,
-  name       VARCHAR(120) NOT NULL,
-  role       VARCHAR(60),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  booth_id          UUID NOT NULL REFERENCES booths(id) ON DELETE CASCADE,
+  name              VARCHAR(120) NOT NULL,
+  role              VARCHAR(20) NOT NULL DEFAULT 'employee'
+    CHECK (role IN ('investor', 'employee', 'manager')),
+  investment_amount NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (investment_amount >= 0),
+  split_percent     NUMERIC(5,2) CHECK (split_percent IS NULL OR (split_percent >= 0 AND split_percent <= 100)),
+  wage_amount       NUMERIC(12,2) CHECK (wage_amount IS NULL OR wage_amount >= 0),
+  wage_type         VARCHAR(10) CHECK (wage_type IS NULL OR wage_type IN ('daily', 'event')),
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_booth_members_booth ON booth_members (booth_id);
+CREATE INDEX IF NOT EXISTS idx_booth_members_booth_role ON booth_members (booth_id, role);
