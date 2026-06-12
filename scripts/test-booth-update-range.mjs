@@ -70,7 +70,7 @@ try {
   userId = users[0].id;
 
   const { rows: booths } = await client.query(
-    `INSERT INTO booths (user_id, name, starting_budget, start_date, end_date)
+    `INSERT INTO booths (user_id, name, pool_budget, start_date, end_date)
      VALUES ($1, 'งาน 3 วัน', 500.00, '2026-06-09'::date, '2026-06-11'::date)
      RETURNING id, start_date::text AS start_date, end_date::text AS end_date`,
     [userId],
