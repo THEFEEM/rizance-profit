@@ -1,8 +1,9 @@
 import { redirect, notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
-import { boothSummary } from "@/lib/booth-queries";
+import { boothSummary, splitProfit } from "@/lib/booth-queries";
 import { BoothBack } from "@/components/booth/BoothBack";
 import { BoothSummaryCard } from "@/components/booth/BoothSummaryCard";
+import { BoothSplitTable } from "@/components/booth/BoothSplitTable";
 import { formatDayShort } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,7 @@ export default async function BoothSummaryPage({ params }: { params: Promise<{ i
   const summary = await boothSummary(user.id, id);
   if (!summary) notFound();
 
+  const split = await splitProfit(user.id, id);
   const { booth } = summary;
   const closed = booth.status === "closed";
 
@@ -43,7 +45,8 @@ export default async function BoothSummaryPage({ params }: { params: Promise<{ i
         )}
       </div>
 
-      <BoothSummaryCard summary={summary} currency={user.currency} />
+      <BoothSummaryCard summary={summary} split={split} currency={user.currency} />
+      {split && <BoothSplitTable split={split} currency={user.currency} />}
     </div>
   );
 }
