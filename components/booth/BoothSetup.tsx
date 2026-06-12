@@ -56,11 +56,8 @@ export function BoothSetup({
   }, 0);
   const totalBudget = poolNum + memberEquity;
 
-  async function saveSettings() {
-    if (closed || !name.trim()) return;
-    setSaving(true);
-    setError(null);
-    setSavedFlash(false);
+  async function persistSettings(): Promise<boolean> {
+    if (closed || !name.trim()) return false;
 
     const payload = {
       name: name.trim(),
@@ -80,14 +77,13 @@ export function BoothSetup({
       if (res.ok) {
         router.replace(`/booth/${res.data.id}/setup`);
         router.refresh();
-      } else {
-        setError(res.message);
-        setSaving(false);
+        return true;
       }
-      return;
+      setError(res.message);
+      return false;
     }
 
-    if (!booth) return;
+    if (!booth) return false;
     const res = await apiFetch<Booth>(`/api/booths/${booth.id}`, {
       method: "PATCH",
       body: JSON.stringify(payload),
@@ -95,10 +91,30 @@ export function BoothSetup({
     if (res.ok) {
       setSavedFlash(true);
       router.refresh();
-    } else {
-      setError(res.message);
+      return true;
     }
+    setError(res.message);
+    return false;
+  }
+
+  async function saveSettings() {
+    setSaving(true);
+    setError(null);
+    setSavedFlash(false);
+    await persistSettings();
     setSaving(false);
+  }
+
+  async function finishSetup() {
+    if (!booth || createMode || closed) return;
+    setSaving(true);
+    setError(null);
+    setSavedFlash(false);
+    const ok = await persistSettings();
+    setSaving(false);
+    if (ok) {
+      router.push(`/booth/${booth.id}`);
+    }
   }
 
   return (
@@ -257,6 +273,18 @@ export function BoothSetup({
             closed={closed}
             currency={currency}
           />
+          {!closed && (
+            <div className="px-4 pt-4">
+              {error && (
+                <p className="mb-2 text-sm text-red-600" role="alert">
+                  {error}
+                </p>
+              )}
+              <Button onClick={finishSetup} disabled={saving || !name.trim()}>
+                {saving ? "กำลังบันทึก…" : "เสร็จสิ้น"}
+              </Button>
+            </div>
+          )}
         </section>
       )}
 
