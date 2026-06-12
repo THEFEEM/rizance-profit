@@ -6,7 +6,6 @@ import {
   PAYMENT_METHODS,
   PROFIT_SPLIT_METHODS,
   WAGE_TYPES,
-  type MemberRole,
 } from "@/types/booth";
 
 const moneyNonNegative = z
@@ -56,6 +55,7 @@ export const boothSchema = z
       z.string().min(1, "กรุณาระบุชื่องาน").max(120),
     ),
     poolBudget: moneyNonNegative,
+    poolGetsShare: z.boolean().optional(),
     profitSplitMethod: z.enum(PROFIT_SPLIT_METHODS).optional(),
     startDate: boothDate,
     endDate: boothDate,
@@ -69,6 +69,21 @@ export const boothSchema = z
     path: ["endDate"],
   });
 
+function wagePairRefine(
+  d: { wageAmount?: number; wageType?: string },
+  ctx: z.RefinementCtx,
+  pathPrefix: string,
+) {
+  const hasWage = d.wageAmount !== undefined && d.wageAmount > 0;
+  const hasType = d.wageType !== undefined;
+  if (hasWage && !hasType) {
+    ctx.addIssue({ code: "custom", message: "กรุณาระบุประเภทค่าแรง", path: [`${pathPrefix}wageType`] });
+  }
+  if (hasType && !hasWage) {
+    ctx.addIssue({ code: "custom", message: "กรุณาระบุค่าแรง", path: [`${pathPrefix}wageAmount`] });
+  }
+}
+
 export const boothMemberSchema = z
   .object({
     name: z.preprocess(
@@ -77,7 +92,6 @@ export const boothMemberSchema = z
     ),
     role: z.enum(MEMBER_ROLES),
     investmentAmount: moneyNonNegative.optional(),
-    splitPercent: moneyNonNegative.max(100).optional(),
     wageAmount: moneyNonNegative.optional(),
     wageType: z.enum(WAGE_TYPES).optional(),
   })
@@ -90,21 +104,11 @@ export const boothMemberSchema = z
       if (d.investmentAmount !== undefined && d.investmentAmount > 0) {
         ctx.addIssue({ code: "custom", message: "พนักงานไม่มีเงินลงทุน", path: ["investmentAmount"] });
       }
-      if (d.splitPercent !== undefined) {
-        ctx.addIssue({ code: "custom", message: "พนักงานไม่มี % แบ่งกำไร", path: ["splitPercent"] });
-      }
       if (!d.wageAmount || d.wageAmount <= 0 || !d.wageType) {
         ctx.addIssue({ code: "custom", message: "กรุณาระบุค่าแรงและประเภท", path: ["wageAmount"] });
       }
     } else if (d.role === "manager") {
-      if (
-        (d.investmentAmount !== undefined && d.investmentAmount > 0) ||
-        d.splitPercent !== undefined ||
-        d.wageAmount !== undefined ||
-        d.wageType !== undefined
-      ) {
-        ctx.addIssue({ code: "custom", message: "ผู้จัดการไม่มีข้อมูลเงิน", path: ["role"] });
-      }
+      wagePairRefine(d, ctx, "");
     }
   });
 
@@ -115,6 +119,7 @@ export const boothPatchSchema = z.object({
     z.string().min(1, "กรุณาระบุชื่องาน").max(120).optional(),
   ),
   poolBudget: moneyNonNegative.optional(),
+  poolGetsShare: z.boolean().optional(),
   profitSplitMethod: z.enum(PROFIT_SPLIT_METHODS).optional(),
   startDate: boothDate.optional(),
   endDate: boothDate.optional(),
@@ -124,36 +129,24 @@ export const boothPatchSchema = z.object({
   ),
 });
 
-export const boothMemberPatchSchema = z.object({
-  name: z.preprocess(
-    (v) => (typeof v === "string" ? v.trim() : v),
-    z.string().min(1, "กรุณาระบุชื่อ").max(120).optional(),
-  ),
-  role: z.enum(MEMBER_ROLES).optional(),
-  investmentAmount: moneyNonNegative.optional(),
-  splitPercent: moneyNonNegative.max(100).optional(),
-  wageAmount: moneyNonNegative.optional(),
-  wageType: z.enum(WAGE_TYPES).optional(),
-});
+export const boothMemberPatchSchema = z
+  .object({
+    name: z.preprocess(
+      (v) => (typeof v === "string" ? v.trim() : v),
+      z.string().min(1, "กรุณาระบุชื่อ").max(120).optional(),
+    ),
+    role: z.enum(MEMBER_ROLES).optional(),
+    investmentAmount: moneyNonNegative.optional(),
+    wageAmount: moneyNonNegative.optional(),
+    wageType: z.enum(WAGE_TYPES).optional(),
+  })
+  .superRefine((d, ctx) => {
+    if (d.role === "manager" || (d.wageAmount !== undefined || d.wageType !== undefined)) {
+      wagePairRefine(d, ctx, "");
+    }
+  });
 
 export type BoothSchemaInput = z.infer<typeof boothSchema>;
 export type BoothMemberSchemaInput = z.infer<typeof boothMemberSchema>;
 export type BoothPatchSchemaInput = z.infer<typeof boothPatchSchema>;
 export type BoothMemberPatchSchemaInput = z.infer<typeof boothMemberPatchSchema>;
-
-/** App-layer check: custom_percent investors must sum to 100.00 */
-export function validateInvestorSplitPercents(
-  members: { role: MemberRole; splitPercent: string | null }[],
-  method: string,
-): string | null {
-  if (method !== "custom_percent") return null;
-  const investors = members.filter((m) => m.role === "investor");
-  if (investors.length === 0) return "ไม่มีนักลงทุน";
-  let sum = 0;
-  for (const m of investors) {
-    if (m.splitPercent === null) return "นักลงทุนทุกคนต้องมี % แบ่งกำไร";
-    sum += Math.round(Number(m.splitPercent) * 100);
-  }
-  if (sum !== 10_000) return `สัดส่วน % ต้องรวม 100.00 (ได้ ${(sum / 100).toFixed(2)}%)`;
-  return null;
-}

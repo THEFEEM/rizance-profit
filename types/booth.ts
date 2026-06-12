@@ -10,7 +10,7 @@ export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 export const BOOTH_COST_TYPES = ["fixed", "variable"] as const;
 export type BoothCostType = (typeof BOOTH_COST_TYPES)[number];
 
-export const PROFIT_SPLIT_METHODS = ["equal", "by_equity", "custom_percent"] as const;
+export const PROFIT_SPLIT_METHODS = ["equal", "by_equity"] as const;
 export type ProfitSplitMethod = (typeof PROFIT_SPLIT_METHODS)[number];
 
 export const MEMBER_ROLES = ["investor", "employee", "manager"] as const;
@@ -32,7 +32,6 @@ export const BOOTH_COST_TYPE_LABELS: Record<BoothCostType, string> = {
 export const PROFIT_SPLIT_METHOD_LABELS: Record<ProfitSplitMethod, string> = {
   equal: "เท่ากัน",
   by_equity: "ตามสัดส่วนลงทุน",
-  custom_percent: "กำหนด % เอง",
 };
 
 export const MEMBER_ROLE_LABELS: Record<MemberRole, string> = {
@@ -50,8 +49,10 @@ export type Booth = {
   id: string;
   name: string;
   poolBudget: string;
+  /** When true, pool_budget participates as virtual shareholder in profit split. */
+  poolGetsShare: boolean;
   profitSplitMethod: ProfitSplitMethod;
-  /** SUM(investment_amount) for investors — derived. */
+  /** SUM(investment_amount) for investors + managers — derived. */
   memberEquity: string;
   /** poolBudget + memberEquity — derived, never stored. */
   totalBudget: string;
@@ -92,7 +93,6 @@ export type BoothMember = {
   name: string;
   role: MemberRole;
   investmentAmount: string;
-  splitPercent: string | null;
   wageAmount: string | null;
   wageType: WageType | null;
   createdAt: string;
@@ -108,16 +108,21 @@ export type BoothSummary = {
   variableExpense: string;
   /** Expenses from booth_expense_entries only. */
   entryExpense: string;
-  /** Computed from member wage fields. */
-  employeeCost: string;
-  /** entryExpense + employeeCost — used for budget bar. */
+  /** Computed from employee + manager wage fields. */
+  wageCost: string;
+  /** entryExpense + wageCost — used for budget bar. */
   totalExpense: string;
   profit: string;
   incomeCount: number;
   expenseCount: number;
 };
 
-export type { SplitProfitResult, MemberShare, AdvanceRepayment } from "@/lib/booth-split";
+export type {
+  SplitProfitResult,
+  MemberShare,
+  AdvanceRepayment,
+  PoolShare,
+} from "@/lib/booth-split";
 
 /** Result of a booth entry write; failures are explicit, not thrown. */
 export type BoothEntryResult<T> =
@@ -136,12 +141,7 @@ export type BoothMemberResult =
   | { ok: true; member: BoothMember }
   | {
       ok: false;
-      reason:
-        | "booth_not_found"
-        | "booth_closed"
-        | "member_not_found"
-        | "invalid_split_percent"
-        | "invalid_payer";
+      reason: "booth_not_found" | "booth_closed" | "member_not_found" | "invalid_payer";
     };
 
 /** Close is permanent in v1 — no reopen. */

@@ -3,11 +3,10 @@
 import { query } from "@/lib/db";
 import {
   computeSplitProfit,
-  computeEmployeeCost,
+  computeWageCost,
   inclusiveEventDays,
   type SplitProfitResult,
 } from "@/lib/booth-split";
-import { validateInvestorSplitPercents } from "@/lib/booth-validation";
 import { computeProfit, sumDecimals } from "@/lib/money";
 import { today } from "@/lib/date";
 import type {
@@ -37,6 +36,7 @@ type BoothRow = {
   id: string;
   name: string;
   pool_budget: string;
+  pool_gets_share: boolean;
   profit_split_method: string;
   member_equity: string;
   start_date: string;
@@ -54,6 +54,7 @@ function mapBooth(r: BoothRow): Booth {
     id: r.id,
     name: r.name,
     poolBudget: r.pool_budget,
+    poolGetsShare: r.pool_gets_share,
     profitSplitMethod: r.profit_split_method as Booth["profitSplitMethod"],
     memberEquity,
     totalBudget: sumDecimals(r.pool_budget, memberEquity),
@@ -70,10 +71,10 @@ function mapBooth(r: BoothRow): Booth {
 const MEMBER_EQUITY_SQL = `COALESCE((
   SELECT SUM(m.investment_amount)
   FROM booth_members m
-  WHERE m.booth_id = b.id AND m.role = 'investor'
+  WHERE m.booth_id = b.id AND m.role IN ('investor', 'manager')
 ), 0)::text AS member_equity`;
 
-const BOOTH_COLS = `b.id, b.name, b.pool_budget, b.profit_split_method,
+const BOOTH_COLS = `b.id, b.name, b.pool_budget, b.pool_gets_share, b.profit_split_method,
   ${MEMBER_EQUITY_SQL},
   b.start_date::text AS start_date, b.end_date::text AS end_date,
   b.status, b.closed_at, b.note, b.created_at, b.updated_at`;
@@ -132,7 +133,6 @@ type BoothMemberRow = {
   name: string;
   role: string;
   investment_amount: string;
-  split_percent: string | null;
   wage_amount: string | null;
   wage_type: string | null;
   created_at: Date | string;
@@ -145,7 +145,6 @@ function mapBoothMember(r: BoothMemberRow): BoothMember {
     name: r.name,
     role: r.role as MemberRole,
     investmentAmount: r.investment_amount,
-    splitPercent: r.split_percent,
     wageAmount: r.wage_amount,
     wageType: r.wage_type as WageType | null,
     createdAt: toIso(r.created_at),
@@ -155,14 +154,25 @@ function mapBoothMember(r: BoothMemberRow): BoothMember {
 const EXPENSE_RETURN = `id, booth_id, amount, cost_type, label, note, payer_member_id,
   entry_date::text AS entry_date, created_at`;
 
-const MEMBER_RETURN = `id, booth_id, name, role, investment_amount, split_percent::text AS split_percent,
-  wage_amount, wage_type, created_at`;
+const MEMBER_RETURN = `id, booth_id, name, role, investment_amount, wage_amount, wage_type, created_at`;
+
+function toSplitMemberInput(m: BoothMember) {
+  return {
+    id: m.id,
+    name: m.name,
+    role: m.role,
+    investmentAmount: m.investmentAmount,
+    wageAmount: m.wageAmount,
+    wageType: m.wageType,
+  };
+}
 
 // ---- booths ----------------------------------------------------------------
 
 export type BoothInput = {
   name: string;
   poolBudget: number;
+  poolGetsShare?: boolean;
   profitSplitMethod?: Booth["profitSplitMethod"];
   startDate: string;
   endDate: string;
@@ -189,13 +199,14 @@ export async function getBooth(userId: string, id: string): Promise<Booth | null
 
 export async function createBooth(userId: string, input: BoothInput): Promise<Booth> {
   const { rows } = await query<{ id: string }>(
-    `INSERT INTO booths (user_id, name, pool_budget, profit_split_method, start_date, end_date, note)
-     VALUES ($1, $2, $3, $4, $5::date, $6::date, $7)
+    `INSERT INTO booths (user_id, name, pool_budget, pool_gets_share, profit_split_method, start_date, end_date, note)
+     VALUES ($1, $2, $3, $4, $5, $6::date, $7::date, $8)
      RETURNING id`,
     [
       userId,
       input.name,
       input.poolBudget.toFixed(2),
+      input.poolGetsShare ?? false,
       input.profitSplitMethod ?? "equal",
       input.startDate,
       input.endDate,
@@ -245,8 +256,8 @@ export async function updateBooth(
   }
 
   const { rows } = await query<BoothRow>(
-    `UPDATE booths b SET name = $3, pool_budget = $4, profit_split_method = $5,
-       start_date = $6::date, end_date = $7::date, note = $8, updated_at = now()
+    `UPDATE booths b SET name = $3, pool_budget = $4, pool_gets_share = $5,
+       profit_split_method = $6, start_date = $7::date, end_date = $8::date, note = $9, updated_at = now()
      WHERE b.user_id = $1 AND b.id = $2 AND b.status = 'open'
      RETURNING ${BOOTH_COLS}`,
     [
@@ -254,6 +265,7 @@ export async function updateBooth(
       id,
       input.name ?? existing.name,
       (input.poolBudget ?? Number(existing.poolBudget)).toFixed(2),
+      input.poolGetsShare ?? existing.poolGetsShare,
       input.profitSplitMethod ?? existing.profitSplitMethod,
       newStart,
       newEnd,
@@ -512,7 +524,7 @@ export async function deleteBoothExpense(
 export async function listBoothMembers(userId: string, boothId: string): Promise<BoothMember[]> {
   const { rows } = await query<BoothMemberRow>(
     `SELECT m.id, m.booth_id, m.name, m.role, m.investment_amount,
-            m.split_percent::text AS split_percent, m.wage_amount, m.wage_type, m.created_at
+            m.wage_amount, m.wage_type, m.created_at
      FROM booth_members m JOIN booths b ON b.id = m.booth_id
      WHERE b.user_id = $1 AND m.booth_id = $2
      ORDER BY m.created_at ASC`,
@@ -525,21 +537,18 @@ export type BoothMemberInput = {
   name: string;
   role: MemberRole;
   investmentAmount?: number;
-  splitPercent?: number;
   wageAmount?: number;
   wageType?: WageType;
 };
 
 function memberValues(input: BoothMemberInput): {
   investment: string;
-  splitPercent: string | null;
   wageAmount: string | null;
   wageType: WageType | null;
 } {
   if (input.role === "investor") {
     return {
       investment: (input.investmentAmount ?? 0).toFixed(2),
-      splitPercent: input.splitPercent !== undefined ? input.splitPercent.toFixed(2) : null,
       wageAmount: null,
       wageType: null,
     };
@@ -547,12 +556,16 @@ function memberValues(input: BoothMemberInput): {
   if (input.role === "employee") {
     return {
       investment: "0.00",
-      splitPercent: null,
       wageAmount: (input.wageAmount ?? 0).toFixed(2),
       wageType: input.wageType ?? null,
     };
   }
-  return { investment: "0.00", splitPercent: null, wageAmount: null, wageType: null };
+  return {
+    investment: (input.investmentAmount ?? 0).toFixed(2),
+    wageAmount:
+      input.wageAmount !== undefined ? input.wageAmount.toFixed(2) : null,
+    wageType: input.wageType ?? null,
+  };
 }
 
 export async function createBoothMember(
@@ -564,19 +577,12 @@ export async function createBoothMember(
   if (!guard.ok) return guard;
 
   const vals = memberValues(input);
-  const existing = await listBoothMembers(userId, boothId);
-  const draft = [
-    ...existing.map((m) => ({ role: m.role, splitPercent: m.splitPercent })),
-    { role: input.role, splitPercent: vals.splitPercent },
-  ];
-  const splitErr = validateInvestorSplitPercents(draft, guard.booth.profitSplitMethod);
-  if (splitErr) return { ok: false, reason: "invalid_split_percent" };
 
   const { rows } = await query<BoothMemberRow>(
-    `INSERT INTO booth_members (booth_id, name, role, investment_amount, split_percent, wage_amount, wage_type)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO booth_members (booth_id, name, role, investment_amount, wage_amount, wage_type)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING ${MEMBER_RETURN}`,
-    [boothId, input.name, input.role, vals.investment, vals.splitPercent, vals.wageAmount, vals.wageType],
+    [boothId, input.name, input.role, vals.investment, vals.wageAmount, vals.wageType],
   );
 
   return { ok: true, member: mapBoothMember(rows[0]) };
@@ -601,27 +607,19 @@ export async function updateBoothMember(
     investmentAmount:
       input.investmentAmount ??
       (existing.investmentAmount ? Number(existing.investmentAmount) : 0),
-    splitPercent:
-      input.splitPercent ?? (existing.splitPercent ? Number(existing.splitPercent) : undefined),
     wageAmount: input.wageAmount ?? (existing.wageAmount ? Number(existing.wageAmount) : undefined),
     wageType: input.wageType ?? existing.wageType ?? undefined,
   };
   const vals = memberValues(merged);
-  const draft = allMembers
-    .filter((m) => m.id !== memberId)
-    .map((m) => ({ role: m.role, splitPercent: m.splitPercent }))
-    .concat([{ role: merged.role, splitPercent: vals.splitPercent }]);
-  const splitErr = validateInvestorSplitPercents(draft, guard.booth.profitSplitMethod);
-  if (splitErr) return { ok: false, reason: "invalid_split_percent" };
 
   const { rows } = await query<BoothMemberRow>(
     `UPDATE booth_members m SET name = $4, role = $5, investment_amount = $6,
-       split_percent = $7, wage_amount = $8, wage_type = $9
+       wage_amount = $7, wage_type = $8
      FROM booths b
      WHERE m.id = $3 AND m.booth_id = $2 AND b.id = m.booth_id AND b.user_id = $1
      RETURNING m.id, m.booth_id, m.name, m.role, m.investment_amount,
-               m.split_percent::text AS split_percent, m.wage_amount, m.wage_type, m.created_at`,
-    [userId, boothId, memberId, merged.name, merged.role, vals.investment, vals.splitPercent, vals.wageAmount, vals.wageType],
+               m.wage_amount, m.wage_type, m.created_at`,
+    [userId, boothId, memberId, merged.name, merged.role, vals.investment, vals.wageAmount, vals.wageType],
   );
   if (!rows[0]) return { ok: false, reason: "member_not_found" };
 
@@ -681,21 +679,14 @@ export async function splitProfit(
 
   return computeSplitProfit({
     poolBudget: booth.poolBudget,
+    poolGetsShare: booth.poolGetsShare,
     profitSplitMethod: booth.profitSplitMethod,
     startDate: booth.startDate,
     endDate: booth.endDate,
     totalIncome: summary.totalIncome,
     totalExpense: summary.entryExpense,
     advances,
-    members: members.map((m) => ({
-      id: m.id,
-      name: m.name,
-      role: m.role,
-      investmentAmount: m.investmentAmount,
-      splitPercent: m.splitPercent,
-      wageAmount: m.wageAmount,
-      wageType: m.wageType,
-    })),
+    members: members.map(toSplitMemberInput),
   });
 }
 
@@ -738,18 +729,7 @@ export async function boothSummary(userId: string, boothId: string): Promise<Boo
 
   const members = await listBoothMembers(userId, boothId);
   const eventDays = inclusiveEventDays(booth.startDate, booth.endDate);
-  const employeeCost = computeEmployeeCost(
-    members.map((m) => ({
-      id: m.id,
-      name: m.name,
-      role: m.role,
-      investmentAmount: m.investmentAmount,
-      splitPercent: m.splitPercent,
-      wageAmount: m.wageAmount,
-      wageType: m.wageType,
-    })),
-    eventDays,
-  );
+  const wageCost = computeWageCost(members.map(toSplitMemberInput), eventDays);
 
   const { rows } = await query<{
     cash_income: string;
@@ -775,7 +755,7 @@ export async function boothSummary(userId: string, boothId: string): Promise<Boo
   const r = rows[0];
   const totalIncome = sumDecimals(r.cash_income, r.transfer_income);
   const entryExpense = sumDecimals(r.fixed_expense, r.variable_expense);
-  const totalExpense = sumDecimals(entryExpense, employeeCost);
+  const totalExpense = sumDecimals(entryExpense, wageCost);
 
   return {
     booth,
@@ -785,7 +765,7 @@ export async function boothSummary(userId: string, boothId: string): Promise<Boo
     fixedExpense: r.fixed_expense,
     variableExpense: r.variable_expense,
     entryExpense,
-    employeeCost,
+    wageCost,
     totalExpense,
     profit: computeProfit(totalIncome, totalExpense),
     incomeCount: Number(r.income_count),

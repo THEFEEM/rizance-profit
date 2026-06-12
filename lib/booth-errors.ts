@@ -9,7 +9,6 @@ export const BOOTH_MEMBER_REASON_MESSAGES = {
   booth_not_found: "ไม่พบงานบูธนี้",
   booth_closed: "งานบูธปิดแล้ว — ไม่สามารถแก้สมาชิกได้",
   member_not_found: "ไม่พบสมาชิก",
-  invalid_split_percent: "สัดส่วน % แบ่งกำไรไม่ถูกต้อง",
   invalid_payer: "ไม่พบสมาชิกที่จ่ายแทน",
 } as const;
 
@@ -37,7 +36,6 @@ export function boothMemberHttpStatus(reason: BoothMemberReason): number {
       return 404;
     case "booth_closed":
       return 409;
-    case "invalid_split_percent":
     case "invalid_payer":
       return 400;
   }

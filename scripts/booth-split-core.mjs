@@ -47,31 +47,29 @@ export function floorWholeBaht(amount) {
 export function computeMemberEquity(members) {
   return sumDecimals(
     0,
-    ...members.filter((m) => m.role === "investor").map((m) => m.investmentAmount),
+    ...members
+      .filter((m) => m.role === "investor" || m.role === "manager")
+      .map((m) => m.investmentAmount),
   );
 }
 
-export function computeEmployeeCost(members, eventDays) {
+export function computeWageCost(members, eventDays) {
   let totalCents = 0;
   for (const m of members) {
-    if (m.role !== "employee" || !m.wageAmount || !m.wageType) continue;
+    if (m.role !== "employee" && m.role !== "manager") continue;
+    if (!m.wageAmount || !m.wageType) continue;
     const mult = m.wageType === "event" ? 1 : eventDays;
     totalCents += toCents(m.wageAmount) * mult;
   }
   return centsToDecimalString(totalCents);
 }
 
+export const computeEmployeeCost = computeWageCost;
+
 function exactShareByRatio(amount, numerator, denominator) {
   if (denominator === 0) return "0.00";
   const shareCents = Math.trunc((toCents(amount) * numerator) / denominator);
   return centsToDecimalString(shareCents);
-}
-
-function percentSumHundredths(investors) {
-  return investors.reduce((sum, m) => {
-    if (m.splitPercent === null || m.splitPercent === undefined) return sum;
-    return sum + toCents(m.splitPercent);
-  }, 0);
 }
 
 export function computeAdvanceRepayments(grossProfit, advances) {
@@ -102,48 +100,59 @@ export function computeAdvanceRepayments(grossProfit, advances) {
   }));
 }
 
-function investorWeights(method, investors) {
-  if (investors.length === 0) {
-    return { weights: [], warning: "ไม่มีนักลงทุน — ไม่สามารถแบ่งกำไรได้" };
+function shareParticipants(poolBudget, poolGetsShare, members) {
+  const shareMembers = members.filter(
+    (m) =>
+      (m.role === "investor" || m.role === "manager") && toCents(m.investmentAmount) > 0,
+  );
+  const poolCents = poolGetsShare && toCents(poolBudget) > 0 ? toCents(poolBudget) : 0;
+  return { members: shareMembers, poolCents };
+}
+
+function shareWeights(method, poolBudget, poolGetsShare, members) {
+  const { members: participants, poolCents } = shareParticipants(
+    poolBudget,
+    poolGetsShare,
+    members,
+  );
+  const headCount = participants.length + (poolCents > 0 ? 1 : 0);
+
+  if (headCount === 0) {
+    return {
+      memberWeights: [],
+      poolWeight: null,
+      warning: "ไม่มีผู้รับส่วนแบ่งกำไร — ตรวจสอบ equity หรือ pool_gets_share",
+    };
   }
 
   if (method === "equal") {
     return {
-      weights: investors.map((m) => ({ member: m, numerator: 1, denominator: investors.length })),
-    };
-  }
-
-  if (method === "by_equity") {
-    const equityCents = investors.reduce((s, m) => s + toCents(m.investmentAmount), 0);
-    if (equityCents <= 0) {
-      return {
-        weights: [],
-        warning: "สัดส่วนลงทุนรวมเป็นศูนย์ — ไม่สามารถแบ่งตาม equity ได้",
-      };
-    }
-    return {
-      weights: investors.map((m) => ({
+      memberWeights: participants.map((m) => ({
         member: m,
-        numerator: toCents(m.investmentAmount),
-        denominator: equityCents,
+        numerator: 1,
+        denominator: headCount,
       })),
+      poolWeight: poolCents > 0 ? { numerator: 1, denominator: headCount } : null,
     };
   }
 
-  const pctTotal = percentSumHundredths(investors);
-  if (pctTotal !== 10_000) {
+  const equityTotal =
+    participants.reduce((s, m) => s + toCents(m.investmentAmount), 0) + poolCents;
+  if (equityTotal <= 0) {
     return {
-      weights: [],
-      warning: `สัดส่วนกำหนดเองต้องรวม 100.00% (ได้ ${(pctTotal / 100).toFixed(2)}%)`,
+      memberWeights: [],
+      poolWeight: null,
+      warning: "สัดส่วนลงทุนรวมเป็นศูนย์ — ไม่สามารถแบ่งตาม equity ได้",
     };
   }
 
   return {
-    weights: investors.map((m) => ({
+    memberWeights: participants.map((m) => ({
       member: m,
-      numerator: toCents(m.splitPercent ?? "0"),
-      denominator: 10_000,
+      numerator: toCents(m.investmentAmount),
+      denominator: equityTotal,
     })),
+    poolWeight: poolCents > 0 ? { numerator: poolCents, denominator: equityTotal } : null,
   };
 }
 
@@ -151,10 +160,10 @@ export function computeSplitProfit(input) {
   const eventDays = inclusiveEventDays(input.startDate, input.endDate);
   const memberEquity = computeMemberEquity(input.members);
   const totalBudget = sumDecimals(input.poolBudget, memberEquity);
-  const employeeCost = computeEmployeeCost(input.members, eventDays);
+  const wageCost = computeWageCost(input.members, eventDays);
   const grossProfit = computeProfit(
     computeProfit(input.totalIncome, input.totalExpense),
-    employeeCost,
+    wageCost,
   );
 
   const advanceRepayments = computeAdvanceRepayments(grossProfit, input.advances);
@@ -162,65 +171,115 @@ export function computeSplitProfit(input) {
   const netProfit = computeProfit(grossProfit, repayTotal);
   const isLoss = toCents(netProfit) < 0;
 
-  const investors = input.members.filter((m) => m.role === "investor");
-  const employees = input.members.filter((m) => m.role === "employee");
   const repaymentByMember = new Map(advanceRepayments.map((r) => [r.memberId, r.amount]));
 
-  const { weights, warning } = investorWeights(input.profitSplitMethod, investors);
+  const { memberWeights, poolWeight, warning } = shareWeights(
+    input.profitSplitMethod,
+    input.poolBudget,
+    input.poolGetsShare ?? false,
+    input.members,
+  );
 
-  const investorShares = weights.map(({ member, numerator, denominator }) => {
+  const memberShares = memberWeights.map(({ member, numerator, denominator }) => {
     const exact = exactShareByRatio(netProfit, numerator, denominator);
+    const wage =
+      (member.role === "manager" || member.role === "employee") &&
+      member.wageAmount &&
+      member.wageType
+        ? centsToDecimalString(
+            toCents(member.wageAmount) * (member.wageType === "event" ? 1 : eventDays),
+          )
+        : "0.00";
     return {
       memberId: member.id,
       name: member.name,
       role: member.role,
       investmentAmount: member.investmentAmount,
-      splitPercent: member.splitPercent,
       exactShare: exact,
       flooredShare: floorWholeBaht(exact),
       advanceRepayment: repaymentByMember.get(member.id) ?? "0.00",
-      wageCost: "0.00",
-      eventDays: null,
+      wageCost: wage,
+      eventDays:
+        (member.role === "employee" || member.role === "manager") &&
+        member.wageType === "daily"
+          ? eventDays
+          : null,
     };
   });
 
-  const employeeShares = employees.map((m) => {
-    const mult = m.wageType === "event" ? 1 : eventDays;
+  for (const m of input.members.filter((x) => x.role === "employee")) {
+    if (memberShares.some((s) => s.memberId === m.id)) continue;
     const wage =
       m.wageAmount && m.wageType
-        ? centsToDecimalString(toCents(m.wageAmount) * mult)
+        ? centsToDecimalString(
+            toCents(m.wageAmount) * (m.wageType === "event" ? 1 : eventDays),
+          )
         : "0.00";
-    return {
+    memberShares.push({
       memberId: m.id,
       name: m.name,
       role: m.role,
       investmentAmount: "0.00",
-      splitPercent: null,
       exactShare: "0.00",
       flooredShare: "0.00",
       advanceRepayment: repaymentByMember.get(m.id) ?? "0.00",
       wageCost: wage,
       eventDays: m.wageType === "daily" ? eventDays : null,
-    };
-  });
+    });
+  }
 
-  const memberShares = [...investorShares, ...employeeShares];
-  const flooredTotal = sumDecimals(0, ...investorShares.map((s) => s.flooredShare));
-  const remainder = computeProfit(netProfit, flooredTotal);
+  for (const m of input.members.filter(
+    (x) => x.role === "manager" && toCents(x.investmentAmount) <= 0,
+  )) {
+    if (memberShares.some((s) => s.memberId === m.id)) continue;
+    const wage =
+      m.wageAmount && m.wageType
+        ? centsToDecimalString(
+            toCents(m.wageAmount) * (m.wageType === "event" ? 1 : eventDays),
+          )
+        : "0.00";
+    memberShares.push({
+      memberId: m.id,
+      name: m.name,
+      role: m.role,
+      investmentAmount: "0.00",
+      exactShare: "0.00",
+      flooredShare: "0.00",
+      advanceRepayment: repaymentByMember.get(m.id) ?? "0.00",
+      wageCost: wage,
+      eventDays: m.wageType === "daily" ? eventDays : null,
+    });
+  }
+
+  let poolExact = "0.00";
+  let poolFloored = "0.00";
+  if (poolWeight) {
+    poolExact = exactShareByRatio(netProfit, poolWeight.numerator, poolWeight.denominator);
+    poolFloored = floorWholeBaht(poolExact);
+  }
+
+  const flooredMemberTotal = sumDecimals(0, ...memberShares.map((s) => s.flooredShare));
+  const flooredWithPool = sumDecimals(flooredMemberTotal, poolFloored);
+  const remainder = computeProfit(netProfit, flooredWithPool);
 
   return {
     method: input.profitSplitMethod,
     poolBudget: input.poolBudget,
+    poolGetsShare: input.poolGetsShare ?? false,
     memberEquity,
     totalBudget,
     totalIncome: input.totalIncome,
     totalExpense: input.totalExpense,
-    employeeCost,
+    wageCost,
     eventDays,
     advanceRepayments,
     grossProfit,
     netProfit,
     memberShares,
+    poolShare: {
+      exactShare: poolExact,
+      flooredShare: poolFloored,
+    },
     remainder,
     isLoss,
     warning,
