@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
-import { boothSummary, getBooth } from "@/lib/booth-queries";
+import { boothSummary, getBooth, splitProfit } from "@/lib/booth-queries";
 import { BoothBack } from "@/components/booth/BoothBack";
 import { BoothCloseButton } from "@/components/booth/BoothCloseButton";
 import { BoothSummaryCard } from "@/components/booth/BoothSummaryCard";
@@ -18,7 +18,10 @@ export default async function BoothHubPage({ params }: { params: Promise<{ id: s
   if (!booth) notFound();
 
   const closed = booth.status === "closed";
-  const summary = await boothSummary(user.id, id);
+  const [summary, split] = await Promise.all([
+    boothSummary(user.id, id),
+    splitProfit(user.id, id),
+  ]);
 
   return (
     <div className="px-4 pb-6">
@@ -28,7 +31,7 @@ export default async function BoothHubPage({ params }: { params: Promise<{ id: s
         {formatDayShort(booth.startDate)}
         {booth.endDate !== booth.startDate && ` – ${formatDayShort(booth.endDate)}`}
         {" · "}
-        งบ {formatMoney(booth.startingBudget, user.currency)}
+        งบ {formatMoney(booth.totalBudget, user.currency)}
         {closed ? " · ปิดแล้ว" : " · เปิดอยู่"}
       </p>
 
@@ -45,10 +48,23 @@ export default async function BoothHubPage({ params }: { params: Promise<{ id: s
         </div>
       )}
 
+      <Link
+        href={`/booth/${id}/setup`}
+        className="tap-target mt-4 block rounded-2xl border-2 border-emerald-600 bg-emerald-50 px-4 py-4 text-center text-base font-bold text-emerald-800 shadow-sm active:bg-emerald-100"
+      >
+        ตั้งค่าบูธ / สมาชิก
+      </Link>
+
       {summary && (
         <div className="mt-6">
           {closed ? (
-            <BoothSummaryCard summary={summary} currency={user.currency} compact />
+            <BoothSummaryCard
+              summary={summary}
+              split={split}
+              boothId={id}
+              currency={user.currency}
+              compact
+            />
           ) : (
             <Link
               href={`/booth/${id}/summary`}

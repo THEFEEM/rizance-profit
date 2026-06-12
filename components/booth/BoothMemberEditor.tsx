@@ -10,7 +10,6 @@ import { formatMoney } from "@/lib/money";
 import {
   MEMBER_ROLE_LABELS,
   MEMBER_ROLES,
-  PROFIT_SPLIT_METHOD_LABELS,
   WAGE_TYPE_LABELS,
   WAGE_TYPES,
   type BoothMember,
@@ -22,7 +21,7 @@ import {
 export function BoothMemberEditor({
   boothId,
   members,
-  profitSplitMethod,
+  profitSplitMethod: _profitSplitMethod,
   closed,
   currency = "THB",
 }: {
@@ -36,7 +35,6 @@ export function BoothMemberEditor({
   const [name, setName] = useState("");
   const [role, setRole] = useState<MemberRole>("investor");
   const [investmentRaw, setInvestmentRaw] = useState("");
-  const [splitPercent, setSplitPercent] = useState("");
   const [wageRaw, setWageRaw] = useState("");
   const [wageType, setWageType] = useState<WageType>("daily");
   const [padField, setPadField] = useState<"investment" | "wage" | null>(null);
@@ -51,12 +49,15 @@ export function BoothMemberEditor({
     const body: Record<string, unknown> = { name: name.trim(), role };
     if (role === "investor") {
       body.investmentAmount = investmentRaw === "" ? 0 : Number(investmentRaw);
-      if (profitSplitMethod === "custom_percent" && splitPercent !== "") {
-        body.splitPercent = Number(splitPercent);
-      }
     } else if (role === "employee") {
       body.wageAmount = wageRaw === "" ? 0 : Number(wageRaw);
       body.wageType = wageType;
+    } else if (role === "manager") {
+      body.investmentAmount = investmentRaw === "" ? 0 : Number(investmentRaw);
+      if (wageRaw !== "") {
+        body.wageAmount = Number(wageRaw);
+        body.wageType = wageType;
+      }
     }
 
     const res = await apiFetch<BoothMember>(`/api/booths/${boothId}/members`, {
@@ -67,7 +68,6 @@ export function BoothMemberEditor({
     if (res.ok) {
       setName("");
       setInvestmentRaw("");
-      setSplitPercent("");
       setWageRaw("");
       router.refresh();
     } else {
@@ -86,10 +86,6 @@ export function BoothMemberEditor({
 
   return (
     <div className="flex flex-col gap-4 px-4 pb-8">
-      <p className="text-sm text-slate-500">
-        แบ่งกำไร: {PROFIT_SPLIT_METHOD_LABELS[profitSplitMethod]} · สมาชิกไม่มีบัญชีเข้าระบบ
-      </p>
-
       {members.length > 0 && (
         <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm">
           {members.map((m) => (
@@ -97,13 +93,13 @@ export function BoothMemberEditor({
               <div className="min-w-0 flex-1">
                 <p className="font-medium text-slate-900">{m.name}</p>
                 <p className="text-xs text-slate-500">{MEMBER_ROLE_LABELS[m.role]}</p>
-                {m.role === "investor" && Number(m.investmentAmount) > 0 && (
-                  <p className="text-xs text-emerald-700">
-                    ลงทุน {formatMoney(m.investmentAmount, currency)}
-                    {m.splitPercent ? ` · ${m.splitPercent}%` : ""}
-                  </p>
-                )}
-                {m.role === "employee" && m.wageAmount && (
+                {(m.role === "investor" || m.role === "manager") &&
+                  Number(m.investmentAmount) > 0 && (
+                    <p className="text-xs text-emerald-700">
+                      ลงทุน {formatMoney(m.investmentAmount, currency)}
+                    </p>
+                  )}
+                {(m.role === "employee" || m.role === "manager") && m.wageAmount && (
                   <p className="text-xs text-slate-600">
                     ค่าแรง {formatMoney(m.wageAmount, currency)} /{" "}
                     {m.wageType ? WAGE_TYPE_LABELS[m.wageType] : "—"}
@@ -149,45 +145,30 @@ export function BoothMemberEditor({
             <Input label="ชื่อ" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
 
-          {role === "investor" && (
-            <>
-              <div className="mt-3">
-                <p className="text-sm text-slate-600">เงินลงทุน (บาท)</p>
-                <p className="text-lg font-bold tabular-nums">{formatTyped(investmentRaw) || "0"}</p>
-                {padField === "investment" ? (
-                  <QuickAmountPad
-                    value={investmentRaw}
-                    onChange={setInvestmentRaw}
-                    onSave={() => setPadField(null)}
-                    saveLabel="ตกลง"
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setPadField("investment")}
-                    className="text-sm text-emerald-700"
-                  >
-                    ใส่จำนวน →
-                  </button>
-                )}
-              </div>
-              {profitSplitMethod === "custom_percent" && (
-                <div className="mt-3">
-                  <Input
-                    label="% แบ่งกำไร"
-                    type="number"
-                    min={0}
-                    max={100}
-                    step="0.01"
-                    value={splitPercent}
-                    onChange={(e) => setSplitPercent(e.target.value)}
-                  />
-                </div>
+          {(role === "investor" || role === "manager") && (
+            <div className="mt-3">
+              <p className="text-sm text-slate-600">เงินลงทุน (บาท)</p>
+              <p className="text-lg font-bold tabular-nums">{formatTyped(investmentRaw) || "0"}</p>
+              {padField === "investment" ? (
+                <QuickAmountPad
+                  value={investmentRaw}
+                  onChange={setInvestmentRaw}
+                  onSave={() => setPadField(null)}
+                  saveLabel="ตกลง"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setPadField("investment")}
+                  className="text-sm text-emerald-700"
+                >
+                  ใส่จำนวน →
+                </button>
               )}
-            </>
+            </div>
           )}
 
-          {role === "employee" && (
+          {(role === "employee" || role === "manager") && (
             <>
               <div className="mt-3 flex gap-2">
                 {WAGE_TYPES.map((w) => (

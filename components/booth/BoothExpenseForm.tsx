@@ -6,6 +6,7 @@ import { AmountInput } from "@/components/ui/AmountInput";
 import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
 import { Input } from "@/components/ui/Input";
 import { BoothBack } from "@/components/booth/BoothBack";
+import { BoothRemainingBar } from "@/components/booth/BoothSetup";
 import { BoothClosedBanner } from "@/components/booth/BoothClosedBanner";
 import { EntryContextBanner } from "@/components/EntryContextBanner";
 import { BoothEntryList } from "@/components/booth/BoothEntryList";
@@ -28,6 +29,8 @@ export function BoothExpenseForm({
   defaultDate,
   entries,
   members,
+  totalBudget,
+  totalExpense,
   currency = "THB",
 }: {
   boothId: string;
@@ -38,6 +41,8 @@ export function BoothExpenseForm({
   defaultDate: string;
   entries: BoothExpense[];
   members: BoothMember[];
+  totalBudget: string;
+  totalExpense: string;
   currency?: string;
 }) {
   const router = useRouter();
@@ -90,6 +95,12 @@ export function BoothExpenseForm({
         <span className="w-16" />
       </div>
       <EntryContextBanner target="booth" name={boothName} />
+
+      <BoothRemainingBar
+        totalBudget={totalBudget}
+        totalExpense={totalExpense}
+        currency={currency}
+      />
 
       {closed && (
         <div className="mb-3">
