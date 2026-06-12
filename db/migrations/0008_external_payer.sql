@@ -31,21 +31,20 @@ BEGIN
   ALTER TABLE booth_expense_entries
     ADD CONSTRAINT booth_expense_entries_payer_xor_check
       CHECK (
-        -- ordinary expense — no payer tracked
+        -- ordinary expense — no payer tracked (blank/whitespace external = none)
         (
           payer_member_id IS NULL
-          AND (external_payer_name IS NULL OR btrim(external_payer_name) = '')
+          AND NULLIF(btrim(external_payer_name), '') IS NULL
         )
         -- member advance
         OR (
           payer_member_id IS NOT NULL
-          AND (external_payer_name IS NULL OR btrim(external_payer_name) = '')
+          AND NULLIF(btrim(external_payer_name), '') IS NULL
         )
-        -- external advance
+        -- external advance — trimmed non-empty name only
         OR (
           payer_member_id IS NULL
-          AND external_payer_name IS NOT NULL
-          AND length(btrim(external_payer_name)) > 0
+          AND NULLIF(btrim(external_payer_name), '') IS NOT NULL
         )
       );
 EXCEPTION
@@ -58,4 +57,4 @@ END $$;
 
 CREATE INDEX IF NOT EXISTS idx_booth_expense_external_payer
   ON booth_expense_entries (booth_id, external_payer_name)
-  WHERE external_payer_name IS NOT NULL AND btrim(external_payer_name) <> '';
+  WHERE NULLIF(btrim(external_payer_name), '') IS NOT NULL;
