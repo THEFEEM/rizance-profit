@@ -272,6 +272,60 @@ try {
   assertEq("(e) netProfit 9000", splitE.netProfit, "9000.00");
   console.log("");
 
+  // External advance + blank name rejection
+  console.log("(f) External advance + validation");
+  const { rows: fBooths } = await client.query(
+    `INSERT INTO booths (user_id, name, pool_budget, start_date, end_date)
+     VALUES ($1, 'External', 0, '2026-06-01'::date, '2026-06-01'::date) RETURNING id`,
+    [userId],
+  );
+  const fBoothId = fBooths[0].id;
+
+  const blankRes = await apiPost(base, `/api/booths/${fBoothId}/expense`, {
+    amount: 100,
+    costType: "variable",
+    entryDate: "2026-06-01",
+    advancePayment: true,
+    externalPayerName: "   ",
+  });
+  assertEq("(f) blank external rejected", String(blankRes.status), "400");
+
+  await apiPost(base, `/api/booths/${fBoothId}/income`, {
+    amount: 5000,
+    paymentMethod: "cash",
+    entryDate: "2026-06-01",
+  });
+  const extRes = await apiPost(base, `/api/booths/${fBoothId}/expense`, {
+    amount: 800,
+    costType: "variable",
+    entryDate: "2026-06-01",
+    advancePayment: true,
+    externalPayerName: "ครูสมชาย",
+  });
+  assertEq("(f) external advance 201", String(extRes.status), "201");
+  assertEq(
+    "(f) external stored name",
+    extRes.json.data.externalPayerName,
+    "ครูสมชาย",
+  );
+
+  await apiPost(base, `/api/booths/${fBoothId}/members`, {
+    name: "Inv",
+    role: "investor",
+    investmentAmount: 1000,
+  });
+
+  res = await apiGet(base, `/api/booths/${fBoothId}/split`);
+  const splitF = res.json.data;
+  assertEq("(f) external repayment 800", splitF.advanceRepayments[0]?.amount, "800.00");
+  assertEq("(f) external role", splitF.advanceRepayments[0]?.role, "external");
+  assertEq(
+    "(f) external not in shares",
+    splitF.memberShares.some((s) => s.name === "ครูสมชาย") ? "yes" : "no",
+    "no",
+  );
+  console.log("");
+
   if (failed === 0) {
     console.log("All assertions passed.");
   } else {

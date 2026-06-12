@@ -35,18 +35,43 @@ export const boothIncomeSchema = z.object({
   entryDate: boothDate.optional(),
 });
 
-export const boothExpenseSchema = z.object({
-  amount: amountPositive,
-  costType: z.enum(BOOTH_COST_TYPES),
-  label: z.preprocess(
-    (v) => (typeof v === "string" && v.trim() !== "" ? v.trim() : undefined),
-    z.string().max(120).optional(),
-  ),
-  note,
-  entryDate: boothDate.optional(),
-  payerMemberId: uuid.optional(),
-  advancePayment: z.boolean().optional(),
-});
+const externalPayerName = z.preprocess(
+  (v) => (typeof v === "string" ? v.trim() : v),
+  z.string().max(120).optional(),
+);
+
+export const boothExpenseSchema = z
+  .object({
+    amount: amountPositive,
+    costType: z.enum(BOOTH_COST_TYPES),
+    label: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() !== "" ? v.trim() : undefined),
+      z.string().max(120).optional(),
+    ),
+    note,
+    entryDate: boothDate.optional(),
+    payerMemberId: uuid.optional(),
+    externalPayerName,
+    advancePayment: z.boolean().optional(),
+  })
+  .superRefine((d, ctx) => {
+    const hasMember = d.payerMemberId !== undefined;
+    const hasExternal = !!d.externalPayerName && d.externalPayerName.length > 0;
+    if (hasMember && hasExternal) {
+      ctx.addIssue({
+        code: "custom",
+        message: "ระบุผู้จ่ายแทนได้อย่างใดอย่างหนึ่ง — สมาชิกหรือบุคคลภายนอก",
+        path: ["externalPayerName"],
+      });
+    }
+    if (d.advancePayment && !hasMember && !hasExternal) {
+      ctx.addIssue({
+        code: "custom",
+        message: "กรุณาระบุผู้จ่ายแทน (สมาชิกหรือบุคคลภายนอก)",
+        path: ["payerMemberId"],
+      });
+    }
+  });
 
 export const boothSchema = z
   .object({

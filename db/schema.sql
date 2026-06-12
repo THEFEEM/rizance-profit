@@ -155,14 +155,23 @@ CREATE TABLE IF NOT EXISTS booth_expense_entries (
   cost_type        VARCHAR(20) NOT NULL CHECK (cost_type IN ('fixed', 'variable')),
   label            VARCHAR(120),
   note             VARCHAR(255),
-  payer_member_id  UUID REFERENCES booth_members(id) ON DELETE SET NULL,
-  entry_date       DATE NOT NULL,
-  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+  payer_member_id      UUID REFERENCES booth_members(id) ON DELETE SET NULL,
+  external_payer_name  VARCHAR(120),
+  entry_date           DATE NOT NULL,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT booth_expense_entries_payer_xor_check CHECK (
+    (payer_member_id IS NULL AND NULLIF(btrim(external_payer_name), '') IS NULL)
+    OR (payer_member_id IS NOT NULL AND NULLIF(btrim(external_payer_name), '') IS NULL)
+    OR (payer_member_id IS NULL AND NULLIF(btrim(external_payer_name), '') IS NOT NULL)
+  )
 );
 CREATE INDEX IF NOT EXISTS idx_booth_expense_booth_date ON booth_expense_entries (booth_id, entry_date);
 CREATE INDEX IF NOT EXISTS idx_booth_expense_user       ON booth_expense_entries (user_id, booth_id);
 CREATE INDEX IF NOT EXISTS idx_booth_expense_payer
   ON booth_expense_entries (payer_member_id) WHERE payer_member_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_booth_expense_external_payer
+  ON booth_expense_entries (booth_id, external_payer_name)
+  WHERE NULLIF(btrim(external_payer_name), '') IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS booth_members (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),

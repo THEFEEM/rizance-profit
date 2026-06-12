@@ -41,6 +41,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const result = await createBoothExpense(userId, id, {
     ...parsed.data,
     payerMemberId: parsed.data.payerMemberId,
+    externalPayerName: parsed.data.externalPayerName,
     advancePayment: parsed.data.advancePayment,
   });
   if (!result.ok) {

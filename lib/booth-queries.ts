@@ -109,11 +109,13 @@ type BoothExpenseRow = {
   label: string | null;
   note: string | null;
   payer_member_id: string | null;
+  external_payer_name: string | null;
   entry_date: string;
   created_at: Date | string;
 };
 
 function mapBoothExpense(r: BoothExpenseRow): BoothExpense {
+  const externalRaw = r.external_payer_name?.trim() ?? "";
   return {
     id: r.id,
     boothId: r.booth_id,
@@ -122,6 +124,7 @@ function mapBoothExpense(r: BoothExpenseRow): BoothExpense {
     label: r.label,
     note: r.note,
     payerMemberId: r.payer_member_id,
+    externalPayerName: externalRaw.length > 0 ? externalRaw : null,
     entryDate: r.entry_date,
     createdAt: toIso(r.created_at),
   };
@@ -152,7 +155,7 @@ function mapBoothMember(r: BoothMemberRow): BoothMember {
 }
 
 const EXPENSE_RETURN = `id, booth_id, amount, cost_type, label, note, payer_member_id,
-  entry_date::text AS entry_date, created_at`;
+  external_payer_name, entry_date::text AS entry_date, created_at`;
 
 const MEMBER_RETURN = `id, booth_id, name, role, investment_amount, wage_amount, wage_type, created_at`;
 
@@ -452,6 +455,7 @@ export type BoothExpenseInput = {
   note?: string;
   entryDate?: string;
   payerMemberId?: string;
+  externalPayerName?: string;
   advancePayment?: boolean;
 };
 
@@ -464,23 +468,33 @@ export async function createBoothExpense(
   const guard = await guardBoothEntry(userId, boothId, entryDate);
   if (!guard.ok) return guard;
 
-  let payerMemberId: string | null = input.payerMemberId ?? null;
+  const payerMemberId: string | null = input.payerMemberId ?? null;
+  const externalTrimmed = input.externalPayerName?.trim() ?? "";
+  const externalPayerName = externalTrimmed.length > 0 ? externalTrimmed : null;
+
+  if (payerMemberId && externalPayerName) {
+    return { ok: false, reason: "invalid_advance_payer" };
+  }
+
   if (payerMemberId) {
     const valid = await memberBelongsToBooth(boothId, payerMemberId);
     if (!valid) return { ok: false, reason: "invalid_payer" };
   }
 
+  const isAdvance = !!(input.advancePayment || payerMemberId || externalPayerName);
+  if (input.advancePayment && !payerMemberId && !externalPayerName) {
+    return { ok: false, reason: "invalid_advance_payer" };
+  }
+
   let note = input.note ?? null;
-  if (input.advancePayment || payerMemberId) {
-    payerMemberId = payerMemberId ?? null;
-    if (payerMemberId && (!note || !note.includes(ADVANCE_NOTE))) {
-      note = note ? `${note} · ${ADVANCE_NOTE}` : ADVANCE_NOTE;
-    }
+  if (isAdvance && (!note || !note.includes(ADVANCE_NOTE))) {
+    note = note ? `${note} · ${ADVANCE_NOTE}` : ADVANCE_NOTE;
   }
 
   const { rows } = await query<BoothExpenseRow>(
-    `INSERT INTO booth_expense_entries (booth_id, user_id, amount, cost_type, label, note, payer_member_id, entry_date)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::date)
+    `INSERT INTO booth_expense_entries
+       (booth_id, user_id, amount, cost_type, label, note, payer_member_id, external_payer_name, entry_date)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::date)
      RETURNING ${EXPENSE_RETURN}`,
     [
       boothId,
@@ -490,6 +504,7 @@ export async function createBoothExpense(
       input.label ?? null,
       note,
       payerMemberId,
+      externalPayerName,
       entryDate,
     ],
   );
@@ -643,24 +658,44 @@ export async function deleteBoothMember(
 
 async function listBoothAdvances(userId: string, boothId: string) {
   const { rows } = await query<{
-    payer_member_id: string;
-    member_name: string;
+    creditor_key: string;
+    member_id: string | null;
+    creditor_name: string;
     amount: string;
     entry_date: string;
+    is_external: boolean;
   }>(
-    `SELECT e.payer_member_id, m.name AS member_name, e.amount, e.entry_date::text AS entry_date
+    `SELECT e.payer_member_id::text AS creditor_key,
+            e.payer_member_id AS member_id,
+            m.name AS creditor_name,
+            e.amount,
+            e.entry_date::text AS entry_date,
+            false AS is_external
      FROM booth_expense_entries e
      JOIN booth_members m ON m.id = e.payer_member_id
      JOIN booths b ON b.id = e.booth_id
      WHERE b.user_id = $1 AND e.booth_id = $2 AND e.payer_member_id IS NOT NULL
-     ORDER BY e.entry_date ASC, e.created_at ASC`,
+     UNION ALL
+     SELECT ('external:' || NULLIF(btrim(e.external_payer_name), '')) AS creditor_key,
+            NULL::uuid AS member_id,
+            NULLIF(btrim(e.external_payer_name), '') AS creditor_name,
+            e.amount,
+            e.entry_date::text AS entry_date,
+            true AS is_external
+     FROM booth_expense_entries e
+     JOIN booths b ON b.id = e.booth_id
+     WHERE b.user_id = $1 AND e.booth_id = $2
+       AND NULLIF(btrim(e.external_payer_name), '') IS NOT NULL
+     ORDER BY entry_date ASC`,
     [userId, boothId],
   );
   return rows.map((r) => ({
-    memberId: r.payer_member_id,
-    memberName: r.member_name,
+    creditorKey: r.creditor_key,
+    memberId: r.member_id,
+    creditorName: r.creditor_name,
     amount: r.amount,
     entryDate: r.entry_date,
+    isExternal: r.is_external,
   }));
 }
 

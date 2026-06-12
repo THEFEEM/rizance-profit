@@ -30,6 +30,29 @@ function manager(id, name, investmentAmount, wageAmount, wageType = "daily") {
   };
 }
 
+function memberAdvance(id, name, amount, entryDate) {
+  return {
+    creditorKey: id,
+    memberId: id,
+    creditorName: name,
+    amount,
+    entryDate,
+    isExternal: false,
+  };
+}
+
+function externalAdvance(name, amount, entryDate) {
+  const trimmed = name.trim();
+  return {
+    creditorKey: `external:${trimmed}`,
+    memberId: null,
+    creditorName: trimmed,
+    amount,
+    entryDate,
+    isExternal: true,
+  };
+}
+
 const threeInvestors = [
   investor("a", "A", "2000.00"),
   investor("b", "B", "2000.00"),
@@ -213,7 +236,7 @@ const advanceSplit = computeSplitProfit({
   endDate: "2026-06-01",
   totalIncome: "10000.00",
   totalExpense: "6000.00",
-  advances: [{ memberId: "a", memberName: "A", amount: "500.00", entryDate: "2026-06-01" }],
+  advances: [memberAdvance("a", "A", "500.00", "2026-06-01")],
   members: [investor("a", "A", "2000.00"), investor("b", "B", "2000.00")],
 });
 assert("advance grossProfit 4000", advanceSplit.grossProfit === "4000.00");
@@ -221,6 +244,54 @@ assert("advance repayment 500 to A", advanceSplit.advanceRepayments[0]?.amount =
 assert("advance netProfit 3500", advanceSplit.netProfit === "3500.00");
 const aShare = advanceSplit.memberShares.find((s) => s.memberId === "a");
 assert("advance A repayment line", aShare?.advanceRepayment === "500.00");
+
+// External-only advance — repaid before split, no profit share
+const externalSplit = computeSplitProfit({
+  poolBudget: "0.00",
+  poolGetsShare: false,
+  profitSplitMethod: "equal",
+  startDate: "2026-06-01",
+  endDate: "2026-06-01",
+  totalIncome: "5000.00",
+  totalExpense: "3000.00",
+  advances: [externalAdvance("ครูสมชาย", "800.00", "2026-06-01")],
+  members: [investor("a", "A", "2000.00"), investor("b", "B", "2000.00")],
+});
+assert("external grossProfit 2000", externalSplit.grossProfit === "2000.00");
+assert("external repayment 800", externalSplit.advanceRepayments[0]?.amount === "800.00");
+assert("external role", externalSplit.advanceRepayments[0]?.role === "external");
+assert("external netProfit 1200", externalSplit.netProfit === "1200.00");
+assert(
+  "external not in memberShares",
+  !externalSplit.memberShares.some((s) => s.name === "ครูสมชาย"),
+);
+assert("external split 600 each", externalSplit.memberShares.every((s) => s.flooredShare === "600.00"));
+
+// Mixed member + external FIFO by entry_date
+const mixedFifo = computeSplitProfit({
+  poolBudget: "0.00",
+  poolGetsShare: false,
+  profitSplitMethod: "equal",
+  startDate: "2026-06-01",
+  endDate: "2026-06-01",
+  totalIncome: "10000.00",
+  totalExpense: "5000.00",
+  advances: [
+    externalAdvance("Vendor", "300.00", "2026-06-01"),
+    memberAdvance("a", "A", "500.00", "2026-06-02"),
+  ],
+  members: [investor("a", "A", "2000.00"), investor("b", "B", "2000.00")],
+});
+assert("mixed grossProfit 5000", mixedFifo.grossProfit === "5000.00");
+assert(
+  "mixed external repaid 300 first",
+  mixedFifo.advanceRepayments.find((r) => r.role === "external")?.amount === "300.00",
+);
+assert(
+  "mixed member repaid 500",
+  mixedFifo.advanceRepayments.find((r) => r.role === "member")?.amount === "500.00",
+);
+assert("mixed netProfit 4200", mixedFifo.netProfit === "4200.00");
 
 // Employee daily wage × event days (3 days) — unchanged employee path
 const employeeCase = computeSplitProfit({
@@ -253,8 +324,8 @@ assert("employee eventDays on share", emp?.eventDays === 3);
 
 // FIFO advance repayment partial pool
 const fifo = computeAdvanceRepayments("1000.00", [
-  { memberId: "a", memberName: "A", amount: "800.00", entryDate: "2026-06-02" },
-  { memberId: "b", memberName: "B", amount: "500.00", entryDate: "2026-06-01" },
+  memberAdvance("a", "A", "800.00", "2026-06-02"),
+  memberAdvance("b", "B", "500.00", "2026-06-01"),
 ]);
 assert("FIFO pays B first 500", fifo.find((r) => r.memberId === "b")?.amount === "500.00");
 assert("FIFO pays A remaining 500", fifo.find((r) => r.memberId === "a")?.amount === "500.00");

@@ -11,10 +11,13 @@ export type SplitMemberInput = {
 };
 
 export type AdvanceInput = {
-  memberId: string;
-  memberName: string;
+  /** Stable key for FIFO aggregation — member UUID or external:{name}. */
+  creditorKey: string;
+  memberId: string | null;
+  creditorName: string;
   amount: string;
   entryDate: string;
+  isExternal: boolean;
 };
 
 export type SplitProfitInput = {
@@ -30,9 +33,11 @@ export type SplitProfitInput = {
 };
 
 export type AdvanceRepayment = {
-  memberId: string;
+  creditorKey: string;
+  memberId: string | null;
   name: string;
   amount: string;
+  role: "member" | "external";
 };
 
 export type MemberShare = {
@@ -132,25 +137,32 @@ export function computeAdvanceRepayments(
 
   const sorted = [...advances].sort((a, b) => a.entryDate.localeCompare(b.entryDate));
   let remaining = grossCents;
-  const paid = new Map<string, { name: string; cents: number }>();
+  const paid = new Map<
+    string,
+    { memberId: string | null; name: string; cents: number; isExternal: boolean }
+  >();
 
   for (const adv of sorted) {
     if (remaining <= 0) break;
     const advCents = toCents(adv.amount);
     const pay = Math.min(remaining, advCents);
     if (pay <= 0) continue;
-    const prev = paid.get(adv.memberId);
-    paid.set(adv.memberId, {
-      name: adv.memberName,
+    const prev = paid.get(adv.creditorKey);
+    paid.set(adv.creditorKey, {
+      memberId: adv.memberId,
+      name: adv.creditorName,
       cents: (prev?.cents ?? 0) + pay,
+      isExternal: adv.isExternal,
     });
     remaining -= pay;
   }
 
-  return [...paid.entries()].map(([memberId, { name, cents }]) => ({
+  return [...paid.entries()].map(([creditorKey, { memberId, name, cents, isExternal }]) => ({
+    creditorKey,
     memberId,
     name,
     amount: centsToDecimalString(cents),
+    role: isExternal ? ("external" as const) : ("member" as const),
   }));
 }
 
@@ -240,7 +252,11 @@ export function computeSplitProfit(input: SplitProfitInput): SplitProfitResult {
   const netProfit = computeProfit(grossProfit, repayTotal);
   const isLoss = toCents(netProfit) < 0;
 
-  const repaymentByMember = new Map(advanceRepayments.map((r) => [r.memberId, r.amount]));
+  const repaymentByMember = new Map(
+    advanceRepayments
+      .filter((r) => r.role === "member" && r.memberId)
+      .map((r) => [r.memberId!, r.amount]),
+  );
 
   const { memberWeights, poolWeight, warning } = shareWeights(
     input.profitSplitMethod,

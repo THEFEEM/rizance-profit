@@ -56,8 +56,8 @@ export function BoothSplitTable({
               <p className="text-xs text-slate-500">คืนเงินออกก่อน (FIFO)</p>
               {split.advanceRepayments.map((r) => (
                 <Row
-                  key={r.memberId}
-                  label={`↳ ${r.name}`}
+                  key={r.creditorKey}
+                  label={`↳ ${r.name}${r.role === "external" ? " (ภายนอก)" : ""}`}
                   amount={r.amount}
                   currency={currency}
                   tone="income"

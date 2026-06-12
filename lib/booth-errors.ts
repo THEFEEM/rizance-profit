@@ -3,6 +3,7 @@ export const BOOTH_ENTRY_REASON_MESSAGES = {
   booth_closed: "งานบูธปิดแล้ว — ไม่สามารถเพิ่มรายการได้",
   date_out_of_range: "วันที่ต้องอยู่ในช่วงงานบูธ",
   invalid_payer: "ไม่พบสมาชิกที่จ่ายแทน",
+  invalid_advance_payer: "กรุณาระบุผู้จ่ายแทน (สมาชิกหรือบุคคลภายนอก)",
 } as const;
 
 export const BOOTH_MEMBER_REASON_MESSAGES = {
@@ -23,6 +24,7 @@ export function boothEntryHttpStatus(reason: BoothEntryReason): number {
     case "date_out_of_range":
       return 422;
     case "invalid_payer":
+    case "invalid_advance_payer":
       return 400;
   }
 }

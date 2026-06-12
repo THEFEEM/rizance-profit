@@ -83,6 +83,8 @@ export type BoothExpense = {
   label: string | null;
   note: string | null;
   payerMemberId: string | null;
+  /** Trimmed non-empty when payer is outside the member list. */
+  externalPayerName: string | null;
   entryDate: string;
   createdAt: string;
 };
@@ -127,7 +129,15 @@ export type {
 /** Result of a booth entry write; failures are explicit, not thrown. */
 export type BoothEntryResult<T> =
   | { ok: true; entry: T }
-  | { ok: false; reason: "booth_not_found" | "booth_closed" | "date_out_of_range" | "invalid_payer" };
+  | {
+      ok: false;
+      reason:
+        | "booth_not_found"
+        | "booth_closed"
+        | "date_out_of_range"
+        | "invalid_payer"
+        | "invalid_advance_payer";
+    };
 
 export type BoothUpdateResult =
   | { ok: true; booth: Booth }
