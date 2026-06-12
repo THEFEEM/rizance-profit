@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserId } from "@/lib/session";
 import { fieldErrorsFrom } from "@/lib/validation";
-import { boothExpenseSchema } from "@/lib/booth-validation";
-import { boothEntryErrorResponse } from "@/lib/booth-errors";
-import { createBoothExpense, getBooth, listBoothExpense } from "@/lib/booth-queries";
+import { boothMemberSchema } from "@/lib/booth-validation";
+import { boothMemberErrorResponse } from "@/lib/booth-errors";
+import { createBoothMember, getBooth, listBoothMembers } from "@/lib/booth-queries";
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const userId = await getUserId(req);
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   const booth = await getBooth(userId, id);
   if (!booth) return NextResponse.json({ error: { message: "ไม่พบงานบูธนี้" } }, { status: 404 });
 
-  const data = await listBoothExpense(userId, id);
+  const data = await listBoothMembers(userId, id);
   return NextResponse.json({ data });
 }
 
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     return NextResponse.json({ error: { message: "Invalid JSON body" } }, { status: 400 });
   }
 
-  const parsed = boothExpenseSchema.safeParse(body);
+  const parsed = boothMemberSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: { message: "Invalid input", fields: fieldErrorsFrom(parsed.error) } },
@@ -38,15 +38,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     );
   }
 
-  const result = await createBoothExpense(userId, id, {
-    ...parsed.data,
-    payerMemberId: parsed.data.payerMemberId,
-    advancePayment: parsed.data.advancePayment,
-  });
+  const result = await createBoothMember(userId, id, parsed.data);
   if (!result.ok) {
-    const { status, body: errBody } = boothEntryErrorResponse(result.reason);
+    const { status, body: errBody } = boothMemberErrorResponse(result.reason);
     return NextResponse.json(errBody, { status });
   }
 
-  return NextResponse.json({ data: result.entry }, { status: 201 });
+  return NextResponse.json({ data: result.member }, { status: 201 });
 }
