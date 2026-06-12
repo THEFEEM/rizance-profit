@@ -1,9 +1,45 @@
-import { formatMoney, moneySign } from "@/lib/money";
+import { formatMoney, moneySign, toCents } from "@/lib/money";
 import {
   MEMBER_ROLE_LABELS,
   PROFIT_SPLIT_METHOD_LABELS,
   type SplitProfitResult,
 } from "@/types/booth";
+
+function formatSplitPercent(numerator: number, denominator: number): string {
+  if (denominator <= 0) return "0.0%";
+  return `${((numerator / denominator) * 100).toFixed(1)}%`;
+}
+
+function splitPercents(split: SplitProfitResult) {
+  const participants = split.memberShares.filter(
+    (s) =>
+      (s.role === "investor" || s.role === "manager") &&
+      toCents(s.investmentAmount) > 0,
+  );
+  const poolCents =
+    split.poolGetsShare && toCents(split.poolBudget) > 0 ? toCents(split.poolBudget) : 0;
+  const headCount = participants.length + (poolCents > 0 ? 1 : 0);
+
+  if (split.method === "equal") {
+    const pct = formatSplitPercent(1, headCount);
+    return {
+      pool: poolCents > 0 ? pct : null,
+      members: new Map(participants.map((s) => [s.memberId, pct])),
+    };
+  }
+
+  const equityTotal =
+    participants.reduce((sum, s) => sum + toCents(s.investmentAmount), 0) + poolCents;
+  return {
+    pool: poolCents > 0 ? formatSplitPercent(poolCents, equityTotal) : null,
+    members: new Map(
+      participants.map((s) => [
+        s.memberId,
+        formatSplitPercent(toCents(s.investmentAmount), equityTotal),
+      ]),
+    ),
+  };
+}
 
 export function BoothSplitTable({
   split,
@@ -15,6 +51,8 @@ export function BoothSplitTable({
   const netSign = moneySign(split.netProfit);
   const netColor =
     netSign > 0 ? "text-emerald-600" : netSign < 0 ? "text-red-600" : "text-slate-500";
+
+  const percents = splitPercents(split);
 
   const shareMembers = split.memberShares.filter(
     (s) => s.role === "investor" || s.role === "manager",
@@ -86,15 +124,12 @@ export function BoothSplitTable({
             <p className="py-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
               กองกลาง
             </p>
-            {showPoolShare && (
+            {showPoolShare && percents.pool && (
               <>
-                <Row
-                  label="ส่วนแบ่งกำไร (ปัดลง)"
-                  amount={split.poolShare.flooredShare}
-                  currency={currency}
-                  bold
-                  className={split.isLoss ? "text-red-600" : "text-emerald-700"}
-                />
+                <p className="text-sm font-medium text-slate-800">
+                  กองกลาง · ลงทุน {formatMoney(split.poolBudget, currency)} · {percents.pool} ·
+                  ได้ {formatMoney(split.poolShare.flooredShare, currency)}
+                </p>
                 {showPoolExact && (
                   <Row
                     label="ส่วนแบ่งแท้จริง"
@@ -123,50 +158,71 @@ export function BoothSplitTable({
             <p className="py-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
               นักลงทุน / ผู้จัดการ
             </p>
-            {shareMembers.map((s) => (
-              <div key={s.memberId} className="border-t border-slate-50 py-2 first:border-t-0">
-                <p className="text-sm font-medium text-slate-800">
-                  {s.name}{" "}
-                  <span className="font-normal text-slate-400">({MEMBER_ROLE_LABELS[s.role]})</span>
-                </p>
-                <Row
-                  label="ส่วนแบ่ง (ปัดลง)"
-                  amount={s.flooredShare}
-                  currency={currency}
-                  bold
-                  className={split.isLoss ? "text-red-600" : "text-emerald-700"}
-                />
-                {s.exactShare !== s.flooredShare && (
-                  <Row
-                    label="ส่วนแบ่งแท้จริง"
-                    amount={s.exactShare}
-                    currency={currency}
-                    small
-                    tone="muted"
-                  />
-                )}
-                {moneySign(s.wageCost) > 0 && (
-                  <Row label="ค่าแรง" amount={s.wageCost} currency={currency} tone="expense" small />
-                )}
-                {s.eventDays !== null && s.eventDays > 0 && (
-                  <p className="text-xs text-slate-400">รายวัน × {s.eventDays} วัน</p>
-                )}
-                {moneySign(s.advanceRepayment) > 0 && (
-                  <Row
-                    label="ได้คืนออกก่อน"
-                    amount={s.advanceRepayment}
-                    currency={currency}
-                    small
-                    tone="income"
-                  />
-                )}
-                {Number(s.investmentAmount) > 0 && (
-                  <p className="text-xs text-slate-400">
-                    ลงทุน {formatMoney(s.investmentAmount, currency)}
-                  </p>
-                )}
-              </div>
-            ))}
+            {shareMembers.map((s) => {
+              const pct = percents.members.get(s.memberId);
+              const hasEquity = Number(s.investmentAmount) > 0;
+              const headline =
+                hasEquity && pct
+                  ? `${s.name} · ลงทุน ${formatMoney(s.investmentAmount, currency)} · ${pct} · ได้ ${formatMoney(s.flooredShare, currency)}`
+                  : null;
+
+              return (
+                <div key={s.memberId} className="border-t border-slate-50 py-2 first:border-t-0">
+                  {headline ? (
+                    <p className="text-sm font-medium text-slate-800">{headline}</p>
+                  ) : (
+                    <p className="text-sm font-medium text-slate-800">
+                      {s.name}{" "}
+                      <span className="font-normal text-slate-400">
+                        ({MEMBER_ROLE_LABELS[s.role]})
+                      </span>
+                    </p>
+                  )}
+                  {!headline && (
+                    <Row
+                      label="ส่วนแบ่ง (ปัดลง)"
+                      amount={s.flooredShare}
+                      currency={currency}
+                      bold
+                      className={split.isLoss ? "text-red-600" : "text-emerald-700"}
+                    />
+                  )}
+                  {headline && s.exactShare !== s.flooredShare && (
+                    <Row
+                      label="ส่วนแบ่งแท้จริง"
+                      amount={s.exactShare}
+                      currency={currency}
+                      small
+                      tone="muted"
+                    />
+                  )}
+                  {!headline && s.exactShare !== s.flooredShare && (
+                    <Row
+                      label="ส่วนแบ่งแท้จริง"
+                      amount={s.exactShare}
+                      currency={currency}
+                      small
+                      tone="muted"
+                    />
+                  )}
+                  {moneySign(s.wageCost) > 0 && (
+                    <Row label="ค่าแรง" amount={s.wageCost} currency={currency} tone="expense" small />
+                  )}
+                  {s.eventDays !== null && s.eventDays > 0 && (
+                    <p className="text-xs text-slate-400">รายวัน × {s.eventDays} วัน</p>
+                  )}
+                  {moneySign(s.advanceRepayment) > 0 && (
+                    <Row
+                      label="ได้คืนออกก่อน"
+                      amount={s.advanceRepayment}
+                      currency={currency}
+                      small
+                      tone="income"
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
