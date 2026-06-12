@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserId } from "@/lib/session";
 import { fieldErrorsFrom } from "@/lib/validation";
-import { boothMemberSchema } from "@/lib/booth-validation";
+import { boothMemberPatchSchema } from "@/lib/booth-validation";
 import { boothMemberErrorResponse } from "@/lib/booth-errors";
 import { deleteBoothMember, updateBoothMember } from "@/lib/booth-queries";
-
-const patchSchema = boothMemberSchema.partial();
 
 export async function PATCH(
   req: NextRequest,
@@ -23,7 +21,7 @@ export async function PATCH(
     return NextResponse.json({ error: { message: "Invalid JSON body" } }, { status: 400 });
   }
 
-  const parsed = patchSchema.safeParse(body);
+  const parsed = boothMemberPatchSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: { message: "Invalid input", fields: fieldErrorsFrom(parsed.error) } },

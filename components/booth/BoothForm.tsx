@@ -7,12 +7,18 @@ import { Input } from "@/components/ui/Input";
 import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
 import { apiFetch } from "@/lib/api-client";
 import { today } from "@/lib/date";
-import type { Booth } from "@/types/booth";
+import {
+  PROFIT_SPLIT_METHODS,
+  PROFIT_SPLIT_METHOD_LABELS,
+  type Booth,
+  type ProfitSplitMethod,
+} from "@/types/booth";
 
 export function BoothForm() {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [budgetRaw, setBudgetRaw] = useState("");
+  const [poolBudgetRaw, setPoolBudgetRaw] = useState("");
+  const [profitSplitMethod, setProfitSplitMethod] = useState<ProfitSplitMethod>("equal");
   const [startDate, setStartDate] = useState(today());
   const [endDate, setEndDate] = useState(today());
   const [note, setNote] = useState("");
@@ -27,7 +33,8 @@ export function BoothForm() {
       method: "POST",
       body: JSON.stringify({
         name,
-        startingBudget: budgetRaw === "" ? 0 : Number(budgetRaw),
+        poolBudget: poolBudgetRaw === "" ? 0 : Number(poolBudgetRaw),
+        profitSplitMethod,
         startDate,
         endDate,
         note: note.trim() || undefined,
@@ -52,14 +59,15 @@ export function BoothForm() {
       />
 
       <div className="rounded-2xl bg-white p-4 shadow-sm">
-        <p className="text-sm font-medium text-slate-700">งบเริ่มต้น (บาท)</p>
+        <p className="text-sm font-medium text-slate-700">งบกองกลาง / ทุนสนับสนุน (บาท)</p>
+        <p className="mt-0.5 text-xs text-slate-400">ไม่นับเป็นสัดส่วนลงทุนสมาชิก</p>
         <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">
-          {formatTyped(budgetRaw) || "0"}
+          {formatTyped(poolBudgetRaw) || "0"}
         </p>
         {padBudget ? (
           <QuickAmountPad
-            value={budgetRaw}
-            onChange={setBudgetRaw}
+            value={poolBudgetRaw}
+            onChange={setPoolBudgetRaw}
             onSave={() => setPadBudget(false)}
             saveLabel="ตกลง"
           />
@@ -72,6 +80,26 @@ export function BoothForm() {
             ใส่จำนวนเงิน →
           </button>
         )}
+      </div>
+
+      <div>
+        <p className="mb-1.5 text-sm font-medium text-slate-700">วิธีแบ่งกำไร</p>
+        <div className="flex flex-col gap-2">
+          {PROFIT_SPLIT_METHODS.map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setProfitSplitMethod(m)}
+              className={`tap-target rounded-2xl border px-4 py-2.5 text-left text-sm font-medium ${
+                profitSplitMethod === m
+                  ? "border-emerald-600 bg-emerald-600 text-white"
+                  : "border-slate-300 bg-white text-slate-700 active:bg-slate-100"
+              }`}
+            >
+              {PROFIT_SPLIT_METHOD_LABELS[m]}
+            </button>
+          ))}
+        </div>
       </div>
 
       <Input

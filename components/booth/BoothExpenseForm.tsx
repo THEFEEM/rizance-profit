@@ -16,6 +16,7 @@ import {
   BOOTH_COST_TYPES,
   type BoothCostType,
   type BoothExpense,
+  type BoothMember,
 } from "@/types/booth";
 
 export function BoothExpenseForm({
@@ -26,6 +27,7 @@ export function BoothExpenseForm({
   closed,
   defaultDate,
   entries,
+  members,
   currency = "THB",
 }: {
   boothId: string;
@@ -35,6 +37,7 @@ export function BoothExpenseForm({
   closed: boolean;
   defaultDate: string;
   entries: BoothExpense[];
+  members: BoothMember[];
   currency?: string;
 }) {
   const router = useRouter();
@@ -43,6 +46,8 @@ export function BoothExpenseForm({
   const [label, setLabel] = useState("");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(defaultDate);
+  const [advancePayment, setAdvancePayment] = useState(false);
+  const [payerMemberId, setPayerMemberId] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,12 +65,16 @@ export function BoothExpenseForm({
         label: label.trim() || undefined,
         note: note.trim() || undefined,
         entryDate: date,
+        advancePayment,
+        payerMemberId: advancePayment && payerMemberId ? payerMemberId : undefined,
       }),
     });
     if (res.ok) {
       setRaw("");
       setLabel("");
       setNote("");
+      setAdvancePayment(false);
+      setPayerMemberId("");
       router.refresh();
     } else {
       setError(res.fields?.amount?.[0] ?? res.message);
@@ -111,6 +120,39 @@ export function BoothExpenseForm({
             ))}
           </div>
         </div>
+
+        <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+          <input
+            type="checkbox"
+            checked={advancePayment}
+            disabled={closed || members.length === 0}
+            onChange={(e) => {
+              setAdvancePayment(e.target.checked);
+              if (!e.target.checked) setPayerMemberId("");
+            }}
+            className="h-4 w-4"
+          />
+          <span className="text-sm text-slate-700">ออกเงินก่อน (จ่ายแทนร้าน)</span>
+        </label>
+
+        {advancePayment && members.length > 0 && (
+          <div>
+            <p className="mb-1.5 text-sm font-medium text-slate-700">ผู้จ่ายแทน</p>
+            <select
+              value={payerMemberId}
+              disabled={closed}
+              onChange={(e) => setPayerMemberId(e.target.value)}
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm"
+            >
+              <option value="">เลือกสมาชิก</option>
+              {members.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <Input
           label="ชื่อรายการ (ไม่บังคับ)"

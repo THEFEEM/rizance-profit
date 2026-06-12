@@ -108,8 +108,38 @@ export const boothMemberSchema = z
     }
   });
 
+/** PATCH bodies — no .partial() on refined schemas (Zod restriction). */
+export const boothPatchSchema = z.object({
+  name: z.preprocess(
+    (v) => (typeof v === "string" ? v.trim() : v),
+    z.string().min(1, "กรุณาระบุชื่องาน").max(120).optional(),
+  ),
+  poolBudget: moneyNonNegative.optional(),
+  profitSplitMethod: z.enum(PROFIT_SPLIT_METHODS).optional(),
+  startDate: boothDate.optional(),
+  endDate: boothDate.optional(),
+  note: z.preprocess(
+    (v) => (typeof v === "string" && v.trim() !== "" ? v.trim() : undefined),
+    z.string().max(255).optional(),
+  ),
+});
+
+export const boothMemberPatchSchema = z.object({
+  name: z.preprocess(
+    (v) => (typeof v === "string" ? v.trim() : v),
+    z.string().min(1, "กรุณาระบุชื่อ").max(120).optional(),
+  ),
+  role: z.enum(MEMBER_ROLES).optional(),
+  investmentAmount: moneyNonNegative.optional(),
+  splitPercent: moneyNonNegative.max(100).optional(),
+  wageAmount: moneyNonNegative.optional(),
+  wageType: z.enum(WAGE_TYPES).optional(),
+});
+
 export type BoothSchemaInput = z.infer<typeof boothSchema>;
 export type BoothMemberSchemaInput = z.infer<typeof boothMemberSchema>;
+export type BoothPatchSchemaInput = z.infer<typeof boothPatchSchema>;
+export type BoothMemberPatchSchemaInput = z.infer<typeof boothMemberPatchSchema>;
 
 /** App-layer check: custom_percent investors must sum to 100.00 */
 export function validateInvestorSplitPercents(

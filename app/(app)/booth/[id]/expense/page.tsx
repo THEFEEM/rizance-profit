@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
-import { getBooth, listBoothExpense } from "@/lib/booth-queries";
+import { getBooth, listBoothExpense, listBoothMembers } from "@/lib/booth-queries";
 import { defaultBoothEntryDate } from "@/lib/date";
 import { BoothExpenseForm } from "@/components/booth/BoothExpenseForm";
 
@@ -13,7 +13,10 @@ export default async function BoothExpensePage({ params }: { params: Promise<{ i
   const booth = await getBooth(user.id, id);
   if (!booth) notFound();
 
-  const entries = await listBoothExpense(user.id, id);
+  const [entries, members] = await Promise.all([
+    listBoothExpense(user.id, id),
+    listBoothMembers(user.id, id),
+  ]);
 
   return (
     <BoothExpenseForm
@@ -24,6 +27,7 @@ export default async function BoothExpensePage({ params }: { params: Promise<{ i
       closed={booth.status === "closed"}
       defaultDate={defaultBoothEntryDate(booth.startDate, booth.endDate)}
       entries={entries}
+      members={members}
       currency={user.currency}
     />
   );

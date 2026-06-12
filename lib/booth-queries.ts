@@ -566,11 +566,8 @@ export async function createBoothMember(
   const vals = memberValues(input);
   const existing = await listBoothMembers(userId, boothId);
   const draft = [
-    ...existing,
-    {
-      role: input.role,
-      splitPercent: vals.splitPercent,
-    } as Pick<BoothMember, "role" | "splitPercent">,
+    ...existing.map((m) => ({ role: m.role, splitPercent: m.splitPercent })),
+    { role: input.role, splitPercent: vals.splitPercent },
   ];
   const splitErr = validateInvestorSplitPercents(draft, guard.booth.profitSplitMethod);
   if (splitErr) return { ok: false, reason: "invalid_split_percent" };
@@ -594,7 +591,8 @@ export async function updateBoothMember(
   const guard = await guardBoothMemberWrite(userId, boothId);
   if (!guard.ok) return guard;
 
-  const existing = (await listBoothMembers(userId, boothId)).find((m) => m.id === memberId);
+  const allMembers = await listBoothMembers(userId, boothId);
+  const existing = allMembers.find((m) => m.id === memberId);
   if (!existing) return { ok: false, reason: "member_not_found" };
 
   const merged: BoothMemberInput = {
@@ -609,14 +607,10 @@ export async function updateBoothMember(
     wageType: input.wageType ?? existing.wageType ?? undefined,
   };
   const vals = memberValues(merged);
-  const draft = existing
+  const draft = allMembers
     .filter((m) => m.id !== memberId)
-    .concat([
-      {
-        role: merged.role,
-        splitPercent: vals.splitPercent,
-      } as Pick<BoothMember, "role" | "splitPercent">,
-    ]);
+    .map((m) => ({ role: m.role, splitPercent: m.splitPercent }))
+    .concat([{ role: merged.role, splitPercent: vals.splitPercent }]);
   const splitErr = validateInvestorSplitPercents(draft, guard.booth.profitSplitMethod);
   if (splitErr) return { ok: false, reason: "invalid_split_percent" };
 

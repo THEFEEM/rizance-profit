@@ -26,7 +26,14 @@ export function BoothList({ booths, currency = "THB" }: { booths: Booth[]; curre
                 {formatDayShort(b.startDate)}
                 {b.endDate !== b.startDate && ` – ${formatDayShort(b.endDate)}`}
                 {" · "}
-                งบ {formatMoney(b.startingBudget, currency)}
+                งบ {formatMoney(b.totalBudget, currency)}
+                {Number(b.memberEquity) > 0 && (
+                  <span className="text-slate-400">
+                    {" "}
+                    (กอง {formatMoney(b.poolBudget, currency)} + สมาชิก{" "}
+                    {formatMoney(b.memberEquity, currency)})
+                  </span>
+                )}
               </p>
             </div>
             <span
