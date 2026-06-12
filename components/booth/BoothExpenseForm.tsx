@@ -6,6 +6,7 @@ import { AmountInput } from "@/components/ui/AmountInput";
 import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
 import { Input } from "@/components/ui/Input";
 import { BoothBack } from "@/components/booth/BoothBack";
+import { BoothRemainingBar } from "@/components/booth/BoothSetup";
 import { BoothClosedBanner } from "@/components/booth/BoothClosedBanner";
 import { EntryContextBanner } from "@/components/EntryContextBanner";
 import { BoothEntryList } from "@/components/booth/BoothEntryList";
@@ -16,7 +17,10 @@ import {
   BOOTH_COST_TYPES,
   type BoothCostType,
   type BoothExpense,
+  type BoothMember,
 } from "@/types/booth";
+
+type PayerKind = "member" | "external";
 
 export function BoothExpenseForm({
   boothId,
@@ -26,6 +30,9 @@ export function BoothExpenseForm({
   closed,
   defaultDate,
   entries,
+  members,
+  totalBudget,
+  totalExpense,
   currency = "THB",
 }: {
   boothId: string;
@@ -35,6 +42,9 @@ export function BoothExpenseForm({
   closed: boolean;
   defaultDate: string;
   entries: BoothExpense[];
+  members: BoothMember[];
+  totalBudget: string;
+  totalExpense: string;
   currency?: string;
 }) {
   const router = useRouter();
@@ -43,6 +53,10 @@ export function BoothExpenseForm({
   const [label, setLabel] = useState("");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(defaultDate);
+  const [advancePayment, setAdvancePayment] = useState(false);
+  const [payerKind, setPayerKind] = useState<PayerKind>("member");
+  const [payerMemberId, setPayerMemberId] = useState("");
+  const [externalPayerName, setExternalPayerName] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,15 +74,24 @@ export function BoothExpenseForm({
         label: label.trim() || undefined,
         note: note.trim() || undefined,
         entryDate: date,
+        advancePayment,
+        payerMemberId:
+          advancePayment && payerKind === "member" && payerMemberId ? payerMemberId : undefined,
+        externalPayerName:
+          advancePayment && payerKind === "external" ? externalPayerName.trim() : undefined,
       }),
     });
     if (res.ok) {
       setRaw("");
       setLabel("");
       setNote("");
+      setAdvancePayment(false);
+      setPayerMemberId("");
+      setExternalPayerName("");
+      setPayerKind("member");
       router.refresh();
     } else {
-      setError(res.fields?.amount?.[0] ?? res.message);
+      setError(res.fields?.amount?.[0] ?? res.fields?.externalPayerName?.[0] ?? res.fields?.payerMemberId?.[0] ?? res.message);
     }
     setSaving(false);
   }
@@ -81,6 +104,12 @@ export function BoothExpenseForm({
         <span className="w-16" />
       </div>
       <EntryContextBanner target="booth" name={boothName} />
+
+      <BoothRemainingBar
+        totalBudget={totalBudget}
+        totalExpense={totalExpense}
+        currency={currency}
+      />
 
       {closed && (
         <div className="mb-3">
@@ -111,6 +140,84 @@ export function BoothExpenseForm({
             ))}
           </div>
         </div>
+
+        <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+          <input
+            type="checkbox"
+            checked={advancePayment}
+            disabled={closed}
+            onChange={(e) => {
+              setAdvancePayment(e.target.checked);
+              if (!e.target.checked) {
+                setPayerMemberId("");
+                setExternalPayerName("");
+              }
+            }}
+            className="h-4 w-4"
+          />
+          <span className="text-sm text-slate-700">ออกเงินก่อน (จ่ายแทนร้าน)</span>
+        </label>
+
+        {advancePayment && (
+          <div className="space-y-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+            <p className="text-sm font-medium text-slate-700">ผู้จ่ายแทน</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={closed}
+                onClick={() => setPayerKind("member")}
+                className={`tap-target flex-1 rounded-xl border px-3 py-2 text-sm font-medium ${
+                  payerKind === "member"
+                    ? "border-emerald-600 bg-emerald-600 text-white"
+                    : "border-slate-300 bg-white text-slate-700"
+                }`}
+              >
+                สมาชิก
+              </button>
+              <button
+                type="button"
+                disabled={closed}
+                onClick={() => setPayerKind("external")}
+                className={`tap-target flex-1 rounded-xl border px-3 py-2 text-sm font-medium ${
+                  payerKind === "external"
+                    ? "border-emerald-600 bg-emerald-600 text-white"
+                    : "border-slate-300 bg-white text-slate-700"
+                }`}
+              >
+                บุคคลภายนอก
+              </button>
+            </div>
+
+            {payerKind === "member" ? (
+              members.length > 0 ? (
+                <select
+                  value={payerMemberId}
+                  disabled={closed}
+                  onChange={(e) => setPayerMemberId(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm"
+                >
+                  <option value="">เลือกสมาชิก</option>
+                  {members.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p className="text-sm text-slate-500">ยังไม่มีสมาชิก — เลือกบุคคลภายนอกแทน</p>
+              )
+            ) : (
+              <Input
+                label="ชื่อผู้จ่ายแทน"
+                placeholder="เช่น ครูสมชาย / ร้านค้า"
+                value={externalPayerName}
+                onChange={(e) => setExternalPayerName(e.target.value)}
+                maxLength={120}
+                disabled={closed}
+              />
+            )}
+          </div>
+        )}
 
         <Input
           label="ชื่อรายการ (ไม่บังคับ)"

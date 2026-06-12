@@ -87,7 +87,7 @@ try {
 
   // Booth + booth entries on the SAME date (different distinct amounts)
   const { rows: booths } = await client.query(
-    `INSERT INTO booths (user_id, name, starting_budget, start_date, end_date)
+    `INSERT INTO booths (user_id, name, pool_budget, start_date, end_date)
      VALUES ($1, 'งานวัดทดสอบ', 1000.00, $2::date, $3::date) RETURNING id`,
     [userId, "2026-06-09", "2026-06-11"],
   );
@@ -230,6 +230,28 @@ try {
     threw = e.code === "23514";
   }
   assert("negative amount rejected", threw);
+
+  threw = false;
+  try {
+    await client.query(`UPDATE booths SET profit_split_method = 'custom_percent' WHERE id = $1`, [
+      boothId,
+    ]);
+  } catch (e) {
+    threw = e.code === "23514";
+  }
+  assert("profit_split_method custom_percent rejected", threw);
+
+  const { rows: poolCol } = await client.query(
+    `SELECT column_name FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'booths' AND column_name = 'pool_gets_share'`,
+  );
+  assert("pool_gets_share column exists", poolCol.length === 1);
+
+  const { rows: splitCol } = await client.query(
+    `SELECT column_name FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'booth_members' AND column_name = 'split_percent'`,
+  );
+  assert("split_percent column dropped", splitCol.length === 0);
 
   console.log("");
   if (failed === 0) {

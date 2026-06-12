@@ -53,7 +53,7 @@ async function boothSummary(client, boothId) {
                  WHERE booth_id = $1 AND cost_type = 'fixed'), 0)::text AS fixed_expense,
        COALESCE((SELECT SUM(amount) FROM booth_expense_entries
                  WHERE booth_id = $1 AND cost_type = 'variable'), 0)::text AS variable_expense,
-       (SELECT starting_budget::text FROM booths WHERE id = $1) AS starting_budget`,
+       (SELECT pool_budget::text FROM booths WHERE id = $1) AS pool_budget`,
     [boothId],
   );
   const r = rows[0];
@@ -67,7 +67,7 @@ async function boothSummary(client, boothId) {
     variableExpense: r.variable_expense,
     totalExpense,
     profit: computeProfit(totalIncome, totalExpense),
-    startingBudget: r.starting_budget,
+    poolBudget: r.pool_budget,
   };
 }
 
@@ -171,7 +171,7 @@ try {
   const midDate = "2026-06-10";
 
   const { rows: booths } = await client.query(
-    `INSERT INTO booths (user_id, name, starting_budget, start_date, end_date)
+    `INSERT INTO booths (user_id, name, pool_budget, start_date, end_date)
      VALUES ($1, 'งาน E2E', 1000.00, $2::date, $3::date)
      RETURNING id`,
     [userId, startDate, endDate],
@@ -226,10 +226,10 @@ try {
   console.log("(c) Profit = totalIncome − totalExpense (budget excluded)");
   summary = await boothSummary(client, boothId);
   assertEq("(c) profit", summary.profit, "50.00");
-  assertEq("(c) startingBudget unchanged (not in profit)", summary.startingBudget, "1000.00");
+  assertEq("(c) poolBudget unchanged (not in profit)", summary.poolBudget, "1000.00");
   assertOk(
-    "(c) profit is NOT startingBudget − expense",
-    summary.profit !== computeProfit(summary.startingBudget, summary.totalExpense),
+    "(c) profit is NOT poolBudget − expense",
+    summary.profit !== computeProfit(summary.poolBudget, summary.totalExpense),
     `profit=${summary.profit}`,
   );
   console.log("");
@@ -292,7 +292,7 @@ try {
   userIds.push(otherUserId);
 
   const { rows: otherBooths } = await client.query(
-    `INSERT INTO booths (user_id, name, starting_budget, start_date, end_date)
+    `INSERT INTO booths (user_id, name, pool_budget, start_date, end_date)
      VALUES ($1, 'งานคนอื่น', 200.00, $2::date, $3::date) RETURNING id`,
     [otherUserId, startDate, endDate],
   );
@@ -319,7 +319,7 @@ try {
   // (g) Boundary inclusive: start_date and end_date both succeed
   console.log("(g) Boundary inclusive: entries on start_date and end_date");
   const { rows: boundaryBooths } = await client.query(
-    `INSERT INTO booths (user_id, name, starting_budget, start_date, end_date)
+    `INSERT INTO booths (user_id, name, pool_budget, start_date, end_date)
      VALUES ($1, 'งานขอบเขต', 500.00, $2::date, $3::date) RETURNING id`,
     [userId, startDate, endDate],
   );

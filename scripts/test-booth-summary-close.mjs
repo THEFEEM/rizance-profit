@@ -41,7 +41,7 @@ function computeProfit(income, expense) {
 /** Mirrors lib/booth-queries.ts boothSummary */
 async function boothSummary(client, userId, boothId) {
   const { rows: boothRows } = await client.query(
-    `SELECT starting_budget::text AS starting_budget, status
+    `SELECT pool_budget::text AS pool_budget, status
      FROM booths WHERE user_id = $1 AND id = $2`,
     [userId, boothId],
   );
@@ -63,7 +63,7 @@ async function boothSummary(client, userId, boothId) {
   const totalIncome = sumDecimals(r.cash_income, r.transfer_income);
   const totalExpense = sumDecimals(r.fixed_expense, r.variable_expense);
   return {
-    startingBudget: boothRows[0].starting_budget,
+    poolBudget: boothRows[0].pool_budget,
     status: boothRows[0].status,
     cashIncome: r.cash_income,
     transferIncome: r.transfer_income,
@@ -178,7 +178,7 @@ try {
 
   const date = "2026-06-10";
   const { rows: booths } = await client.query(
-    `INSERT INTO booths (user_id, name, starting_budget, start_date, end_date)
+    `INSERT INTO booths (user_id, name, pool_budget, start_date, end_date)
      VALUES ($1, 'งานสรุป', 5000.00, '2026-06-09'::date, '2026-06-11'::date)
      RETURNING id`,
     [userId],
@@ -206,8 +206,24 @@ try {
   assertEq("variableExpense", sum.variableExpense, "20.00");
   assertEq("totalExpense", sum.totalExpense, "100.00");
   assertEq("profit", sum.profit, "50.00");
-  assertEq("startingBudget (display only)", sum.startingBudget, "5000.00");
-  const budgetMinusExpense = computeProfit(sum.startingBudget, sum.totalExpense);
+  assertEq("poolBudget (display only)", sum.poolBudget, "5000.00");
+
+  await client.query(
+    `INSERT INTO booth_members (booth_id, name, role, investment_amount)
+     VALUES ($1, 'Inv', 'investor', 2000.00)`,
+    [boothId],
+  );
+  const { rows: budgetRow } = await client.query(
+    `SELECT pool_budget::text AS pool_budget,
+       COALESCE((SELECT SUM(investment_amount) FROM booth_members
+                 WHERE booth_id = $1 AND role IN ('investor','manager')), 0)::text AS member_equity
+     FROM booths WHERE id = $1`,
+    [boothId],
+  );
+  const totalBudget = sumDecimals(budgetRow[0].pool_budget, budgetRow[0].member_equity);
+  assertEq("totalBudget = pool + member equity", totalBudget, "7000.00");
+
+  const budgetMinusExpense = computeProfit(sum.poolBudget, sum.totalExpense);
   assertEq(
     "profit NOT budget − expense",
     sum.profit === "50.00" && budgetMinusExpense !== "50.00" ? "confirmed" : `profit=${sum.profit}, budget−exp=${budgetMinusExpense}`,
@@ -243,7 +259,7 @@ try {
     console.log(`  using ${base}`);
 
     const { rows: openBooths } = await client.query(
-      `INSERT INTO booths (user_id, name, starting_budget, start_date, end_date)
+      `INSERT INTO booths (user_id, name, pool_budget, start_date, end_date)
        VALUES ($1, 'งาน HTTP', 1000.00, '2026-06-09'::date, '2026-06-11'::date) RETURNING id`,
       [userId],
     );

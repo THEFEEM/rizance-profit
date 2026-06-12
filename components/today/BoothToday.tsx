@@ -32,7 +32,9 @@ export async function BoothToday({
   return (
     <>
       <BoothBudgetBar
-        startingBudget={booth.startingBudget}
+        poolBudget={booth.poolBudget}
+        memberEquity={booth.memberEquity}
+        totalBudget={booth.totalBudget}
         totalExpense={eventSummary?.totalExpense ?? "0.00"}
         currency={user.currency}
       />

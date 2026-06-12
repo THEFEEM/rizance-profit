@@ -137,7 +137,7 @@ try {
 
   const boothName = "งานเทสบูธ";
   const { rows: booths } = await client.query(
-    `INSERT INTO booths (user_id, name, starting_budget, start_date, end_date)
+    `INSERT INTO booths (user_id, name, pool_budget, start_date, end_date)
      VALUES ($1, $2, 1000.00, '2026-06-09'::date, '2026-06-11'::date)
      RETURNING id`,
     [userId, boothName],
