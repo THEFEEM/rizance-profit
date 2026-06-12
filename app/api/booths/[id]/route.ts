@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserId } from "@/lib/session";
 import { fieldErrorsFrom } from "@/lib/validation";
-import { boothPatchSchema, validateInvestorSplitPercents } from "@/lib/booth-validation";
-import { getBooth, listBoothMembers, updateBooth } from "@/lib/booth-queries";
+import { boothPatchSchema } from "@/lib/booth-validation";
+import { getBooth, updateBooth } from "@/lib/booth-queries";
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const userId = await getUserId(req);
@@ -28,15 +28,6 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const existing = await getBooth(userId, id);
   if (!existing) {
     return NextResponse.json({ error: { message: "ไม่พบงานบูธนี้" } }, { status: 404 });
-  }
-
-  const nextMethod = parsed.data.profitSplitMethod ?? existing.profitSplitMethod;
-  if (nextMethod === "custom_percent") {
-    const members = await listBoothMembers(userId, id);
-    const splitErr = validateInvestorSplitPercents(members, nextMethod);
-    if (splitErr) {
-      return NextResponse.json({ error: { message: splitErr, reason: "invalid_split_percent" } }, { status: 400 });
-    }
   }
 
   const start = parsed.data.startDate ?? existing.startDate;
