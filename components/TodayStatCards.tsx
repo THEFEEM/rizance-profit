@@ -1,14 +1,18 @@
 import { formatMoney } from "@/lib/money";
 import { ExpenseArrowIcon, IncomeArrowIcon } from "@/components/today/today-icons";
 
-/** Display-only today income/expense cards — not interactive. */
+/** Display-only income/expense cards — not interactive. */
 export function TodayStatCards({
   income,
   expense,
+  incomeLabel = "รายรับวันนี้",
+  expenseLabel = "รายจ่ายวันนี้",
   currency = "THB",
 }: {
   income: string;
   expense: string;
+  incomeLabel?: string;
+  expenseLabel?: string;
   currency?: string;
 }) {
   return (
@@ -19,7 +23,7 @@ export function TodayStatCards({
             <IncomeArrowIcon />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] text-rz-hint">รายรับวันนี้</p>
+            <p className="text-[11px] text-rz-hint">{incomeLabel}</p>
             <p className="rz-tabular mt-0.5 text-[17px] font-medium text-rz-text">
               {formatMoney(income, currency)}
             </p>
@@ -33,7 +37,7 @@ export function TodayStatCards({
             <ExpenseArrowIcon />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] text-rz-hint">รายจ่ายวันนี้</p>
+            <p className="text-[11px] text-rz-hint">{expenseLabel}</p>
             <p className="rz-tabular mt-0.5 text-[17px] font-medium text-rz-text">
               {formatMoney(expense, currency)}
             </p>

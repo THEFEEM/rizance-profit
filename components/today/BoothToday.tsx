@@ -1,78 +1,84 @@
-import Link from "next/link";
 import {
-  boothDaySummary,
   boothSummary,
-  listBoothExpenseByDate,
-  listBoothIncomeByDate,
+  listBoothExpense,
+  listBoothIncome,
 } from "@/lib/booth-queries";
-import { ProfitCard } from "@/components/ProfitCard";
+import { computeProfit, sumDecimals } from "@/lib/money";
+import { BoothTodayHeroCard } from "@/components/today/BoothTodayHeroCard";
 import { BoothBudgetBar } from "@/components/today/BoothBudgetBar";
+import { TodayStatCards } from "@/components/TodayStatCards";
 import { BoothDayEntryList } from "@/components/BoothDayEntryList";
 import type { Booth } from "@/types/booth";
 import type { User } from "@/types";
 
+/** Booth Today — event totals hero, budget bar, event entry list. */
 export async function BoothToday({
   user,
   booth,
-  date,
 }: {
   user: User;
   booth: Booth;
   date: string;
 }) {
-  const [summary, incomes, expenses, eventSummary] = await Promise.all([
-    boothDaySummary(user.id, booth.id, date),
-    listBoothIncomeByDate(user.id, booth.id, date),
-    listBoothExpenseByDate(user.id, booth.id, date),
+  const [eventSummary, incomes, expenses] = await Promise.all([
     boothSummary(user.id, booth.id),
+    listBoothIncome(user.id, booth.id),
+    listBoothExpense(user.id, booth.id),
   ]);
 
-  const day = summary ?? { income: "0.00", expense: "0.00", profit: "0.00" };
+  const event = eventSummary ?? {
+    totalIncome: "0.00",
+    totalExpense: "0.00",
+    profit: "0.00",
+  };
+
+  const totalIncome = event.totalIncome;
+  const totalExpense = event.totalExpense;
+  const boothProfit = event.profit;
+  const remainingBudget = computeProfit(booth.totalBudget, totalExpense);
+  const cashInHand = sumDecimals(remainingBudget, totalIncome);
+
+  const hasEntries = incomes.length + expenses.length > 0;
 
   return (
     <>
+      <BoothTodayHeroCard
+        totalSales={totalIncome}
+        cashInHand={cashInHand}
+        boothProfit={boothProfit}
+        currency={user.currency}
+      />
+
       <BoothBudgetBar
-        poolBudget={booth.poolBudget}
-        memberEquity={booth.memberEquity}
         totalBudget={booth.totalBudget}
-        totalExpense={eventSummary?.totalExpense ?? "0.00"}
+        totalExpense={totalExpense}
         currency={user.currency}
       />
 
-      <ProfitCard
-        profit={day.profit}
-        income={day.income}
-        expense={day.expense}
+      <TodayStatCards
+        income={totalIncome}
+        expense={totalExpense}
+        incomeLabel="รายรับรวมบูธ"
+        expenseLabel="รายจ่ายรวมบูธ"
         currency={user.currency}
-        label="TODAY'S PROFIT"
-        subtitle={booth.name}
       />
 
-      <div className="grid grid-cols-2 gap-3 px-4">
-        <Link
-          href={`/booth/${booth.id}/income`}
-          className="tap-target flex h-20 items-center justify-center rounded-2xl bg-emerald-600 text-lg font-bold text-white active:bg-emerald-700"
-        >
-          + INCOME
-        </Link>
-        <Link
-          href={`/booth/${booth.id}/expense`}
-          className="tap-target flex h-20 items-center justify-center rounded-2xl bg-red-600 text-lg font-bold text-white active:bg-red-700"
-        >
-          − EXPENSE
-        </Link>
-      </div>
-
-      <div className="mt-6">
-        <h2 className="px-4 pb-1 text-sm font-semibold text-slate-500">Recent today</h2>
-        <div className="mx-2 overflow-hidden rounded-2xl bg-white shadow-sm">
-          <BoothDayEntryList
-            boothId={booth.id}
-            incomes={incomes}
-            expenses={expenses}
-            currency={user.currency}
-          />
-        </div>
+      <div className="mt-3 px-4">
+        {hasEntries ? (
+          <div className="overflow-hidden rounded-[14px] border-[0.5px] border-rz-border bg-rz-card">
+            <BoothDayEntryList
+              boothId={booth.id}
+              incomes={incomes}
+              expenses={expenses}
+              currency={user.currency}
+              appearance="today"
+            />
+          </div>
+        ) : (
+          <p className="rounded-[14px] border-[0.5px] border-rz-border bg-rz-card px-4 py-6 text-center text-[13px] text-rz-hint">
+            ยังไม่มีรายการในงาน — แตะ +In หรือ −Out เพื่อเริ่ม
+          </p>
+        )}
       </div>
     </>
   );

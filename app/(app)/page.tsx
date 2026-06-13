@@ -25,6 +25,8 @@ export default async function TodayPage() {
         mode={ctx.mode}
         boothId={ctx.mode === "booth" ? ctx.boothId : undefined}
         boothName={ctx.mode === "booth" ? ctx.booth.name : undefined}
+        boothStartDate={ctx.mode === "booth" ? ctx.booth.startDate : undefined}
+        boothEndDate={ctx.mode === "booth" ? ctx.booth.endDate : undefined}
       />
       {ctx.mode === "regular" ? (
         <RegularToday user={user} />

@@ -7,6 +7,13 @@ import { apiFetch } from "@/lib/api-client";
 import type { Booth } from "@/types/booth";
 import type { AppContext } from "@/types/context";
 
+import { formatDayShort } from "@/lib/date";
+
+function formatBoothDateRange(start: string, end: string): string {
+  if (start === end) return formatDayShort(start);
+  return `${formatDayShort(start)} – ${formatDayShort(end)}`;
+}
+
 function TentIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0">
@@ -25,10 +32,14 @@ export function ModeSwitcher({
   mode,
   boothId,
   boothName,
+  boothStartDate,
+  boothEndDate,
 }: {
   mode: "regular" | "booth";
   boothId?: string;
   boothName?: string;
+  boothStartDate?: string;
+  boothEndDate?: string;
 }) {
   const router = useRouter();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -130,7 +141,15 @@ export function ModeSwitcher({
         {mode === "booth" && boothName && (
           <p className="mt-2 flex items-center justify-center gap-1.5 truncate text-center text-[11px] font-medium text-rz-amber">
             <TentIcon />
-            {boothName}
+            <span className="truncate">
+              {boothName}
+              {boothStartDate && boothEndDate && (
+                <span className="text-rz-amber/80">
+                  {" "}
+                  · {formatBoothDateRange(boothStartDate, boothEndDate)}
+                </span>
+              )}
+            </span>
           </p>
         )}
       </div>
