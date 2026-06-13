@@ -15,6 +15,10 @@
   --rz-red: #f87171;
   --rz-blue: #6bb6ff;
   --rz-amber: #ef9f27;
+  --rz-btn: #1d9e75;
+  --rz-logo-bg: #16352a;
+  --rz-logo-border: #1d5b43;
+  --rz-placeholder: #5c6679;
 }
 
 @theme inline {
@@ -35,6 +39,10 @@
   --color-rz-red: var(--rz-red);
   --color-rz-blue: var(--rz-blue);
   --color-rz-amber: var(--rz-amber);
+  --color-rz-btn: var(--rz-btn);
+  --color-rz-logo-bg: var(--rz-logo-bg);
+  --color-rz-logo-border: var(--rz-logo-border);
+  --color-rz-placeholder: var(--rz-placeholder);
   --font-sans: var(--font-geist-sans);
 }
 

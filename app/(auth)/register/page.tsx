@@ -3,8 +3,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { AuthButton } from "@/components/auth/AuthButton";
+import { AuthField } from "@/components/auth/AuthField";
+import {
+  EyeIcon,
+  EyeOffIcon,
+  LockIcon,
+  MailIcon,
+  StoreIcon,
+} from "@/components/auth/auth-icons";
 import { apiFetch } from "@/lib/api-client";
 import type { User } from "@/types";
 
@@ -38,30 +45,41 @@ export default function RegisterPage() {
     }
   }
 
+  const showGlobalError = Boolean(
+    error && !fields.shopName && !fields.email && !fields.password,
+  );
+
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
-      <Input
-        label="Shop name"
-        placeholder="Bean & Brew"
-        value={shopName}
-        onChange={(e) => setShopName(e.target.value)}
-        error={fields.shopName?.[0]}
-        required
-      />
-      <Input
-        label="Email"
-        type="email"
-        inputMode="email"
-        autoComplete="email"
-        autoCapitalize="none"
-        placeholder="you@shop.com"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        error={fields.email?.[0]}
-        required
-      />
-      <div className="relative">
-        <Input
+    <form onSubmit={onSubmit} className="flex flex-col" noValidate>
+      <p className="mb-4 text-center text-xs font-medium text-rz-muted">Create shop</p>
+
+      <div className="flex flex-col gap-3.5">
+        <AuthField
+          label="Shop name"
+          autoComplete="organization"
+          placeholder="Bean & Brew"
+          value={shopName}
+          onChange={(e) => setShopName(e.target.value)}
+          error={fields.shopName?.[0]}
+          leadingIcon={<StoreIcon />}
+          required
+        />
+
+        <AuthField
+          label="Email"
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          autoCapitalize="none"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          error={fields.email?.[0]}
+          leadingIcon={<MailIcon />}
+          required
+        />
+
+        <AuthField
           label="Password"
           type={showPw ? "text" : "password"}
           autoComplete="new-password"
@@ -69,31 +87,39 @@ export default function RegisterPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           error={fields.password?.[0]}
+          leadingIcon={<LockIcon />}
+          trailing={
+            <button
+              type="button"
+              onClick={() => setShowPw((s) => !s)}
+              aria-label={showPw ? "Hide password" : "Show password"}
+              className="tap-target absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-rz-hint active:bg-rz-elevated"
+            >
+              {showPw ? <EyeOffIcon /> : <EyeIcon />}
+            </button>
+          }
           required
         />
-        <button
-          type="button"
-          onClick={() => setShowPw((s) => !s)}
-          className="absolute right-3 top-9 text-sm font-medium text-slate-500"
-          tabIndex={-1}
-        >
-          {showPw ? "Hide" : "Show"}
-        </button>
       </div>
 
-      {error && (
-        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+      {showGlobalError && (
+        <p
+          className="mt-3 rounded-[11px] border-[0.5px] border-rz-red/40 bg-rz-red/10 px-4 py-3 text-sm text-rz-red"
+          role="alert"
+        >
           {error}
         </p>
       )}
 
-      <Button type="submit" disabled={submitting}>
-        {submitting ? "Creating…" : "Create shop"}
-      </Button>
+      <div className="mt-[22px]">
+        <AuthButton type="submit" disabled={submitting}>
+          {submitting ? "Creating…" : "Create shop"}
+        </AuthButton>
+      </div>
 
-      <p className="mt-2 text-center text-slate-600">
+      <p className="mt-6 text-center text-sm text-rz-hint">
         Already have a shop?{" "}
-        <Link href="/login" className="font-semibold text-emerald-700">
+        <Link href="/login" className="font-medium text-rz-green">
           Log in →
         </Link>
       </p>
