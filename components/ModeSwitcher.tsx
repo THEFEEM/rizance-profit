@@ -7,14 +7,39 @@ import { apiFetch } from "@/lib/api-client";
 import type { Booth } from "@/types/booth";
 import type { AppContext } from "@/types/context";
 
+import { formatDayShort } from "@/lib/date";
+
+function formatBoothDateRange(start: string, end: string): string {
+  if (start === end) return formatDayShort(start);
+  return `${formatDayShort(start)} – ${formatDayShort(end)}`;
+}
+
+function TentIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0">
+      <path
+        d="M4 20h16M6 20 12 4l6 16M9 14h6"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function ModeSwitcher({
   mode,
   boothId,
   boothName,
+  boothStartDate,
+  boothEndDate,
 }: {
   mode: "regular" | "booth";
   boothId?: string;
   boothName?: string;
+  boothStartDate?: string;
+  boothEndDate?: string;
 }) {
   const router = useRouter();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -78,9 +103,9 @@ export function ModeSwitcher({
 
   return (
     <>
-      <div className="px-4 pt-3">
+      <div className="px-4 pt-1">
         <div
-          className="flex rounded-full bg-slate-100 p-1"
+          className="flex rounded-full bg-rz-elevated p-[3px]"
           role="tablist"
           aria-label="สลับโหมด"
         >
@@ -90,10 +115,10 @@ export function ModeSwitcher({
             aria-selected={mode === "regular"}
             disabled={switching}
             onClick={switchToRegular}
-            className={`tap-target flex-1 rounded-full py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 ${
+            className={`tap-target flex-1 rounded-full py-2.5 text-sm font-medium transition-colors disabled:opacity-50 ${
               mode === "regular"
-                ? "bg-white text-emerald-700 shadow-sm"
-                : "text-slate-600 active:bg-slate-200/60"
+                ? "bg-rz-green text-rz-bg"
+                : "text-rz-muted active:bg-rz-card"
             }`}
           >
             ร้านค้า
@@ -104,46 +129,57 @@ export function ModeSwitcher({
             aria-selected={mode === "booth"}
             disabled={switching}
             onClick={switchToBooth}
-            className={`tap-target flex-1 rounded-full py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 ${
+            className={`tap-target flex-1 rounded-full py-2.5 text-sm font-medium transition-colors disabled:opacity-50 ${
               mode === "booth"
-                ? "bg-white text-emerald-700 shadow-sm"
-                : "text-slate-600 active:bg-slate-200/60"
+                ? "bg-rz-amber text-rz-bg"
+                : "text-rz-muted active:bg-rz-card"
             }`}
           >
             บูธ
           </button>
         </div>
         {mode === "booth" && boothName && (
-          <p className="mt-1.5 truncate text-center text-xs text-slate-500">{boothName}</p>
+          <p className="mt-2 flex items-center justify-center gap-1.5 truncate text-center text-[11px] font-medium text-rz-amber">
+            <TentIcon />
+            <span className="truncate">
+              {boothName}
+              {boothStartDate && boothEndDate && (
+                <span className="text-rz-amber/80">
+                  {" "}
+                  · {formatBoothDateRange(boothStartDate, boothEndDate)}
+                </span>
+              )}
+            </span>
+          </p>
         )}
       </div>
 
       {pickerOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
           role="dialog"
           aria-modal="true"
           aria-labelledby="booth-picker-title"
           onClick={() => !switching && setPickerOpen(false)}
         >
           <div
-            className="max-h-[80dvh] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-4 shadow-xl"
+            className="max-h-[80dvh] w-full max-w-sm overflow-y-auto rounded-2xl border-[0.5px] border-rz-border bg-rz-card p-4 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 id="booth-picker-title" className="text-lg font-bold text-slate-900">
+            <h2 id="booth-picker-title" className="text-lg font-medium text-rz-text">
               เลือกงานบูธ
             </h2>
-            <p className="mt-1 text-sm text-slate-500">เลือกงานบูธที่เปิดอยู่</p>
+            <p className="mt-1 text-sm text-rz-muted">เลือกงานบูธที่เปิดอยู่</p>
 
             {error && (
-              <p className="mt-3 text-sm text-red-600" role="alert">
+              <p className="mt-3 text-sm text-rz-red" role="alert">
                 {error}
               </p>
             )}
 
-            <ul className="mt-4 divide-y divide-slate-100">
+            <ul className="mt-4 divide-y divide-rz-border">
               {loading && (
-                <li className="px-2 py-3 text-sm text-slate-400">กำลังโหลดงานบูธ…</li>
+                <li className="px-2 py-3 text-sm text-rz-hint">กำลังโหลดงานบูธ…</li>
               )}
 
               {booths?.map((b) => {
@@ -156,12 +192,12 @@ export function ModeSwitcher({
                       disabled={disabled}
                       onClick={() => selectContext({ mode: "booth", boothId: b.id })}
                       className={`tap-target w-full px-2 py-3 text-left text-sm font-medium disabled:opacity-40 ${
-                        isActive ? "text-emerald-700" : "text-slate-700"
+                        isActive ? "text-rz-amber" : "text-rz-text"
                       }`}
                     >
                       {b.name}
                       {b.status === "closed" && (
-                        <span className="ml-1 text-xs text-slate-400">(ปิดแล้ว)</span>
+                        <span className="ml-1 text-xs text-rz-hint">(ปิดแล้ว)</span>
                       )}
                       {isActive && " ✓"}
                     </button>
@@ -170,14 +206,14 @@ export function ModeSwitcher({
               })}
 
               {!loading && booths?.every((b) => b.status !== "open") && (
-                <li className="px-2 py-3 text-sm text-slate-400">ยังไม่มีงานบูธที่เปิดอยู่</li>
+                <li className="px-2 py-3 text-sm text-rz-hint">ยังไม่มีงานบูธที่เปิดอยู่</li>
               )}
             </ul>
 
             <Link
               href="/booth/new"
               onClick={() => setPickerOpen(false)}
-              className="tap-target mt-4 flex w-full items-center justify-center rounded-2xl border border-dashed border-slate-300 py-3 text-sm font-semibold text-slate-600 active:bg-slate-50"
+              className="tap-target mt-4 flex w-full items-center justify-center rounded-2xl border border-dashed border-rz-border py-3 text-sm font-medium text-rz-muted active:bg-rz-elevated"
             >
               + สร้างงานบูธ
             </Link>
@@ -186,7 +222,7 @@ export function ModeSwitcher({
               type="button"
               onClick={() => setPickerOpen(false)}
               disabled={switching}
-              className="tap-target mt-3 w-full py-2 text-sm font-medium text-slate-500"
+              className="tap-target mt-3 w-full py-2 text-sm font-medium text-rz-hint"
             >
               ปิด
             </button>

@@ -17,13 +17,17 @@ function isNavActive(pathname: string, key: string, href: string): boolean {
 }
 
 export function BottomNav({
+  mode,
   incomeHref,
   expenseHref,
 }: {
+  mode: "regular" | "booth";
   incomeHref: string;
   expenseHref: string;
 }) {
   const pathname = usePathname();
+  const accentActive = mode === "booth" ? "text-rz-amber" : "text-rz-green";
+  const accentIdle = "text-rz-hint";
 
   const hrefByKey: Record<string, string> = {
     today: "/",
@@ -33,7 +37,7 @@ export function BottomNav({
   };
 
   return (
-    <nav className="sticky bottom-0 z-10 border-t border-slate-200 bg-white/95 backdrop-blur">
+    <nav className="sticky bottom-0 z-10 border-t-[0.5px] border-rz-border bg-rz-nav">
       <div className="mx-auto flex max-w-md items-stretch justify-around px-2 pb-[env(safe-area-inset-bottom)]">
         {NAV_ITEMS.map((item) => {
           const href = hrefByKey[item.key];
@@ -42,11 +46,11 @@ export function BottomNav({
             <Link
               key={item.key}
               href={href}
-              className={`tap-target no-select flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-xs font-medium ${
-                active ? "text-emerald-700" : "text-slate-500"
+              className={`tap-target no-select flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium ${
+                active ? accentActive : accentIdle
               }`}
             >
-              <span className="text-lg leading-none" aria-hidden>
+              <span className="text-xl leading-none" aria-hidden>
                 {item.icon}
               </span>
               {item.label}

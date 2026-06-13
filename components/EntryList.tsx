@@ -10,6 +10,7 @@ import {
   type IncomeCategory,
 } from "@/types";
 import { DeleteConfirm } from "@/components/DeleteConfirm";
+import { ExpenseArrowIcon, IncomeArrowIcon } from "@/components/today/today-icons";
 
 export type EntryRow = {
   id: string;
@@ -35,17 +36,27 @@ function entryTitle(e: EntryRow): string {
   return e.note ? `${label} · ${e.note}` : label;
 }
 
+function entryCategoryLabel(e: EntryRow): string {
+  if (e.kind === "income") {
+    return INCOME_CATEGORY_LABELS[(e.category as IncomeCategory) ?? "storefront"];
+  }
+  return EXPENSE_CATEGORY_LABELS[(e.category as ExpenseCategory) ?? "other"];
+}
+
 export function EntryList({
   entries,
   currency = "THB",
   emptyHint = "No entries yet.",
   readOnly = false,
+  appearance = "default",
 }: {
   entries: EntryRow[];
   currency?: string;
   emptyHint?: string;
   /** Hide delete actions (e.g. Stats close-out view). */
   readOnly?: boolean;
+  /** Dark Today list styling — does not affect Stats. */
+  appearance?: "default" | "today";
 }) {
   const router = useRouter();
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -54,6 +65,7 @@ export function EntryList({
   const [error, setError] = useState<string | null>(null);
 
   const visible = readOnly ? entries : entries.filter((e) => !removed.has(e.id));
+  const isToday = appearance === "today";
 
   async function confirmDelete() {
     if (!pending || deleting) return;
@@ -71,21 +83,70 @@ export function EntryList({
   }
 
   if (visible.length === 0) {
-    return <p className="px-4 py-6 text-center text-sm text-slate-400">{emptyHint}</p>;
+    const emptyClass = isToday
+      ? "px-4 py-6 text-center text-[13px] text-rz-hint"
+      : "px-4 py-6 text-center text-sm text-slate-400";
+    return <p className={emptyClass}>{emptyHint}</p>;
   }
+
+  const dividerClass = isToday ? "divide-rz-border" : "divide-slate-100";
+  const errorClass = isToday
+    ? "px-4 py-2 text-center text-sm text-rz-red"
+    : "px-4 py-2 text-center text-sm text-red-600";
 
   return (
     <>
       {error && (
-        <p className="px-4 py-2 text-center text-sm text-red-600" role="alert">
+        <p className={errorClass} role="alert">
           {error}
         </p>
       )}
-      <ul className="divide-y divide-slate-100">
+      <ul className={`divide-y ${dividerClass}`}>
         {visible.map((e) => {
           const isIncome = e.kind === "income";
           const title = entryTitle(e);
+          const categoryLabel = entryCategoryLabel(e);
           const displayAmount = `${isIncome ? "+ " : "− "}${formatMoney(e.amount, currency)}`;
+
+          if (isToday) {
+            return (
+              <li
+                key={e.id}
+                data-cat-group={entryCategoryKey(e)}
+                className="flex items-center gap-3 px-4 py-3"
+              >
+                <div
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                    isIncome ? "bg-rz-green/15 text-rz-green" : "bg-rz-red/15 text-rz-red"
+                  }`}
+                >
+                  {isIncome ? <IncomeArrowIcon /> : <ExpenseArrowIcon />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13px] text-rz-text">{title}</p>
+                  <p className="text-[10px] text-rz-hint">{categoryLabel}</p>
+                </div>
+                <span
+                  className={`rz-tabular shrink-0 text-[13px] font-medium ${
+                    isIncome ? "text-rz-green" : "text-rz-red"
+                  }`}
+                >
+                  {displayAmount}
+                </span>
+                {!readOnly && (
+                  <button
+                    onClick={() => setPending(e)}
+                    disabled={deleting === e.id}
+                    aria-label={`Delete ${title}`}
+                    className="tap-target -mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-rz-hint active:bg-rz-elevated disabled:opacity-40"
+                  >
+                    {deleting === e.id ? "…" : "✕"}
+                  </button>
+                )}
+              </li>
+            );
+          }
+
           return (
             <li
               key={e.id}

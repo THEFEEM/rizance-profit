@@ -2,36 +2,50 @@ import { formatMoney, moneySign } from "@/lib/money";
 
 function profitColor(amount: string): string {
   const sign = moneySign(amount);
-  return sign > 0 ? "text-emerald-600" : sign < 0 ? "text-red-600" : "text-slate-400";
+  return sign > 0 ? "text-rz-green" : sign < 0 ? "text-rz-red" : "text-rz-hint";
 }
 
 /**
- * Regular-mode Today hero: cumulative profit (ยอดสะสม) with today's breakdown below.
+ * Regular-mode Today hero: total sales + cumulative / today profit.
  */
 export function TodayBalanceCard({
+  totalSales,
   cumulativeProfit,
   todayProfit,
   currency = "THB",
 }: {
+  totalSales: string;
   cumulativeProfit: string;
   todayProfit: string;
   currency?: string;
 }) {
   return (
-    <section className="px-4 py-6 text-center">
-      <p className="text-sm font-semibold tracking-wide text-slate-400">ยอดสะสม</p>
-      <p
-        className={`mt-1 break-all text-6xl font-extrabold leading-tight tracking-tight ${profitColor(cumulativeProfit)}`}
-      >
-        {formatMoney(cumulativeProfit, currency)}
-      </p>
+    <section className="px-4 pt-3">
+      <div className="rounded-[14px] border-[0.5px] border-rz-border bg-rz-card px-[18px] py-[18px]">
+        <p className="text-[11px] text-rz-hint">ยอดขายรวม</p>
+        <p className="rz-tabular mt-1 break-all text-[32px] font-medium leading-tight tracking-[-0.5px] text-rz-green">
+          {formatMoney(totalSales, currency)}
+        </p>
 
-      <p className="mt-3 text-sm text-slate-600">
-        กำไรวันนี้{" "}
-        <span className={`font-semibold ${profitColor(todayProfit)}`}>
-          {formatMoney(todayProfit, currency)}
-        </span>
-      </p>
+        <div className="my-3 border-t-[0.5px] border-rz-border" />
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <p className="text-[11px] text-rz-hint">กำไรสะสม</p>
+            <p
+              className={`rz-tabular mt-0.5 text-base font-medium ${profitColor(cumulativeProfit)}`}
+            >
+              {formatMoney(cumulativeProfit, currency)}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[11px] text-rz-hint">กำไรวันนี้</p>
+            <p className={`rz-tabular mt-0.5 text-base font-medium ${profitColor(todayProfit)}`}>
+              {formatMoney(todayProfit, currency)}
+            </p>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }

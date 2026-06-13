@@ -20,11 +20,13 @@ export default async function TodayPage() {
   );
 
   return (
-    <div className="pb-4">
+    <div className="pb-3">
       <ModeSwitcher
         mode={ctx.mode}
         boothId={ctx.mode === "booth" ? ctx.boothId : undefined}
         boothName={ctx.mode === "booth" ? ctx.booth.name : undefined}
+        boothStartDate={ctx.mode === "booth" ? ctx.booth.startDate : undefined}
+        boothEndDate={ctx.mode === "booth" ? ctx.booth.endDate : undefined}
       />
       {ctx.mode === "regular" ? (
         <RegularToday user={user} />

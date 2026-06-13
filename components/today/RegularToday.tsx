@@ -12,7 +12,7 @@ import { EntryList, type EntryRow } from "@/components/EntryList";
 import { buildTodayCategoryGroups } from "@/lib/today-category-groups";
 import type { User } from "@/types";
 
-/** Regular-shop Today — cumulative hero + today's breakdown; booth mode unchanged. */
+/** Regular-shop Today — total sales hero + today's breakdown. */
 export async function RegularToday({ user }: { user: User }) {
   const date = today();
   const [allTime, summary, incomes, expenses] = await Promise.all([
@@ -42,10 +42,12 @@ export async function RegularToday({ user }: { user: User }) {
   ].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 
   const categoryGroups = buildTodayCategoryGroups(entries);
+  const hasEntries = entries.length > 0;
 
   return (
     <>
       <TodayBalanceCard
+        totalSales={allTime.income}
         cumulativeProfit={allTime.profit}
         todayProfit={summary.profit}
         currency={user.currency}
@@ -57,17 +59,25 @@ export async function RegularToday({ user }: { user: User }) {
         currency={user.currency}
       />
 
-      <TodayCategoryMiniList groups={categoryGroups} currency={user.currency} />
+      {hasEntries && (
+        <TodayCategoryMiniList groups={categoryGroups} currency={user.currency} />
+      )}
 
-      <div className="mt-6">
-        <h2 className="px-4 pb-1 text-sm font-semibold text-slate-500">Recent today</h2>
-        <div className="mx-2 overflow-hidden rounded-2xl bg-white shadow-sm">
-          <EntryList
-            entries={entries}
-            currency={user.currency}
-            emptyHint="No entries today — tap +In or −Out in the nav to start."
-          />
-        </div>
+      <div className="mt-3 px-4">
+        {hasEntries ? (
+          <div className="overflow-hidden rounded-[14px] border-[0.5px] border-rz-border bg-rz-card">
+            <EntryList
+              entries={entries}
+              currency={user.currency}
+              appearance="today"
+              emptyHint="ยังไม่มีรายการวันนี้ — แตะ +In หรือ −Out เพื่อเริ่ม"
+            />
+          </div>
+        ) : (
+          <p className="rounded-[14px] border-[0.5px] border-rz-border bg-rz-card px-4 py-6 text-center text-[13px] text-rz-hint">
+            ยังไม่มีรายการวันนี้ — แตะ +In หรือ −Out เพื่อเริ่ม
+          </p>
+        )}
       </div>
     </>
   );
