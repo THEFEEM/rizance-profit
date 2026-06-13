@@ -3,9 +3,9 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Spinner } from "@/components/ui/Spinner";
+import { AuthButton } from "@/components/auth/AuthButton";
+import { AuthField } from "@/components/auth/AuthField";
+import { EyeIcon, EyeOffIcon, LockIcon, MailIcon } from "@/components/auth/auth-icons";
 import { apiFetch } from "@/lib/api-client";
 import type { User } from "@/types";
 
@@ -40,54 +40,68 @@ function LoginForm() {
     }
   }
 
+  const showGlobalError = Boolean(error && !fields.email && !fields.password);
+
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
-      <Input
-        label="Email"
-        type="email"
-        inputMode="email"
-        autoComplete="email"
-        autoCapitalize="none"
-        placeholder="you@shop.com"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        error={fields.email?.[0]}
-        required
-      />
-      <div className="relative">
-        <Input
+    <form onSubmit={onSubmit} className="flex flex-col" noValidate>
+      <p className="mb-4 text-center text-xs font-medium text-rz-muted">Sign in</p>
+
+      <div className="flex flex-col gap-3.5">
+        <AuthField
+          label="Email"
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          autoCapitalize="none"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          error={fields.email?.[0]}
+          leadingIcon={<MailIcon />}
+          required
+        />
+
+        <AuthField
           label="Password"
           type={showPw ? "text" : "password"}
           autoComplete="current-password"
-          placeholder="Your password"
+          placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           error={fields.password?.[0]}
+          leadingIcon={<LockIcon />}
+          trailing={
+            <button
+              type="button"
+              onClick={() => setShowPw((s) => !s)}
+              aria-label={showPw ? "Hide password" : "Show password"}
+              className="tap-target absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-rz-hint active:bg-rz-elevated"
+            >
+              {showPw ? <EyeOffIcon /> : <EyeIcon />}
+            </button>
+          }
           required
         />
-        <button
-          type="button"
-          onClick={() => setShowPw((s) => !s)}
-          className="absolute right-3 top-9 text-sm font-medium text-slate-500"
-          tabIndex={-1}
-        >
-          {showPw ? "Hide" : "Show"}
-        </button>
       </div>
 
-      {error && !fields.email && !fields.password && (
-        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+      {showGlobalError && (
+        <p
+          className="mt-3 rounded-[11px] border-[0.5px] border-rz-red/40 bg-rz-red/10 px-4 py-3 text-sm text-rz-red"
+          role="alert"
+        >
           {error}
         </p>
       )}
 
-      <Button type="submit" disabled={submitting}>
-        {submitting ? "Logging in…" : "Log in"}
-      </Button>
+      <div className="mt-[22px]">
+        <AuthButton type="submit" disabled={submitting}>
+          {submitting ? "Logging in…" : "Log in"}
+        </AuthButton>
+      </div>
 
-      <p className="mt-2 text-center text-slate-600">
+      <p className="mt-6 text-center text-sm text-rz-hint">
         New here?{" "}
-        <Link href="/register" className="font-semibold text-emerald-700">
+        <Link href="/register" className="font-medium text-rz-green">
           Create shop →
         </Link>
       </p>
@@ -95,9 +109,21 @@ function LoginForm() {
   );
 }
 
+function LoginFallback() {
+  return (
+    <div className="flex flex-col items-center gap-3 py-8" role="status">
+      <div
+        className="h-8 w-8 animate-spin rounded-full border-2 border-rz-border border-t-rz-green"
+        aria-hidden
+      />
+      <p className="text-sm text-rz-hint">Loading…</p>
+    </div>
+  );
+}
+
 export default function LoginPage() {
   return (
-    <Suspense fallback={<Spinner label="Loading…" />}>
+    <Suspense fallback={<LoginFallback />}>
       <LoginForm />
     </Suspense>
   );

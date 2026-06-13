@@ -3,6 +3,19 @@
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;
+  --rz-bg: #0e1525;
+  --rz-card: #16203a;
+  --rz-elevated: #1a2236;
+  --rz-border: #243049;
+  --rz-text: #e8edf5;
+  --rz-muted: #9aa6b8;
+  --rz-hint: #7a8699;
+  --rz-green: #4ade9e;
+  --rz-red: #f87171;
+  --rz-btn: #1d9e75;
+  --rz-logo-bg: #16352a;
+  --rz-logo-border: #1d5b43;
+  --rz-placeholder: #5c6679;
 }
 
 @theme inline {
@@ -11,6 +24,19 @@
   --color-profit: #16a34a;
   --color-loss: #dc2626;
   --color-neutral: #6b7280;
+  --color-rz-bg: var(--rz-bg);
+  --color-rz-card: var(--rz-card);
+  --color-rz-elevated: var(--rz-elevated);
+  --color-rz-border: var(--rz-border);
+  --color-rz-text: var(--rz-text);
+  --color-rz-muted: var(--rz-muted);
+  --color-rz-hint: var(--rz-hint);
+  --color-rz-green: var(--rz-green);
+  --color-rz-red: var(--rz-red);
+  --color-rz-btn: var(--rz-btn);
+  --color-rz-logo-bg: var(--rz-logo-bg);
+  --color-rz-logo-border: var(--rz-logo-border);
+  --color-rz-placeholder: var(--rz-placeholder);
   --font-sans: var(--font-geist-sans);
 }
 
@@ -22,17 +48,14 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
-  /* Prevent the iOS "double-tap to zoom" delay on big tap targets. */
   touch-action: manipulation;
 }
 
-/* Tap targets must be >= 48px; this utility enforces it everywhere. */
 .tap-target {
   min-height: 48px;
   min-width: 48px;
 }
 
-/* Disable text selection on the custom keypad / buttons for a native feel. */
 .no-select {
   -webkit-user-select: none;
   user-select: none;
