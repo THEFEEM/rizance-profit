@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import { getBooth, listBoothMembers } from "@/lib/booth-queries";
-import { BoothBack } from "@/components/booth/BoothBack";
+import { BoothSetupHeader } from "@/components/booth/setup/BoothSetupHeader";
 import { BoothClosedBanner } from "@/components/booth/BoothClosedBanner";
 import { BoothSetup } from "@/components/booth/BoothSetup";
 
@@ -19,11 +19,7 @@ export default async function BoothSetupPage({ params }: { params: Promise<{ id:
 
   return (
     <div>
-      <div className="px-4 pb-2 pt-2">
-        <BoothBack href={`/booth/${id}`} />
-        <h1 className="text-lg font-bold text-slate-900">ตั้งค่าบูธ / สมาชิก</h1>
-        <p className="mt-1 text-sm text-slate-500">{booth.name}</p>
-      </div>
+      <BoothSetupHeader mode="edit" backHref={`/booth/${id}`} />
       {closed && (
         <div className="mx-4 mb-3">
           <BoothClosedBanner />

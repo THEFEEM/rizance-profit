@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { EntryOptionButton } from "@/components/entry/EntryOptionButton";
 import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
+import { SetupField, SetupPrimaryButton } from "@/components/booth/setup/SetupField";
+import { UserIcon } from "@/components/booth/setup/icons";
+import { ROLE_STYLES } from "@/components/booth/summary/role-styles";
 import { apiFetch } from "@/lib/api-client";
 import { formatMoney } from "@/lib/money";
 import {
@@ -17,6 +19,34 @@ import {
   type ProfitSplitMethod,
   type WageType,
 } from "@/types/booth";
+
+function memberSubline(m: BoothMember, currency: string): string {
+  if (m.role === "investor") {
+    return `นักลงทุน · ${formatMoney(m.investmentAmount, currency)}`;
+  }
+  if (m.role === "manager") {
+    const parts: string[] = [];
+    if (Number(m.investmentAmount) > 0) {
+      parts.push(formatMoney(m.investmentAmount, currency));
+    }
+    if (m.wageAmount) {
+      parts.push(`+ ค่าแรง ${formatMoney(m.wageAmount, currency)}`);
+    }
+    return `ผู้จัดการ · ${parts.join(" ") || "—"}`;
+  }
+  return `พนักงาน · ค่าแรง ${m.wageAmount ? formatMoney(m.wageAmount, currency) : "—"}`;
+}
+
+function RoleIconTile({ role }: { role: MemberRole }) {
+  const s = ROLE_STYLES[role];
+  return (
+    <span
+      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border-[0.5px] ${s.badgeBg} ${s.badgeBorder} ${s.text}`}
+    >
+      <UserIcon />
+    </span>
+  );
+}
 
 export function BoothMemberEditor({
   boothId,
@@ -85,24 +115,41 @@ export function BoothMemberEditor({
   }
 
   return (
-    <div className="flex flex-col gap-4 px-4 pb-8">
+    <section className="px-4">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-medium text-rz-muted">สมาชิก</h2>
+        {!closed && (
+          <a
+            href="#add-member-form"
+            className="tap-target text-sm font-medium text-rz-green"
+          >
+            ＋ เพิ่มสมาชิก
+          </a>
+        )}
+      </div>
+
+      {members.length === 0 && (
+        <p className="mb-3 text-sm text-rz-hint">
+          ยังไม่มีสมาชิก — เพิ่มได้ หรือข้ามไปก่อน
+        </p>
+      )}
+
       {members.length > 0 && (
-        <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm">
+        <ul className="mb-4 space-y-2">
           {members.map((m) => (
-            <li key={m.id} className="flex items-start gap-3 px-4 py-3">
+            <li
+              key={m.id}
+              className="flex items-center gap-3 rounded-[14px] border-[0.5px] border-rz-border bg-rz-card px-4 py-3"
+            >
+              <RoleIconTile role={m.role} />
               <div className="min-w-0 flex-1">
-                <p className="font-medium text-slate-900">{m.name}</p>
-                <p className="text-xs text-slate-500">{MEMBER_ROLE_LABELS[m.role]}</p>
-                {(m.role === "investor" || m.role === "manager") &&
-                  Number(m.investmentAmount) > 0 && (
-                    <p className="text-xs text-emerald-700">
-                      ลงทุน {formatMoney(m.investmentAmount, currency)}
-                    </p>
-                  )}
-                {(m.role === "employee" || m.role === "manager") && m.wageAmount && (
-                  <p className="text-xs text-slate-600">
-                    ค่าแรง {formatMoney(m.wageAmount, currency)} /{" "}
-                    {m.wageType ? WAGE_TYPE_LABELS[m.wageType] : "—"}
+                <p className="text-sm font-medium text-rz-text">{m.name}</p>
+                <p className={`text-xs ${ROLE_STYLES[m.role].text}`}>
+                  {memberSubline(m, currency)}
+                </p>
+                {(m.role === "employee" || m.role === "manager") && m.wageType && (
+                  <p className="text-xs text-rz-hint">
+                    {WAGE_TYPE_LABELS[m.wageType]}
                   </p>
                 )}
               </div>
@@ -110,7 +157,8 @@ export function BoothMemberEditor({
                 <button
                   type="button"
                   onClick={() => removeMember(m.id)}
-                  className="tap-target shrink-0 text-sm text-slate-400 active:text-red-600"
+                  className="tap-target shrink-0 px-2 text-sm text-rz-hint active:text-rz-red"
+                  aria-label={`ลบ ${m.name}`}
                 >
                   ลบ
                 </button>
@@ -121,46 +169,52 @@ export function BoothMemberEditor({
       )}
 
       {!closed && (
-        <div className="rounded-2xl bg-white p-4 shadow-sm">
-          <p className="text-sm font-semibold text-slate-800">เพิ่มสมาชิก</p>
+        <div id="add-member-form" className="rounded-[14px] border-[0.5px] border-rz-border bg-rz-card p-4">
+          <p className="text-sm font-medium text-rz-text">เพิ่มสมาชิก</p>
 
           <div className="mt-3 flex flex-wrap gap-2">
             {MEMBER_ROLES.map((r) => (
-              <button
+              <EntryOptionButton
                 key={r}
-                type="button"
+                selected={role === r}
                 onClick={() => setRole(r)}
-                className={`tap-target rounded-full px-3 py-1.5 text-xs font-semibold ${
-                  role === r
-                    ? "bg-emerald-600 text-white"
-                    : "bg-slate-100 text-slate-600"
-                }`}
+                accent={r === "manager" ? "amber" : "green"}
+                className="text-xs"
               >
                 {MEMBER_ROLE_LABELS[r]}
-              </button>
+              </EntryOptionButton>
             ))}
           </div>
 
           <div className="mt-3">
-            <Input label="ชื่อ" value={name} onChange={(e) => setName(e.target.value)} />
+            <SetupField
+              label="ชื่อ"
+              icon={<UserIcon />}
+              iconTone={role === "investor" ? "blue" : "hint"}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
           </div>
 
           {(role === "investor" || role === "manager") && (
             <div className="mt-3">
-              <p className="text-sm text-slate-600">เงินลงทุน (บาท)</p>
-              <p className="text-lg font-bold tabular-nums">{formatTyped(investmentRaw) || "0"}</p>
+              <p className="text-xs text-rz-muted">เงินลงทุน (บาท)</p>
+              <p className="rz-tabular text-lg font-medium text-rz-text">
+                {formatTyped(investmentRaw) || "0"}
+              </p>
               {padField === "investment" ? (
                 <QuickAmountPad
                   value={investmentRaw}
                   onChange={setInvestmentRaw}
                   onSave={() => setPadField(null)}
                   saveLabel="ตกลง"
+                  accent="amber"
                 />
               ) : (
                 <button
                   type="button"
                   onClick={() => setPadField("investment")}
-                  className="text-sm text-emerald-700"
+                  className="tap-target text-sm font-medium text-rz-green"
                 >
                   ใส่จำนวน →
                 </button>
@@ -170,37 +224,38 @@ export function BoothMemberEditor({
 
           {(role === "employee" || role === "manager") && (
             <>
-              <div className="mt-3 flex gap-2">
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 {WAGE_TYPES.map((w) => (
-                  <button
+                  <EntryOptionButton
                     key={w}
-                    type="button"
+                    selected={wageType === w}
                     onClick={() => setWageType(w)}
-                    className={`tap-target rounded-full px-3 py-1.5 text-xs font-semibold ${
-                      wageType === w
-                        ? "bg-emerald-600 text-white"
-                        : "bg-slate-100 text-slate-600"
-                    }`}
+                    accent="amber"
+                    layout="row"
+                    className="text-center text-xs"
                   >
                     {WAGE_TYPE_LABELS[w]}
-                  </button>
+                  </EntryOptionButton>
                 ))}
               </div>
               <div className="mt-3">
-                <p className="text-sm text-slate-600">ค่าแรง (บาท)</p>
-                <p className="text-lg font-bold tabular-nums">{formatTyped(wageRaw) || "0"}</p>
+                <p className="text-xs text-rz-muted">ค่าแรง (บาท)</p>
+                <p className="rz-tabular text-lg font-medium text-rz-text">
+                  {formatTyped(wageRaw) || "0"}
+                </p>
                 {padField === "wage" ? (
                   <QuickAmountPad
                     value={wageRaw}
                     onChange={setWageRaw}
                     onSave={() => setPadField(null)}
                     saveLabel="ตกลง"
+                    accent="amber"
                   />
                 ) : (
                   <button
                     type="button"
                     onClick={() => setPadField("wage")}
-                    className="text-sm text-emerald-700"
+                    className="tap-target text-sm font-medium text-rz-green"
                   >
                     ใส่จำนวน →
                   </button>
@@ -210,16 +265,18 @@ export function BoothMemberEditor({
           )}
 
           {error && (
-            <p className="mt-3 text-sm text-red-600" role="alert">
+            <p className="mt-3 text-sm text-rz-red" role="alert">
               {error}
             </p>
           )}
 
-          <Button className="mt-4" onClick={addMember} disabled={saving || !name.trim()}>
-            {saving ? "กำลังบันทึก…" : "เพิ่มสมาชิก"}
-          </Button>
+          <div className="mt-4">
+            <SetupPrimaryButton onClick={addMember} disabled={saving || !name.trim()}>
+              {saving ? "กำลังบันทึก…" : "เพิ่มสมาชิก"}
+            </SetupPrimaryButton>
+          </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }
