@@ -162,7 +162,7 @@ try {
   page = await fetchHtml(base, "/income");
   assertEq("/income status", String(page.status), "200");
   assertTrue("income banner ร้านประจำ", page.html.includes("บันทึกเข้า:") && page.html.includes("ร้านประจำ"));
-  assertTrue("income not amber booth banner", !page.html.includes("bg-amber-100"));
+  assertTrue("income not booth banner", !page.html.includes('data-entry-context="booth"'));
 
   page = await fetchHtml(base, "/expense");
   assertEq("/expense status", String(page.status), "200");
@@ -186,12 +186,12 @@ try {
   page = await fetchHtml(base, `/booth/${boothId}/income`);
   assertEq("booth income status", String(page.status), "200");
   assertTrue("booth income banner text", page.html.includes("บันทึกเข้า:") && page.html.includes(boothName));
-  assertTrue("booth income amber style", page.html.includes("bg-amber-100"));
+  assertTrue("booth income amber style", page.html.includes('data-entry-context="booth"'));
 
   page = await fetchHtml(base, `/booth/${boothId}/expense`);
   assertEq("booth expense status", String(page.status), "200");
   assertTrue("booth expense banner text", page.html.includes("บันทึกเข้า:") && page.html.includes(boothName));
-  assertTrue("booth expense amber style", page.html.includes("bg-amber-100"));
+  assertTrue("booth expense amber style", page.html.includes('data-entry-context="booth"'));
   console.log("");
 
   console.log("5) Closed booth cookie → nav falls back to regular routes");

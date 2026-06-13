@@ -303,31 +303,47 @@ export function BoothRemainingBudget({
   totalExpense,
   currency = "THB",
   variant = "bar",
+  appearance = "default",
 }: {
   totalBudget: string;
   totalExpense: string;
   currency?: string;
   /** bar = expense form strip; inline = summary capital section */
   variant?: "bar" | "inline";
+  /** entry = dark +In/−Out expense form styling */
+  appearance?: "default" | "entry";
 }) {
   const remaining = computeProfit(totalBudget, totalExpense);
   const sign = moneySign(remaining);
   const color =
-    sign < 0 ? "text-red-600" : sign > 0 ? "text-emerald-700" : "text-slate-700";
+    appearance === "entry"
+      ? sign < 0
+        ? "text-rz-red"
+        : sign > 0
+          ? "text-rz-green"
+          : "text-rz-text"
+      : sign < 0
+        ? "text-red-600"
+        : sign > 0
+          ? "text-emerald-700"
+          : "text-slate-700";
+
+  const labelMuted = appearance === "entry" ? "text-rz-hint" : variant === "inline" ? "text-sm text-slate-600" : "text-xs text-slate-500";
+  const subMuted = appearance === "entry" ? "text-rz-hint" : "text-xs text-slate-400";
 
   const body = (
     <div className="flex items-center justify-between gap-3">
       <div>
-        <p className={variant === "inline" ? "text-sm text-slate-600" : "text-xs text-slate-500"}>
+        <p className={variant === "inline" && appearance === "default" ? "text-sm text-slate-600" : labelMuted}>
           งบคงเหลือ
         </p>
-        <p className="text-xs text-slate-400">
+        <p className={`text-xs ${subMuted}`}>
           งบรวม {formatMoney(totalBudget, currency)} − ใช้ไป{" "}
           {formatMoney(totalExpense, currency)}
         </p>
       </div>
       <p
-        className={`font-bold tabular-nums ${color} ${variant === "inline" ? "text-base" : "text-xl"}`}
+        className={`font-medium tabular-nums ${color} ${variant === "inline" ? "text-base" : "text-xl"}`}
       >
         {formatMoney(remaining, currency)}
       </p>
@@ -336,6 +352,14 @@ export function BoothRemainingBudget({
 
   if (variant === "inline") {
     return <div className="mt-3 border-t border-slate-100 pt-3">{body}</div>;
+  }
+
+  if (appearance === "entry") {
+    return (
+      <div className="mx-4 mb-3 rounded-[11px] border-[0.5px] border-rz-border bg-rz-card px-4 py-3">
+        {body}
+      </div>
+    );
   }
 
   return (
@@ -350,6 +374,7 @@ export function BoothRemainingBar(props: {
   totalBudget: string;
   totalExpense: string;
   currency?: string;
+  appearance?: "default" | "entry";
 }) {
   return <BoothRemainingBudget {...props} variant="bar" />;
 }

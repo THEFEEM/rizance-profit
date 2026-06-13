@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AmountInput } from "@/components/ui/AmountInput";
 import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
-import { Input } from "@/components/ui/Input";
+import { EntryField } from "@/components/entry/EntryField";
+import { EntryPageHeader } from "@/components/entry/EntryPageHeader";
 import { apiFetch } from "@/lib/api-client";
 import { today } from "@/lib/date";
 import { CategoryGrid } from "@/components/CategoryGrid";
@@ -43,13 +44,7 @@ export default function AddExpensePage() {
 
   return (
     <div className="flex min-h-[calc(100dvh-57px-61px)] flex-col">
-      <div className="flex items-center justify-between px-4 py-3">
-        <button onClick={() => router.back()} className="tap-target text-sm font-medium text-slate-500">
-          ← Cancel
-        </button>
-        <h1 className="text-base font-bold text-slate-900">Add Expense</h1>
-        <span className="w-16" />
-      </div>
+      <EntryPageHeader title="Add Expense" />
 
       <EntryContextBanner target="regular" />
 
@@ -57,34 +52,48 @@ export default function AddExpensePage() {
 
       <div className="flex flex-col gap-3 px-4">
         <div>
-          <p className="mb-1.5 text-sm font-medium text-slate-700">ประเภทรายจ่าย</p>
+          <p className="mb-1.5 text-xs text-rz-muted">ประเภทรายจ่าย</p>
           <CategoryGrid
             options={EXPENSE_CATEGORY_OPTIONS}
             value={category}
             onChange={setCategory}
             columns={3}
+            accent="green"
           />
         </div>
 
-        <Input
+        <EntryField
           label="Note (optional)"
           placeholder="Milk + cups"
           value={note}
           onChange={(e) => setNote(e.target.value)}
           maxLength={255}
+          accent="green"
         />
-        <Input
+        <EntryField
           label="Date"
           type="date"
           value={date}
           max={today()}
           onChange={(e) => setDate(e.target.value || today())}
+          accent="green"
         />
-        {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
+        {error && (
+          <p className="text-sm text-rz-red" role="alert">
+            {error}
+          </p>
+        )}
       </div>
 
       <div className="mt-auto px-2 pb-3">
-        <QuickAmountPad value={raw} onChange={setRaw} onSave={save} saving={saving} saveLabel="SAVE" />
+        <QuickAmountPad
+          value={raw}
+          onChange={setRaw}
+          onSave={save}
+          saving={saving}
+          saveLabel="SAVE"
+          accent="green"
+        />
       </div>
     </div>
   );

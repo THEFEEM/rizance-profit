@@ -35,39 +35,53 @@ export function QuickAmountPad({
   onSave,
   saving = false,
   saveLabel = "SAVE",
+  accent = "green",
 }: {
   value: string;
   onChange: (next: string) => void;
   onSave: () => void;
   saving?: boolean;
   saveLabel?: string;
+  accent?: "green" | "amber";
 }) {
   const press = (k: Key) => onChange(applyKey(value, k));
   const canSave = !!value && Number(value) > 0 && !saving;
+  const saveActive =
+    accent === "amber"
+      ? "bg-rz-amber text-rz-bg active:opacity-90 disabled:opacity-40"
+      : "bg-rz-green text-rz-bg active:opacity-90 disabled:opacity-40";
 
   return (
     <div className="no-select grid grid-cols-4 gap-2 p-2">
       <PadButton onClick={() => press("7")}>7</PadButton>
       <PadButton onClick={() => press("8")}>8</PadButton>
       <PadButton onClick={() => press("9")}>9</PadButton>
-      <PadButton onClick={() => press("back")} variant="muted" aria-label="Delete">⌫</PadButton>
+      <PadButton onClick={() => press("back")} variant="muted" aria-label="Delete">
+        ⌫
+      </PadButton>
 
       <PadButton onClick={() => press("4")}>4</PadButton>
       <PadButton onClick={() => press("5")}>5</PadButton>
       <PadButton onClick={() => press("6")}>6</PadButton>
-      <PadButton onClick={() => press("00")} variant="muted">00</PadButton>
+      <PadButton onClick={() => press("00")} variant="muted">
+        00
+      </PadButton>
 
       <PadButton onClick={() => press("1")}>1</PadButton>
       <PadButton onClick={() => press("2")}>2</PadButton>
       <PadButton onClick={() => press("3")}>3</PadButton>
-      <PadButton onClick={() => press(".")} variant="muted">.</PadButton>
+      <PadButton onClick={() => press(".")} variant="muted">
+        .
+      </PadButton>
 
-      <PadButton onClick={() => press("0")} className="col-span-2">0</PadButton>
+      <PadButton onClick={() => press("0")} className="col-span-2">
+        0
+      </PadButton>
       <button
         type="button"
         onClick={() => canSave && onSave()}
         disabled={!canSave}
-        className="tap-target col-span-2 flex h-16 items-center justify-center rounded-2xl bg-emerald-600 text-lg font-bold text-white transition-colors active:bg-emerald-700 disabled:bg-emerald-300"
+        className={`tap-target col-span-2 flex h-16 items-center justify-center rounded-[11px] text-[15px] font-medium transition-opacity ${saveActive}`}
       >
         {saving ? "Saving…" : saveLabel}
       </button>
@@ -89,13 +103,13 @@ function PadButton({
 } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const base =
     variant === "muted"
-      ? "bg-slate-100 text-slate-700 active:bg-slate-200"
-      : "bg-white text-slate-900 shadow-sm active:bg-slate-100";
+      ? "border-[0.5px] border-rz-border bg-rz-elevated text-rz-muted active:bg-rz-card"
+      : "border-[0.5px] border-rz-border bg-rz-card text-rz-text active:bg-rz-elevated";
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`tap-target flex h-16 items-center justify-center rounded-2xl text-2xl font-semibold transition-colors ${base} ${className}`}
+      className={`tap-target flex h-16 items-center justify-center rounded-[11px] text-2xl font-medium transition-colors ${base} ${className}`}
       {...rest}
     >
       {children}

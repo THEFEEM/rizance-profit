@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AmountInput } from "@/components/ui/AmountInput";
 import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
-import { Input } from "@/components/ui/Input";
+import { EntryField } from "@/components/entry/EntryField";
+import { EntryOptionButton } from "@/components/entry/EntryOptionButton";
 import { BoothBack } from "@/components/booth/BoothBack";
 import { BoothClosedBanner } from "@/components/booth/BoothClosedBanner";
 import { EntryContextBanner } from "@/components/EntryContextBanner";
@@ -74,8 +75,8 @@ export function BoothIncomeForm({
     <div className="flex min-h-[calc(100dvh-57px-61px)] flex-col">
       <div className="flex items-center justify-between px-4 py-3">
         <BoothBack href={`/booth/${boothId}`} />
-        <h1 className="text-base font-bold text-slate-900">รายรับบูธ</h1>
-        <span className="w-16" />
+        <h1 className="text-base font-medium text-rz-text">รายรับบูธ</h1>
+        <span className="w-16" aria-hidden />
       </div>
       <EntryContextBanner target="booth" name={boothName} />
 
@@ -89,35 +90,32 @@ export function BoothIncomeForm({
 
       <div className="flex flex-col gap-3 px-4">
         <div>
-          <p className="mb-1.5 text-sm font-medium text-slate-700">ช่องทางรับเงิน</p>
+          <p className="mb-1.5 text-xs text-rz-muted">ช่องทางรับเงิน</p>
           <div className="flex flex-wrap gap-2">
             {PAYMENT_METHODS.map((m) => (
-              <button
+              <EntryOptionButton
                 key={m}
-                type="button"
+                selected={paymentMethod === m}
                 disabled={closed}
                 onClick={() => setPaymentMethod(m)}
-                className={`tap-target rounded-full border px-4 text-sm font-medium transition-colors disabled:opacity-50 ${
-                  paymentMethod === m
-                    ? "border-emerald-600 bg-emerald-600 text-white"
-                    : "border-slate-300 bg-white text-slate-700 active:bg-slate-100"
-                }`}
+                accent="amber"
               >
                 {PAYMENT_METHOD_LABELS[m]}
-              </button>
+              </EntryOptionButton>
             ))}
           </div>
         </div>
 
-        <Input
+        <EntryField
           label="หมายเหตุ (ไม่บังคับ)"
           placeholder="ยอดขายเช้า"
           value={note}
           onChange={(e) => setNote(e.target.value)}
           maxLength={255}
           disabled={closed}
+          accent="amber"
         />
-        <Input
+        <EntryField
           label="วันที่"
           type="date"
           value={date}
@@ -125,9 +123,10 @@ export function BoothIncomeForm({
           max={endDate}
           disabled={closed}
           onChange={(e) => setDate(clamp(e.target.value || defaultDate))}
+          accent="amber"
         />
         {error && (
-          <p className="text-sm text-red-600" role="alert">
+          <p className="text-sm text-rz-red" role="alert">
             {error}
           </p>
         )}
@@ -135,20 +134,28 @@ export function BoothIncomeForm({
 
       <div className="mt-auto px-2 pb-3">
         {closed ? (
-          <p className="px-2 py-4 text-center text-sm text-slate-400">ฟอร์มถูกปิดใช้งาน</p>
+          <p className="px-2 py-4 text-center text-sm text-rz-hint">ฟอร์มถูกปิดใช้งาน</p>
         ) : (
-          <QuickAmountPad value={raw} onChange={setRaw} onSave={save} saving={saving} saveLabel="บันทึก" />
+          <QuickAmountPad
+            value={raw}
+            onChange={setRaw}
+            onSave={save}
+            saving={saving}
+            saveLabel="บันทึก"
+            accent="amber"
+          />
         )}
       </div>
 
-      <div className="border-t border-slate-100">
-        <h2 className="px-4 pt-4 text-sm font-semibold text-slate-700">รายการที่บันทึกแล้ว</h2>
+      <div className="border-t-[0.5px] border-rz-border">
+        <h2 className="px-4 pt-4 text-xs font-medium text-rz-muted">รายการที่บันทึกแล้ว</h2>
         <BoothEntryList
           kind="income"
           boothId={boothId}
           entries={entries}
           currency={currency}
           readOnly={closed}
+          appearance="entry"
         />
       </div>
     </div>

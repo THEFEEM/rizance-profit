@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AmountInput } from "@/components/ui/AmountInput";
 import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
-import { Input } from "@/components/ui/Input";
+import { EntryField } from "@/components/entry/EntryField";
+import { EntryOptionButton } from "@/components/entry/EntryOptionButton";
 import { BoothBack } from "@/components/booth/BoothBack";
 import { BoothRemainingBar } from "@/components/booth/BoothSetup";
 import { BoothClosedBanner } from "@/components/booth/BoothClosedBanner";
@@ -91,7 +92,12 @@ export function BoothExpenseForm({
       setPayerKind("member");
       router.refresh();
     } else {
-      setError(res.fields?.amount?.[0] ?? res.fields?.externalPayerName?.[0] ?? res.fields?.payerMemberId?.[0] ?? res.message);
+      setError(
+        res.fields?.amount?.[0] ??
+          res.fields?.externalPayerName?.[0] ??
+          res.fields?.payerMemberId?.[0] ??
+          res.message,
+      );
     }
     setSaving(false);
   }
@@ -100,8 +106,8 @@ export function BoothExpenseForm({
     <div className="flex min-h-[calc(100dvh-57px-61px)] flex-col">
       <div className="flex items-center justify-between px-4 py-3">
         <BoothBack href={`/booth/${boothId}`} />
-        <h1 className="text-base font-bold text-slate-900">รายจ่ายบูธ</h1>
-        <span className="w-16" />
+        <h1 className="text-base font-medium text-rz-text">รายจ่ายบูธ</h1>
+        <span className="w-16" aria-hidden />
       </div>
       <EntryContextBanner target="booth" name={boothName} />
 
@@ -109,6 +115,7 @@ export function BoothExpenseForm({
         totalBudget={totalBudget}
         totalExpense={totalExpense}
         currency={currency}
+        appearance="entry"
       />
 
       {closed && (
@@ -121,27 +128,24 @@ export function BoothExpenseForm({
 
       <div className="flex flex-col gap-3 px-4">
         <div>
-          <p className="mb-1.5 text-sm font-medium text-slate-700">ประเภทต้นทุน</p>
+          <p className="mb-1.5 text-xs text-rz-muted">ประเภทต้นทุน</p>
           <div className="flex flex-col gap-2">
             {BOOTH_COST_TYPES.map((t) => (
-              <button
+              <EntryOptionButton
                 key={t}
-                type="button"
+                selected={costType === t}
                 disabled={closed}
                 onClick={() => setCostType(t)}
-                className={`tap-target rounded-2xl border px-4 py-2.5 text-left text-sm font-medium transition-colors disabled:opacity-50 ${
-                  costType === t
-                    ? "border-emerald-600 bg-emerald-600 text-white"
-                    : "border-slate-300 bg-white text-slate-700 active:bg-slate-100"
-                }`}
+                accent="amber"
+                layout="row"
               >
                 {BOOTH_COST_TYPE_LABELS[t]}
-              </button>
+              </EntryOptionButton>
             ))}
           </div>
         </div>
 
-        <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+        <label className="flex items-center gap-3 rounded-[11px] border-[0.5px] border-rz-border bg-rz-card px-4 py-3">
           <input
             type="checkbox"
             checked={advancePayment}
@@ -153,39 +157,35 @@ export function BoothExpenseForm({
                 setExternalPayerName("");
               }
             }}
-            className="h-4 w-4"
+            className="h-4 w-4 accent-rz-amber"
           />
-          <span className="text-sm text-slate-700">ออกเงินก่อน (จ่ายแทนร้าน)</span>
+          <span className="text-sm text-rz-text">ออกเงินก่อน (จ่ายแทนร้าน)</span>
         </label>
 
         {advancePayment && (
-          <div className="space-y-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
-            <p className="text-sm font-medium text-slate-700">ผู้จ่ายแทน</p>
+          <div className="space-y-3 rounded-[11px] border-[0.5px] border-rz-border bg-rz-card px-4 py-3">
+            <p className="text-sm font-medium text-rz-muted">ผู้จ่ายแทน</p>
             <div className="flex gap-2">
-              <button
-                type="button"
+              <EntryOptionButton
+                selected={payerKind === "member"}
                 disabled={closed}
                 onClick={() => setPayerKind("member")}
-                className={`tap-target flex-1 rounded-xl border px-3 py-2 text-sm font-medium ${
-                  payerKind === "member"
-                    ? "border-emerald-600 bg-emerald-600 text-white"
-                    : "border-slate-300 bg-white text-slate-700"
-                }`}
+                accent="amber"
+                layout="row"
+                className="flex-1"
               >
                 สมาชิก
-              </button>
-              <button
-                type="button"
+              </EntryOptionButton>
+              <EntryOptionButton
+                selected={payerKind === "external"}
                 disabled={closed}
                 onClick={() => setPayerKind("external")}
-                className={`tap-target flex-1 rounded-xl border px-3 py-2 text-sm font-medium ${
-                  payerKind === "external"
-                    ? "border-emerald-600 bg-emerald-600 text-white"
-                    : "border-slate-300 bg-white text-slate-700"
-                }`}
+                accent="amber"
+                layout="row"
+                className="flex-1"
               >
                 บุคคลภายนอก
-              </button>
+              </EntryOptionButton>
             </div>
 
             {payerKind === "member" ? (
@@ -194,7 +194,7 @@ export function BoothExpenseForm({
                   value={payerMemberId}
                   disabled={closed}
                   onChange={(e) => setPayerMemberId(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm"
+                  className="tap-target w-full rounded-[11px] border-[0.5px] border-rz-border bg-rz-elevated px-[13px] py-[13px] text-sm text-rz-text outline-none focus:border-rz-amber"
                 >
                   <option value="">เลือกสมาชิก</option>
                   {members.map((m) => (
@@ -204,38 +204,41 @@ export function BoothExpenseForm({
                   ))}
                 </select>
               ) : (
-                <p className="text-sm text-slate-500">ยังไม่มีสมาชิก — เลือกบุคคลภายนอกแทน</p>
+                <p className="text-sm text-rz-hint">ยังไม่มีสมาชิก — เลือกบุคคลภายนอกแทน</p>
               )
             ) : (
-              <Input
+              <EntryField
                 label="ชื่อผู้จ่ายแทน"
                 placeholder="เช่น ครูสมชาย / ร้านค้า"
                 value={externalPayerName}
                 onChange={(e) => setExternalPayerName(e.target.value)}
                 maxLength={120}
                 disabled={closed}
+                accent="amber"
               />
             )}
           </div>
         )}
 
-        <Input
+        <EntryField
           label="ชื่อรายการ (ไม่บังคับ)"
           placeholder="ค่าที่ / นม / แก้ว"
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           maxLength={120}
           disabled={closed}
+          accent="amber"
         />
-        <Input
+        <EntryField
           label="หมายเหตุ (ไม่บังคับ)"
           placeholder="รายละเอียดเพิ่มเติม"
           value={note}
           onChange={(e) => setNote(e.target.value)}
           maxLength={255}
           disabled={closed}
+          accent="amber"
         />
-        <Input
+        <EntryField
           label="วันที่"
           type="date"
           value={date}
@@ -243,9 +246,10 @@ export function BoothExpenseForm({
           max={endDate}
           disabled={closed}
           onChange={(e) => setDate(clamp(e.target.value || defaultDate))}
+          accent="amber"
         />
         {error && (
-          <p className="text-sm text-red-600" role="alert">
+          <p className="text-sm text-rz-red" role="alert">
             {error}
           </p>
         )}
@@ -253,20 +257,28 @@ export function BoothExpenseForm({
 
       <div className="mt-auto px-2 pb-3">
         {closed ? (
-          <p className="px-2 py-4 text-center text-sm text-slate-400">ฟอร์มถูกปิดใช้งาน</p>
+          <p className="px-2 py-4 text-center text-sm text-rz-hint">ฟอร์มถูกปิดใช้งาน</p>
         ) : (
-          <QuickAmountPad value={raw} onChange={setRaw} onSave={save} saving={saving} saveLabel="บันทึก" />
+          <QuickAmountPad
+            value={raw}
+            onChange={setRaw}
+            onSave={save}
+            saving={saving}
+            saveLabel="บันทึก"
+            accent="amber"
+          />
         )}
       </div>
 
-      <div className="border-t border-slate-100">
-        <h2 className="px-4 pt-4 text-sm font-semibold text-slate-700">รายการที่บันทึกแล้ว</h2>
+      <div className="border-t-[0.5px] border-rz-border">
+        <h2 className="px-4 pt-4 text-xs font-medium text-rz-muted">รายการที่บันทึกแล้ว</h2>
         <BoothEntryList
           kind="expense"
           boothId={boothId}
           entries={entries}
           currency={currency}
           readOnly={closed}
+          appearance="entry"
         />
       </div>
     </div>
