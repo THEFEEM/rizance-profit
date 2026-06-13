@@ -40,6 +40,20 @@ export function EyeIcon({ className }: { className?: string }) {
   );
 }
 
+export function StoreIcon({ className }: { className?: string }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden className={className}>
+      <path
+        d="M4 10h16l-1.5-5H5.5L4 10Zm0 0v10h16V10M9 14h6"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function EyeOffIcon({ className }: { className?: string }) {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden className={className}>
