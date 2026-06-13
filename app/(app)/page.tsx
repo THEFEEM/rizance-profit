@@ -20,7 +20,7 @@ export default async function TodayPage() {
   );
 
   return (
-    <div className="pb-4">
+    <div className="pb-3">
       <ModeSwitcher
         mode={ctx.mode}
         boothId={ctx.mode === "booth" ? ctx.boothId : undefined}

@@ -18,34 +18,33 @@ export function TodayCategoryMiniList({
   }
 
   return (
-    <section className="mt-4 px-4">
-      <h2 className="pb-2 text-sm font-semibold text-slate-500">วันนี้ตามหมวด</h2>
-      <ul className="overflow-hidden rounded-2xl bg-white shadow-sm">
+    <section className="mt-3 px-4">
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {groups.map((g) => (
-          <li key={g.key} className="border-b border-slate-50 last:border-b-0">
-            <button
-              type="button"
-              onClick={() => scrollToCategory(g.key)}
-              className="tap-target flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-50"
+          <button
+            key={g.key}
+            type="button"
+            onClick={() => scrollToCategory(g.key)}
+            className="flex min-h-8 shrink-0 items-center gap-2 rounded-full border-[0.5px] border-rz-border bg-rz-card px-3 py-1.5 active:bg-rz-elevated"
+          >
+            <span
+              className={`text-sm ${g.kind === "income" ? "text-rz-green" : "text-rz-red"}`}
+              aria-hidden
             >
-              <span className="text-xl" aria-hidden>
-                {g.icon}
-              </span>
-              <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">
-                {g.label}
-              </span>
-              <span
-                className={`text-sm font-semibold tabular-nums ${
-                  g.kind === "income" ? "text-emerald-600" : "text-red-600"
-                }`}
-              >
-                {g.kind === "income" ? "+ " : "− "}
-                {formatMoney(g.subtotal, currency)}
-              </span>
-            </button>
-          </li>
+              {g.icon}
+            </span>
+            <span className="text-[11px] text-rz-muted">{g.label}</span>
+            <span
+              className={`rz-tabular text-[11px] font-medium ${
+                g.kind === "income" ? "text-rz-green" : "text-rz-red"
+              }`}
+            >
+              {g.kind === "income" ? "+" : "−"}
+              {formatMoney(g.subtotal, currency)}
+            </span>
+          </button>
         ))}
-      </ul>
+      </div>
     </section>
   );
 }

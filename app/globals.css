@@ -1,16 +1,40 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --background: #0e1525;
+  --foreground: #e8edf5;
+  --rz-bg: #0e1525;
+  --rz-card: #16203a;
+  --rz-elevated: #1a2236;
+  --rz-nav: #111a2e;
+  --rz-border: #243049;
+  --rz-text: #e8edf5;
+  --rz-muted: #9aa6b8;
+  --rz-hint: #7a8699;
+  --rz-green: #4ade9e;
+  --rz-red: #f87171;
+  --rz-blue: #6bb6ff;
+  --rz-amber: #ef9f27;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-profit: #16a34a;
-  --color-loss: #dc2626;
-  --color-neutral: #6b7280;
+  --color-profit: var(--rz-green);
+  --color-loss: var(--rz-red);
+  --color-neutral: var(--rz-muted);
+  --color-rz-bg: var(--rz-bg);
+  --color-rz-card: var(--rz-card);
+  --color-rz-elevated: var(--rz-elevated);
+  --color-rz-nav: var(--rz-nav);
+  --color-rz-border: var(--rz-border);
+  --color-rz-text: var(--rz-text);
+  --color-rz-muted: var(--rz-muted);
+  --color-rz-hint: var(--rz-hint);
+  --color-rz-green: var(--rz-green);
+  --color-rz-red: var(--rz-red);
+  --color-rz-blue: var(--rz-blue);
+  --color-rz-amber: var(--rz-amber);
   --font-sans: var(--font-geist-sans);
 }
 
@@ -22,18 +46,24 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
-  /* Prevent the iOS "double-tap to zoom" delay on big tap targets. */
   touch-action: manipulation;
 }
 
-/* Tap targets must be >= 48px; this utility enforces it everywhere. */
 .tap-target {
   min-height: 48px;
   min-width: 48px;
 }
 
-/* Disable text selection on the custom keypad / buttons for a native feel. */
 .no-select {
   -webkit-user-select: none;
   user-select: none;
+}
+
+.rz-hairline {
+  border-color: var(--rz-border);
+  border-width: 0.5px;
+}
+
+.rz-tabular {
+  font-variant-numeric: tabular-nums;
 }
