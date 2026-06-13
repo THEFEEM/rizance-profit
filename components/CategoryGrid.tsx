@@ -4,12 +4,21 @@ export function CategoryGrid<T extends string>({
   value,
   onChange,
   columns = 3,
+  accent = "green",
 }: {
   options: readonly { value: T; label: string; icon: string }[];
   value: T;
   onChange: (value: T) => void;
   columns?: 2 | 3;
+  accent?: "green" | "amber";
 }) {
+  const active =
+    accent === "amber"
+      ? "border-rz-amber bg-rz-amber text-rz-bg"
+      : "border-rz-green bg-rz-green text-rz-bg";
+  const idle =
+    "border-rz-border bg-rz-card text-rz-text active:bg-rz-elevated";
+
   return (
     <div
       className={`grid gap-2 ${columns === 3 ? "grid-cols-3" : "grid-cols-2"}`}
@@ -24,16 +33,14 @@ export function CategoryGrid<T extends string>({
             role="radio"
             aria-checked={selected}
             onClick={() => onChange(opt.value)}
-            className={`tap-target flex min-h-12 flex-col items-center justify-center rounded-2xl border px-1 py-2 text-center transition-colors ${
-              selected
-                ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
-                : "border-slate-300 bg-white text-slate-700 active:bg-slate-100"
+            className={`tap-target flex min-h-12 flex-col items-center justify-center rounded-[11px] border-[0.5px] px-1 py-2 text-center transition-colors ${
+              selected ? active : idle
             }`}
           >
             <span className="text-xl leading-none" aria-hidden>
               {opt.icon}
             </span>
-            <span className="mt-1 text-xs font-semibold leading-tight">{opt.label}</span>
+            <span className="mt-1 text-xs font-medium leading-tight">{opt.label}</span>
           </button>
         );
       })}

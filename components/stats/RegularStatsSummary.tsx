@@ -111,7 +111,7 @@ export async function RegularStatsSummary({
           currency={user.currency}
           labels={PERIOD_SUMMARY_LABELS}
         />
-        <p className="px-4 pt-2 text-center text-xs text-slate-400">
+        <p className="px-4 pt-2 text-center text-xs text-rz-hint">
           {formatPeriodRangeLabel(periodData.start, periodData.end)}
           {entryTotal > 0 && ` · ${entryTotal.toLocaleString()} รายการ`}
         </p>
@@ -119,7 +119,7 @@ export async function RegularStatsSummary({
           <p className="px-4 pt-2 text-center">
             <Link
               href={`/summary/monthly?month=${currentMonth()}`}
-              className="text-sm font-medium text-emerald-700"
+              className="text-sm font-medium text-rz-green"
             >
               ดูรายวันในเดือน →
             </Link>
@@ -136,12 +136,13 @@ export async function RegularStatsSummary({
       />
 
       <div className="mt-8">
-        <h2 className="px-4 text-base font-bold text-slate-900">ปิดร้าน</h2>
+        <h2 className="px-4 text-base font-medium text-rz-text">ปิดร้าน</h2>
         <DateNav
           date={closeDate}
           label={formatDateLabel(closeDate)}
           period={period}
           maxDate={today()}
+          accent="green"
         />
         <SummaryRows
           income={closeOut.income}
@@ -150,7 +151,7 @@ export async function RegularStatsSummary({
           currency={user.currency}
           labels={CLOSE_OUT_LABELS}
         />
-        <p className="px-4 pb-1 text-center text-xs text-slate-400">
+        <p className="px-4 pb-1 text-center text-xs text-rz-hint">
           {closeOut.incomeCount + closeOut.expenseCount > 0
             ? `${closeOut.incomeCount} รายรับ · ${closeOut.expenseCount} รายจ่าย`
             : "ยังไม่มีรายการในวันนี้"}
@@ -165,15 +166,14 @@ export async function RegularStatsSummary({
       />
 
       <div className="mt-6">
-        <h2 className="px-4 pb-1 text-sm font-semibold text-slate-500">รายการ</h2>
-        <div className="mx-2 overflow-hidden rounded-2xl bg-white shadow-sm">
-          <EntryList
-            entries={entries}
-            currency={user.currency}
-            emptyHint="ไม่มีรายการในวันนี้"
-            readOnly
-          />
-        </div>
+        <h2 className="px-4 pb-2 text-sm font-medium text-rz-muted">รายการ</h2>
+        <EntryList
+          entries={entries}
+          currency={user.currency}
+          emptyHint="ไม่มีรายการในวันนี้"
+          readOnly
+          appearance="today"
+        />
       </div>
     </>
   );

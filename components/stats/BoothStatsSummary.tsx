@@ -52,8 +52,8 @@ export async function BoothStatsSummary({
   return (
     <>
       <div className="mt-3 px-4">
-        <p className="text-center text-sm font-semibold text-slate-700">{booth.name}</p>
-        <p className="text-center text-xs text-slate-400">
+        <p className="text-center text-sm font-medium text-rz-amber">{booth.name}</p>
+        <p className="text-center text-xs text-rz-hint">
           {formatDayShort(booth.startDate)}
           {booth.endDate !== booth.startDate && ` – ${formatDayShort(booth.endDate)}`}
           {" · สรุปทั้งงาน"}
@@ -69,7 +69,7 @@ export async function BoothStatsSummary({
           profit={event.profit}
           currency={user.currency}
         />
-        <p className="px-4 pt-2 text-center text-xs text-slate-400">
+        <p className="px-4 pt-2 text-center text-xs text-rz-hint">
           {event.incomeCount + event.expenseCount > 0
             ? `${event.incomeCount + event.expenseCount} รายการทั้งงาน`
             : "ยังไม่มีรายการในงานนี้"}
@@ -77,7 +77,7 @@ export async function BoothStatsSummary({
         <p className="px-4 pt-2 text-center">
           <Link
             href={`/booth/${booth.id}/summary`}
-            className="text-sm font-medium text-emerald-700"
+            className="text-sm font-medium text-rz-amber"
           >
             ดูสรุปบูธเต็ม →
           </Link>
@@ -85,13 +85,14 @@ export async function BoothStatsSummary({
       </div>
 
       <div className="mt-8">
-        <h2 className="px-4 text-base font-bold text-slate-900">สรุปรายวัน</h2>
+        <h2 className="px-4 text-base font-medium text-rz-text">สรุปรายวัน</h2>
         <DateNav
           date={closeDate}
           label={formatDateLabel(closeDate)}
           period="today"
           minDate={booth.startDate}
           maxDate={maxDate}
+          accent="amber"
         />
         <SummaryRows
           income={day.income}
@@ -100,7 +101,7 @@ export async function BoothStatsSummary({
           currency={user.currency}
           labels={DAY_LABELS}
         />
-        <p className="px-4 pb-1 text-center text-xs text-slate-400">
+        <p className="px-4 pb-1 text-center text-xs text-rz-hint">
           {dayEntryCount > 0
             ? `${incomes.length} รายรับ · ${expenses.length} รายจ่าย`
             : "ไม่มีรายการในวันนี้"}
@@ -108,16 +109,15 @@ export async function BoothStatsSummary({
       </div>
 
       <div className="mt-6">
-        <h2 className="px-4 pb-1 text-sm font-semibold text-slate-500">รายการ</h2>
-        <div className="mx-2 overflow-hidden rounded-2xl bg-white shadow-sm">
-          <BoothDayEntryList
-            boothId={booth.id}
-            incomes={incomes}
-            expenses={expenses}
-            currency={user.currency}
-            readOnly
-          />
-        </div>
+        <h2 className="px-4 pb-2 text-sm font-medium text-rz-muted">รายการ</h2>
+        <BoothDayEntryList
+          boothId={booth.id}
+          incomes={incomes}
+          expenses={expenses}
+          currency={user.currency}
+          readOnly
+          appearance="today"
+        />
       </div>
     </>
   );

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { PERIOD_KEYS, PERIOD_LABELS, type PeriodKey } from "@/lib/date";
 
+/** Period pills for regular-mode Stats — green accent when active. */
 export function PeriodSelector({
   period,
   date,
@@ -19,10 +20,10 @@ export function PeriodSelector({
           <Link
             key={key}
             href={`/summary?${qs}`}
-            className={`tap-target shrink-0 rounded-full px-4 py-2 text-sm font-semibold ${
+            className={`tap-target shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
               active
-                ? "bg-emerald-700 text-white"
-                : "bg-white text-slate-600 shadow-sm ring-1 ring-slate-200"
+                ? "bg-rz-green text-rz-bg"
+                : "border-[0.5px] border-rz-border bg-rz-card text-rz-muted active:bg-rz-elevated"
             }`}
           >
             {PERIOD_LABELS[key]}

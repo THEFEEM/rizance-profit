@@ -11,12 +11,12 @@ export function AmountInput({
   tone?: "neutral" | "income" | "expense";
 }) {
   const toneClass =
-    tone === "income" ? "text-emerald-600" : tone === "expense" ? "text-red-600" : "text-slate-900";
+    tone === "income" ? "text-rz-green" : tone === "expense" ? "text-rz-red" : "text-rz-text";
 
   return (
     <div className="flex items-baseline justify-center gap-2 py-4" aria-live="polite">
-      <span className="text-3xl font-semibold text-slate-400">{currencySymbol(currency)}</span>
-      <span className={`text-6xl font-extrabold tabular-nums tracking-tight ${toneClass}`}>
+      <span className="text-2xl font-medium text-rz-hint">{currencySymbol(currency)}</span>
+      <span className={`rz-tabular text-[48px] font-medium leading-none tracking-[-0.5px] ${toneClass}`}>
         {value || "0"}
       </span>
     </div>

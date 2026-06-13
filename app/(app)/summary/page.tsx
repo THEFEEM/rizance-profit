@@ -36,9 +36,9 @@ export default async function StatsSummaryPage({
   return (
     <div className="pb-6">
       <div className="flex items-center justify-between px-4 pt-3">
-        <h1 className="text-lg font-bold text-slate-900">สถิติ</h1>
+        <h1 className="text-lg font-medium text-rz-text">สถิติ</h1>
         {ctx.mode === "regular" && (
-          <Link href="/pricing" className="text-sm font-medium text-emerald-700">
+          <Link href="/pricing" className="text-sm font-medium text-rz-green">
             ต้นทุนและราคา →
           </Link>
         )}
@@ -48,6 +48,8 @@ export default async function StatsSummaryPage({
         mode={ctx.mode}
         boothId={ctx.mode === "booth" ? ctx.boothId : undefined}
         boothName={ctx.mode === "booth" ? ctx.booth.name : undefined}
+        boothStartDate={ctx.mode === "booth" ? ctx.booth.startDate : undefined}
+        boothEndDate={ctx.mode === "booth" ? ctx.booth.endDate : undefined}
       />
 
       {ctx.mode === "regular" ? (
