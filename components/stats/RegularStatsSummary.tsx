@@ -6,6 +6,8 @@ import {
   listExpenseByDate,
   listIncomeInPeriod,
   listExpenseInPeriod,
+  periodExpenseByFixedVariable,
+  periodIncomeByCashTransfer,
   periodSummary,
 } from "@/lib/queries";
 import {
@@ -15,6 +17,7 @@ import {
   formatDateLabel,
   formatPeriodRangeLabel,
   currentMonth,
+  periodRange,
   type PeriodKey,
 } from "@/lib/date";
 import { boothNetForPeriod } from "@/lib/booth-queries";
@@ -28,6 +31,7 @@ import {
   type CategoryBreakdownEntry,
   type CategoryBreakdownRow,
 } from "@/components/stats/CategoryBreakdownPanel";
+import { RegularStatsRows } from "@/components/stats/RegularStatsRows";
 import { EntryList, type EntryRow } from "@/components/EntryList";
 import {
   expenseCategoryIcon,
@@ -41,12 +45,6 @@ import {
   type CategoryBreakdownItem,
   type User,
 } from "@/types";
-
-const PERIOD_SUMMARY_LABELS = {
-  income: "สรุปรายรับ",
-  expense: "สรุปรายจ่าย",
-  profit: "กำไร",
-};
 
 const CLOSE_OUT_LABELS = {
   income: "รายรับ",
@@ -64,17 +62,30 @@ export async function RegularStatsSummary({
   period: PeriodKey;
   closeDate: string;
 }) {
-  const periodData = await periodSummary(user.id, period);
-  const [closeOut, incomes, expenses, boothProfit, breakdown, periodIncomes, periodExpenses] =
-    await Promise.all([
-      dailySummary(user.id, closeDate),
-      listIncomeByDate(user.id, closeDate),
-      listExpenseByDate(user.id, closeDate),
-      boothNetForPeriod(user.id, periodData.start, periodData.end),
-      categoryBreakdown(user.id, periodData.start, periodData.end),
-      listIncomeInPeriod(user.id, periodData.start, periodData.end),
-      listExpenseInPeriod(user.id, periodData.start, periodData.end),
-    ]);
+  const { start, end } = periodRange(period);
+  const [
+    periodData,
+    cashTransfer,
+    fixedVariable,
+    closeOut,
+    incomes,
+    expenses,
+    boothProfit,
+    breakdown,
+    periodIncomes,
+    periodExpenses,
+  ] = await Promise.all([
+    periodSummary(user.id, period),
+    periodIncomeByCashTransfer(user.id, start, end),
+    periodExpenseByFixedVariable(user.id, start, end),
+    dailySummary(user.id, closeDate),
+    listIncomeByDate(user.id, closeDate),
+    listExpenseByDate(user.id, closeDate),
+    boothNetForPeriod(user.id, start, end),
+    categoryBreakdown(user.id, start, end),
+    listIncomeInPeriod(user.id, start, end),
+    listExpenseInPeriod(user.id, start, end),
+  ]);
   const combinedProfit = sumDecimals(periodData.profit, boothProfit);
 
   const entries: EntryRow[] = [
@@ -110,12 +121,13 @@ export async function RegularStatsSummary({
       </div>
 
       <div className="mt-4">
-        <SummaryRows
-          income={periodData.income}
-          expense={periodData.expense}
+        <RegularStatsRows
+          cashIncome={cashTransfer.cashIncome}
+          transferIncome={cashTransfer.transferIncome}
+          fixedExpense={fixedVariable.fixedExpense}
+          variableExpense={fixedVariable.variableExpense}
           profit={periodData.profit}
           currency={user.currency}
-          labels={PERIOD_SUMMARY_LABELS}
         />
         <p className="px-4 pt-2 text-center text-xs text-rz-hint">
           {formatPeriodRangeLabel(periodData.start, periodData.end)}

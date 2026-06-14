@@ -17,6 +17,8 @@ import type {
 } from "@/types";
 import type { ExpenseInput, IncomeInput } from "@/lib/validation";
 import { monthRange, periodRange, today } from "@/lib/date";
+import { isFixed } from "@/lib/expense-categories";
+import { centsToDecimalString } from "@/lib/money";
 
 // ---- row → domain mappers -------------------------------------------------
 
@@ -322,6 +324,48 @@ export async function categoryBreakdown(
     end,
     income: mapBreakdownRows(incomeRes.rows),
     expense: mapBreakdownRows(expenseRes.rows),
+  };
+}
+
+/** Cash vs transfer income totals for a date range — regular shop only. */
+export async function periodIncomeByCashTransfer(
+  userId: string,
+  start: string,
+  end: string,
+): Promise<{ cashIncome: string; transferIncome: string }> {
+  const { rows } = await query<{ cash_income: string; transfer_income: string }>(
+    `SELECT
+       COALESCE(SUM(CASE WHEN payment_method = 'cash' THEN amount ELSE 0 END), 0)::text AS cash_income,
+       COALESCE(SUM(CASE WHEN payment_method = 'transfer' THEN amount ELSE 0 END), 0)::text AS transfer_income
+     FROM income_entries
+     WHERE user_id = $1 AND entry_date >= $2 AND entry_date <= $3`,
+    [userId, start, end],
+  );
+  const r = rows[0];
+  return { cashIncome: r.cash_income, transferIncome: r.transfer_income };
+}
+
+/** Fixed vs variable expense totals for a date range — derived from category via isFixed(). */
+export async function periodExpenseByFixedVariable(
+  userId: string,
+  start: string,
+  end: string,
+): Promise<{ fixedExpense: string; variableExpense: string }> {
+  const { rows } = await query<{ amount: string; category: string }>(
+    `SELECT amount, category FROM expense_entries
+     WHERE user_id = $1 AND entry_date >= $2 AND entry_date <= $3`,
+    [userId, start, end],
+  );
+  let fixedCents = 0;
+  let variableCents = 0;
+  for (const row of rows) {
+    const cents = toCents(row.amount);
+    if (isFixed(row.category)) fixedCents += cents;
+    else variableCents += cents;
+  }
+  return {
+    fixedExpense: centsToDecimalString(fixedCents),
+    variableExpense: centsToDecimalString(variableCents),
   };
 }
 
