@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { boothNetBalance, BoothNetBalanceRow } from "@/components/booth/BoothNetBalance";
 import { BoothRemainingBudget } from "@/components/booth/BoothSetup";
 import { formatMoney, moneySign } from "@/lib/money";
 import type { BoothSummary, SplitProfitResult } from "@/types/booth";
@@ -58,6 +59,11 @@ export function BoothSummaryCard({
 
   const { booth } = summary;
   const hasEquity = moneySign(booth.memberEquity) > 0;
+  const { remainingBudget, netBalance } = boothNetBalance(
+    booth.totalBudget,
+    summary.totalExpense,
+    summary.totalIncome,
+  );
 
   return (
     <div className={compact ? "" : "px-4 pb-6"}>
@@ -164,6 +170,15 @@ export function BoothSummaryCard({
             tone="expense"
           />
         </div>
+
+        {compact && (
+          <BoothNetBalanceRow
+            remainingBudget={remainingBudget}
+            totalIncome={summary.totalIncome}
+            netBalance={netBalance}
+            currency={currency}
+          />
+        )}
 
         {split && !compact && (
           <div className="border-b-[0.5px] border-rz-border px-4 py-3">

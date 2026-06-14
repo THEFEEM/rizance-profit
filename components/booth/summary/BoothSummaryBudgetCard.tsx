@@ -5,7 +5,8 @@ import {
   UsersIcon,
   WalletIcon,
 } from "@/components/booth/summary/icons";
-import { computeProfit, formatMoney, moneySign } from "@/lib/money";
+import { boothNetBalance, BoothNetBalanceHighlight } from "@/components/booth/BoothNetBalance";
+import { formatMoney, moneySign } from "@/lib/money";
 import type { BoothSummary } from "@/types/booth";
 
 function IconTile({
@@ -71,8 +72,12 @@ export function BoothSummaryBudgetCard({
 }) {
   const { booth } = summary;
   const hasEquity = moneySign(booth.memberEquity) > 0;
-  const remaining = computeProfit(booth.totalBudget, summary.totalExpense);
-  const remSign = moneySign(remaining);
+  const { remainingBudget, netBalance } = boothNetBalance(
+    booth.totalBudget,
+    summary.totalExpense,
+    summary.totalIncome,
+  );
+  const remSign = moneySign(remainingBudget);
   const remColor = remSign < 0 ? "text-rz-red" : remSign > 0 ? "text-rz-green" : "text-rz-text";
   const remSub =
     remSign < 0
@@ -127,10 +132,16 @@ export function BoothSummaryBudgetCard({
               <p className="text-xs text-rz-hint">{remSub}</p>
             </div>
             <p className={`rz-tabular text-base font-medium ${remColor}`}>
-              {formatMoney(remaining, currency)}
+              {formatMoney(remainingBudget, currency)}
             </p>
           </div>
         </div>
+        <BoothNetBalanceHighlight
+          remainingBudget={remainingBudget}
+          totalIncome={summary.totalIncome}
+          netBalance={netBalance}
+          currency={currency}
+        />
         {booth.poolGetsShare && (
           <p className="border-t-[0.5px] border-rz-border px-4 py-2 text-xs text-rz-blue">
             กองกลางรับส่วนแบ่งกำไร
