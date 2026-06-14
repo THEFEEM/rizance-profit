@@ -14,20 +14,20 @@ export const Input = forwardRef<HTMLInputElement, Props>(function Input(
   return (
     <div className="w-full">
       {label && (
-        <label htmlFor={inputId} className="mb-1.5 block text-sm font-medium text-slate-700">
+        <label htmlFor={inputId} className="mb-1.5 block text-xs font-normal text-rz-muted">
           {label}
         </label>
       )}
       <input
         ref={ref}
         id={inputId}
-        className={`tap-target w-full rounded-2xl border bg-white px-4 text-base text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 ${
-          error ? "border-red-400" : "border-slate-300"
+        className={`tap-target w-full rounded-[11px] border-[0.5px] bg-rz-card px-[13px] py-[13px] text-sm text-rz-text outline-none transition-colors placeholder:text-rz-placeholder focus:border-rz-green ${
+          error ? "border-rz-red" : "border-rz-border"
         } ${className}`}
         aria-invalid={error ? true : undefined}
         {...props}
       />
-      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-1 text-xs text-rz-red">{error}</p>}
     </div>
   );
 });
