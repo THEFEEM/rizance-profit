@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { boothSummary, listBooths } from "@/lib/booth-queries";
 import { getCurrentUser } from "@/lib/session";
-import { listBooths } from "@/lib/booth-queries";
 import { BoothBack } from "@/components/booth/BoothBack";
-import { BoothList } from "@/components/booth/BoothList";
+import { BoothList, type ClosedBoothListItem } from "@/components/booth/BoothList";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +11,20 @@ export default async function BoothListPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   const booths = await listBooths(user.id);
+  const openBooths = booths.filter((b) => b.status === "open");
+  const closedBoothRecords = booths.filter((b) => b.status === "closed");
+
+  const closedBooths: ClosedBoothListItem[] = await Promise.all(
+    closedBoothRecords.map(async (booth) => {
+      const summary = await boothSummary(user.id, booth.id);
+      return {
+        booth,
+        totalIncome: summary?.totalIncome ?? "0.00",
+        totalExpense: summary?.totalExpense ?? "0.00",
+        profit: summary?.profit ?? "0.00",
+      };
+    }),
+  );
 
   return (
     <div className="pb-6" data-context="booth">
@@ -28,7 +42,11 @@ export default async function BoothListPage() {
         </Link>
       </div>
       <div className="mt-4 px-4">
-        <BoothList booths={booths} currency={user.currency} />
+        <BoothList
+          openBooths={openBooths}
+          closedBooths={closedBooths}
+          currency={user.currency}
+        />
       </div>
     </div>
   );
