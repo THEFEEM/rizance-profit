@@ -6,6 +6,13 @@ import { dirname, join } from "node:path";
 import { SignJWT } from "jose";
 import pg from "pg";
 import { pgClientOptions } from "./pg-config.mjs";
+import {
+  EXPENSE_CATEGORIES,
+  EXPENSE_COST_TYPE_LABELS,
+  INCOME_CATEGORIES,
+  PAYMENT_METHOD_LABELS,
+  PAYMENT_METHODS,
+} from "./expense-categories-core.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -74,6 +81,7 @@ function assertEq(label, actual, expected) {
 
 const client = new pg.Client(pgClientOptions(process.env.DATABASE_URL));
 let userId = null;
+let boothId = null;
 
 try {
   await client.connect();
@@ -100,28 +108,79 @@ try {
   assertEq("category", res.body?.data?.category ?? "missing", "storefront");
   console.log("");
 
-  console.log("2) POST /api/income with delivery category");
+  console.log("2) POST /api/income with delivery + transfer");
   res = await apiJson(base, "/api/income", {
     method: "POST",
-    body: JSON.stringify({ amount: 50, category: "delivery", entryDate: "2026-06-10" }),
+    body: JSON.stringify({
+      amount: 50,
+      category: "delivery",
+      paymentMethod: "transfer",
+      entryDate: "2026-06-10",
+    }),
   });
   assertEq("status", String(res.status), "201");
   assertEq("category", res.body?.data?.category ?? "missing", "delivery");
+  assertEq("paymentMethod", res.body?.data?.paymentMethod ?? "missing", "transfer");
   console.log("");
 
-  console.log("3) Income form shows CategoryGrid (Thai labels)");
+  console.log("3) Shop income form — 6 category chips + payment toggle");
   const page = await fetch(`${base}/income`, { headers: { Cookie: cookie } });
   const html = await page.text();
   assertEq("page status", String(page.status), "200");
-  assertEq("has ขายหน้าร้าน", html.includes("ขายหน้าร้าน") ? "yes" : "no", "yes");
-  assertEq("has เดลิเวอรี", html.includes("เดลิเวอรี") ? "yes" : "no", "yes");
+  for (const c of INCOME_CATEGORIES) {
+    assertEq(`has ${c.label}`, html.includes(c.label) ? "yes" : "no", "yes");
+  }
+  for (const m of PAYMENT_METHODS) {
+    assertEq(`has ${PAYMENT_METHOD_LABELS[m]}`, html.includes(PAYMENT_METHOD_LABELS[m]) ? "yes" : "no", "yes");
+  }
   console.log("");
 
-  console.log("4) Expense form shows Thai CategoryGrid");
+  console.log("4) Booth income API accepts category");
+  const { rows: booths } = await client.query(
+    `INSERT INTO booths (user_id, name, pool_budget, start_date, end_date)
+     VALUES ($1, 'Inc Cat Booth', 0, '2026-06-10'::date, '2026-06-10'::date) RETURNING id`,
+    [userId],
+  );
+  boothId = booths[0].id;
+  res = await apiJson(base, `/api/booths/${boothId}/income`, {
+    method: "POST",
+    body: JSON.stringify({
+      amount: 200,
+      category: "service",
+      paymentMethod: "cash",
+      entryDate: "2026-06-10",
+    }),
+  });
+  assertEq("booth income status", String(res.status), "201");
+  assertEq("booth category", res.body?.data?.category ?? "missing", "service");
+  console.log("");
+
+  console.log("5) Shop expense form — 8 category chips + fixed/variable badges");
   const expPage = await fetch(`${base}/expense`, { headers: { Cookie: cookie } });
   const expHtml = await expPage.text();
   assertEq("expense page status", String(expPage.status), "200");
-  assertEq("has วัตถุดิบ", expHtml.includes("วัตถุดิบ") ? "yes" : "no", "yes");
+  for (const c of EXPENSE_CATEGORIES) {
+    assertEq(`has ${c.label}`, expHtml.includes(c.label) ? "yes" : "no", "yes");
+    assertEq(
+      `has ${EXPENSE_COST_TYPE_LABELS[c.type]} for ${c.key}`,
+      expHtml.includes(EXPENSE_COST_TYPE_LABELS[c.type]) ? "yes" : "no",
+      "yes",
+    );
+  }
+  console.log("");
+
+  console.log("6) Booth expense API accepts category");
+  res = await apiJson(base, `/api/booths/${boothId}/expense`, {
+    method: "POST",
+    body: JSON.stringify({
+      amount: 150,
+      category: "rent",
+      entryDate: "2026-06-10",
+    }),
+  });
+  assertEq("booth expense status", String(res.status), "201");
+  assertEq("booth expense category", res.body?.data?.category ?? "missing", "rent");
+  assertEq("booth expense costType derived", res.body?.data?.costType ?? "missing", "fixed");
   console.log("");
 
   if (failed === 0) console.log("All assertions passed.");

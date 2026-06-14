@@ -69,6 +69,7 @@ export type BoothIncome = {
   id: string;
   boothId: string;
   amount: string;
+  category: string;
   paymentMethod: PaymentMethod;
   note: string | null;
   entryDate: string;

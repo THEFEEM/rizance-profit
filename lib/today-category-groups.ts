@@ -1,12 +1,12 @@
 import type { EntryRow } from "@/components/EntryList";
 import { sumDecimals, toCents } from "@/lib/money";
 import {
-  EXPENSE_CATEGORIES,
-  EXPENSE_CATEGORY_OPTIONS,
-  INCOME_CATEGORIES,
-  INCOME_CATEGORY_OPTIONS,
+  expenseCategoryIcon,
   expenseCategoryLabel,
+  expenseCategoryOrder,
+  incomeCategoryIcon,
   incomeCategoryLabel,
+  incomeCategoryOrder,
 } from "@/lib/expense-categories";
 
 export type TodayCategoryGroup = {
@@ -16,11 +16,6 @@ export type TodayCategoryGroup = {
   label: string;
   subtotal: string;
 };
-
-const incomeIconByKey = Object.fromEntries(INCOME_CATEGORIES.map((c) => [c.key, c.icon]));
-const expenseIconByKey = Object.fromEntries(EXPENSE_CATEGORIES.map((c) => [c.key, c.icon]));
-const legacyIncomeIcon = Object.fromEntries(INCOME_CATEGORY_OPTIONS.map((o) => [o.value, o.icon]));
-const legacyExpenseIcon = Object.fromEntries(EXPENSE_CATEGORY_OPTIONS.map((o) => [o.value, o.icon]));
 
 /** Group today's entries by kind+category — client-side from existing entry list. */
 export function buildTodayCategoryGroups(entries: EntryRow[]): TodayCategoryGroup[] {
@@ -44,10 +39,7 @@ export function buildTodayCategoryGroups(entries: EntryRow[]): TodayCategoryGrou
     const category = key.split(":")[1]!;
     const label =
       kind === "income" ? incomeCategoryLabel(category) : expenseCategoryLabel(category);
-    const icon =
-      kind === "income"
-        ? (incomeIconByKey[category] ?? legacyIncomeIcon[category] ?? "•")
-        : (expenseIconByKey[category] ?? legacyExpenseIcon[category] ?? "•");
+    const icon = kind === "income" ? incomeCategoryIcon(category) : expenseCategoryIcon(category);
     groups.push({
       key,
       kind,
@@ -57,5 +49,13 @@ export function buildTodayCategoryGroups(entries: EntryRow[]): TodayCategoryGrou
     });
   }
 
-  return groups.sort((a, b) => toCents(b.subtotal) - toCents(a.subtotal));
+  return groups.sort((a, b) => {
+    if (a.kind !== b.kind) return a.kind === "income" ? -1 : 1;
+    const catA = a.key.split(":")[1]!;
+    const catB = b.key.split(":")[1]!;
+    const orderA = a.kind === "income" ? incomeCategoryOrder(catA) : expenseCategoryOrder(catA);
+    const orderB = b.kind === "income" ? incomeCategoryOrder(catB) : expenseCategoryOrder(catB);
+    if (orderA !== orderB) return orderA - orderB;
+    return toCents(b.subtotal) - toCents(a.subtotal);
+  });
 }

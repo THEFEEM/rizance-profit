@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { SignJWT } from "jose";
 import pg from "pg";
 import { pgClientOptions } from "./pg-config.mjs";
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "./expense-categories-core.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -247,7 +248,16 @@ try {
     assertEq("stats 200", String(page.status), "200");
     assertEq("has รายรับตามหมวด", html.includes("รายรับตามหมวด") ? "yes" : "no", "yes");
     assertEq("has รายจ่ายตามหมวด", html.includes("รายจ่ายตามหมวด") ? "yes" : "no", "yes");
-    assertEq("has ขายหน้าร้าน", html.includes("ขายหน้าร้าน") ? "yes" : "no", "yes");
+    for (const c of INCOME_CATEGORIES) {
+      if (c.key === "storefront" || c.key === "delivery") {
+        assertEq(`has income ${c.label}`, html.includes(c.label) ? "yes" : "no", "yes");
+      }
+    }
+    for (const c of EXPENSE_CATEGORIES) {
+      if (c.key === "materials" || c.key === "rent") {
+        assertEq(`has expense ${c.label}`, html.includes(c.label) ? "yes" : "no", "yes");
+      }
+    }
   } else {
     console.log("  (skipped — dev server not running)");
   }

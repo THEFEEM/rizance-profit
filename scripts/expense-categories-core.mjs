@@ -20,15 +20,26 @@ export const INCOME_CATEGORY_KEYS = [
 ];
 
 export const EXPENSE_CATEGORIES = [
-  { key: "rent", label: "ค่าเช่า", type: "fixed" },
-  { key: "wage", label: "ค่าแรง", type: "fixed" },
-  { key: "equipment", label: "อุปกรณ์", type: "fixed" },
-  { key: "materials", label: "วัตถุดิบ", type: "variable" },
-  { key: "utilities", label: "สาธารณูปโภค", type: "variable" },
-  { key: "shipping", label: "ขนส่ง", type: "variable" },
-  { key: "marketing", label: "การตลาด", type: "variable" },
-  { key: "expense_misc", label: "อื่นๆ", type: "variable" },
+  { key: "rent", label: "ค่าเช่า", icon: "🏢", type: "fixed" },
+  { key: "wage", label: "ค่าแรง", icon: "👥", type: "fixed" },
+  { key: "equipment", label: "อุปกรณ์", icon: "🔧", type: "fixed" },
+  { key: "materials", label: "วัตถุดิบ", icon: "📦", type: "variable" },
+  { key: "utilities", label: "สาธารณูปโภค", icon: "⚡", type: "variable" },
+  { key: "shipping", label: "ขนส่ง", icon: "🚚", type: "variable" },
+  { key: "marketing", label: "การตลาด", icon: "📣", type: "variable" },
+  { key: "expense_misc", label: "อื่นๆ", icon: "⋯", type: "variable" },
 ];
+
+export const EXPENSE_COST_TYPE_LABELS = {
+  fixed: "คงที่",
+  variable: "ผันแปร",
+};
+
+export const PAYMENT_METHODS = ["cash", "transfer"];
+export const PAYMENT_METHOD_LABELS = {
+  cash: "เงินสด",
+  transfer: "เงินโอน",
+};
 
 export const INCOME_CATEGORIES = [
   { key: "storefront", label: "ขายหน้าร้าน" },
@@ -89,4 +100,23 @@ export function normalizeExpenseCategory(value, fallback = "expense_misc") {
   if (EXPENSE_CATEGORY_KEYS.includes(value)) return value;
   if (value in LEGACY_EXPENSE_TO_CANONICAL) return LEGACY_EXPENSE_TO_CANONICAL[value];
   return fallback;
+}
+
+const INCOME_LABEL_BY_KEY = Object.fromEntries(INCOME_CATEGORIES.map((c) => [c.key, c.label]));
+const EXPENSE_LABEL_BY_KEY = Object.fromEntries(EXPENSE_CATEGORIES.map((c) => [c.key, c.label]));
+
+export function incomeCategoryLabel(key) {
+  if (INCOME_CATEGORY_KEYS.includes(key)) return INCOME_LABEL_BY_KEY[key];
+  if (key in LEGACY_INCOME_TO_CANONICAL) {
+    return INCOME_LABEL_BY_KEY[LEGACY_INCOME_TO_CANONICAL[key]];
+  }
+  return key;
+}
+
+export function expenseCategoryLabel(key) {
+  if (EXPENSE_CATEGORY_KEYS.includes(key)) return EXPENSE_LABEL_BY_KEY[key];
+  if (key in LEGACY_EXPENSE_TO_CANONICAL) {
+    return EXPENSE_LABEL_BY_KEY[LEGACY_EXPENSE_TO_CANONICAL[key]];
+  }
+  return key;
 }

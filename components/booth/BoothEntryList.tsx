@@ -4,10 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatMoney } from "@/lib/money";
 import { formatDayShort } from "@/lib/date";
+import { expenseCategoryLabel, expenseCostTypeLabel, incomeCategoryLabel } from "@/lib/expense-categories";
 import { DeleteConfirm } from "@/components/DeleteConfirm";
 import { ExpenseArrowIcon, IncomeArrowIcon } from "@/components/today/today-icons";
 import {
-  BOOTH_COST_TYPE_LABELS,
   PAYMENT_METHOD_LABELS,
   type BoothExpense,
   type BoothIncome,
@@ -51,13 +51,13 @@ export function BoothEntryList({
   function title(row: Row): string {
     if (row.kind === "income") {
       const e = row.entry;
-      const method = PAYMENT_METHOD_LABELS[e.paymentMethod];
-      return e.note ? `${method} · ${e.note}` : method;
+      const cat = incomeCategoryLabel(e.category);
+      return e.note ? `${cat} · ${e.note}` : cat;
     }
     const e = row.entry;
-    const type = BOOTH_COST_TYPE_LABELS[e.costType];
+    const cat = expenseCategoryLabel(e.category);
     const parts = [e.label, e.note].filter(Boolean);
-    return parts.length ? `${type} · ${parts.join(" · ")}` : type;
+    return parts.length ? `${cat} · ${parts.join(" · ")}` : cat;
   }
 
   function meta(row: Row): string {
@@ -65,7 +65,8 @@ export function BoothEntryList({
     if (row.kind === "income") {
       return `${date} · ${PAYMENT_METHOD_LABELS[row.entry.paymentMethod]}`;
     }
-    return `${date} · ${BOOTH_COST_TYPE_LABELS[row.entry.costType]}`;
+    const badge = expenseCostTypeLabel(row.entry.category);
+    return badge ? `${date} · ${badge}` : date;
   }
 
   async function confirmDelete() {

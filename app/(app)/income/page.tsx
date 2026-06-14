@@ -5,17 +5,26 @@ import { useRouter } from "next/navigation";
 import { AmountInput } from "@/components/ui/AmountInput";
 import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
 import { EntryField } from "@/components/entry/EntryField";
+import { EntryOptionButton } from "@/components/entry/EntryOptionButton";
 import { EntryPageHeader } from "@/components/entry/EntryPageHeader";
 import { apiFetch } from "@/lib/api-client";
 import { today } from "@/lib/date";
 import { CategoryGrid } from "@/components/CategoryGrid";
 import { EntryContextBanner } from "@/components/EntryContextBanner";
-import { INCOME_CATEGORY_OPTIONS, type Income, type LegacyIncomeFormKey } from "@/types";
+import {
+  INCOME_CATEGORY_GRID_OPTIONS,
+  PAYMENT_METHOD_LABELS,
+  PAYMENT_METHODS,
+  type Income,
+  type IncomeCategoryKey,
+  type PaymentMethod,
+} from "@/types";
 
 export default function AddIncomePage() {
   const router = useRouter();
   const [raw, setRaw] = useState("");
-  const [category, setCategory] = useState<LegacyIncomeFormKey>("storefront");
+  const [category, setCategory] = useState<IncomeCategoryKey>("storefront");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(today());
   const [saving, setSaving] = useState(false);
@@ -29,6 +38,7 @@ export default function AddIncomePage() {
       body: JSON.stringify({
         amount: Number(raw),
         category,
+        paymentMethod,
         note: note.trim() || undefined,
         entryDate: date,
       }),
@@ -54,12 +64,28 @@ export default function AddIncomePage() {
         <div>
           <p className="mb-1.5 text-xs text-rz-muted">ประเภทรายรับ</p>
           <CategoryGrid
-            options={INCOME_CATEGORY_OPTIONS}
+            options={INCOME_CATEGORY_GRID_OPTIONS}
             value={category}
             onChange={setCategory}
             columns={3}
             accent="green"
           />
+        </div>
+
+        <div>
+          <p className="mb-1.5 text-xs text-rz-muted">ช่องทางรับเงิน</p>
+          <div className="flex flex-wrap gap-2">
+            {PAYMENT_METHODS.map((m) => (
+              <EntryOptionButton
+                key={m}
+                selected={paymentMethod === m}
+                onClick={() => setPaymentMethod(m)}
+                accent="green"
+              >
+                {PAYMENT_METHOD_LABELS[m]}
+              </EntryOptionButton>
+            ))}
+          </div>
         </div>
 
         <EntryField

@@ -47,9 +47,16 @@ export const INCOME_CATEGORIES: IncomeCategoryDef[] = [
   { key: "online", label: "ขายออนไลน์", icon: "🛒" },
   { key: "delivery", label: "เดลิเวอรี", icon: "🛵" },
   { key: "service", label: "บริการ", icon: "🧰" },
-  { key: "other_income", label: "รายได้อื่น", icon: "💡" },
   { key: "misc", label: "อื่นๆ", icon: "⋯" },
+  { key: "other_income", label: "รายได้อื่น", icon: "💡" },
 ];
+
+/** CategoryGrid options — labels/icons from INCOME_CATEGORIES only. */
+export const INCOME_CATEGORY_GRID_OPTIONS = INCOME_CATEGORIES.map((c) => ({
+  value: c.key,
+  label: c.label,
+  icon: c.icon,
+}));
 
 export const EXPENSE_CATEGORIES: ExpenseCategoryDef[] = [
   { key: "rent", label: "ค่าเช่า", icon: "🏢", type: "fixed" },
@@ -61,6 +68,20 @@ export const EXPENSE_CATEGORIES: ExpenseCategoryDef[] = [
   { key: "marketing", label: "การตลาด", icon: "📣", type: "variable" },
   { key: "expense_misc", label: "อื่นๆ", icon: "⋯", type: "variable" },
 ];
+
+/** Display-only fixed/variable badge text under expense category chips. */
+export const EXPENSE_COST_TYPE_LABELS: Record<ExpenseCostType, string> = {
+  fixed: "คงที่",
+  variable: "ผันแปร",
+};
+
+/** CategoryGrid options — labels/icons/badges from EXPENSE_CATEGORIES only. */
+export const EXPENSE_CATEGORY_GRID_OPTIONS = EXPENSE_CATEGORIES.map((c) => ({
+  value: c.key,
+  label: c.label,
+  icon: c.icon,
+  badge: EXPENSE_COST_TYPE_LABELS[c.type],
+}));
 
 /** Round 1 forms still expose legacy picker values until Round 3 UI. */
 export const LEGACY_INCOME_FORM_KEYS = ["storefront", "delivery", "other"] as const;
@@ -75,6 +96,14 @@ export const LEGACY_EXPENSE_FORM_KEYS = [
   "other",
 ] as const;
 export type LegacyExpenseFormKey = (typeof LEGACY_EXPENSE_FORM_KEYS)[number];
+
+const INCOME_ICON_BY_KEY = Object.fromEntries(
+  INCOME_CATEGORIES.map((c) => [c.key, c.icon]),
+) as Record<IncomeCategoryKey, string>;
+
+const EXPENSE_ICON_BY_KEY = Object.fromEntries(
+  EXPENSE_CATEGORIES.map((c) => [c.key, c.icon]),
+) as Record<ExpenseCategoryKey, string>;
 
 const INCOME_LABEL_BY_KEY = Object.fromEntries(
   INCOME_CATEGORIES.map((c) => [c.key, c.label]),
@@ -151,9 +180,43 @@ export function expenseCategoryLabel(key: string): string {
   return key;
 }
 
+export function incomeCategoryIcon(key: string): string {
+  if (isIncomeCategoryKey(key)) return INCOME_ICON_BY_KEY[key];
+  if ((LEGACY_INCOME_FORM_KEYS as readonly string[]).includes(key)) {
+    return INCOME_ICON_BY_KEY[LEGACY_INCOME_TO_CANONICAL[key as LegacyIncomeFormKey]];
+  }
+  return "•";
+}
+
+export function expenseCategoryIcon(key: string): string {
+  if (isExpenseCategoryKey(key)) return EXPENSE_ICON_BY_KEY[key];
+  if ((LEGACY_EXPENSE_FORM_KEYS as readonly string[]).includes(key)) {
+    return EXPENSE_ICON_BY_KEY[LEGACY_EXPENSE_TO_CANONICAL[key as LegacyExpenseFormKey]];
+  }
+  return "•";
+}
+
+/** Canonical sort index for display lists (unknown keys sort last). */
+export function incomeCategoryOrder(key: string): number {
+  const canonical = normalizeIncomeCategory(key);
+  const idx = (INCOME_CATEGORY_KEYS as readonly string[]).indexOf(canonical);
+  return idx >= 0 ? idx : INCOME_CATEGORY_KEYS.length;
+}
+
+export function expenseCategoryOrder(key: string): number {
+  const canonical = normalizeExpenseCategory(key);
+  const idx = (EXPENSE_CATEGORY_KEYS as readonly string[]).indexOf(canonical);
+  return idx >= 0 ? idx : EXPENSE_CATEGORY_KEYS.length;
+}
+
 export function getExpenseType(categoryKey: string): ExpenseCostType | null {
   if (!isExpenseCategoryKey(categoryKey)) return null;
   return EXPENSE_TYPE_BY_KEY[categoryKey];
+}
+
+export function expenseCostTypeLabel(categoryKey: string): string | null {
+  const type = getExpenseType(categoryKey);
+  return type ? EXPENSE_COST_TYPE_LABELS[type] : null;
 }
 
 export function isFixed(categoryKey: string): boolean {

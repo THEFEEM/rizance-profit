@@ -18,7 +18,7 @@ import {
   type PeriodKey,
 } from "@/lib/date";
 import { boothNetForPeriod } from "@/lib/booth-queries";
-import { sumDecimals } from "@/lib/money";
+import { sumDecimals, toCents } from "@/lib/money";
 import { PeriodSelector } from "@/components/PeriodSelector";
 import { DateNav } from "@/components/DateNav";
 import { SummaryRows } from "@/components/SummaryRows";
@@ -30,12 +30,12 @@ import {
 } from "@/components/stats/CategoryBreakdownPanel";
 import { EntryList, type EntryRow } from "@/components/EntryList";
 import {
+  expenseCategoryIcon,
   expenseCategoryLabel,
+  expenseCategoryOrder,
+  incomeCategoryIcon,
   incomeCategoryLabel,
-  INCOME_CATEGORIES,
-  EXPENSE_CATEGORIES,
-  INCOME_CATEGORY_OPTIONS,
-  EXPENSE_CATEGORY_OPTIONS,
+  incomeCategoryOrder,
 } from "@/lib/expense-categories";
 import {
   type CategoryBreakdownItem,
@@ -189,22 +189,23 @@ function toBreakdownRows(
   items: CategoryBreakdownItem[],
   kind: "income" | "expense",
 ): CategoryBreakdownRow[] {
-  const iconByKey =
-    kind === "income"
-      ? Object.fromEntries(INCOME_CATEGORIES.map((c) => [c.key, c.icon]))
-      : Object.fromEntries(EXPENSE_CATEGORIES.map((c) => [c.key, c.icon]));
-  const legacyIconByKey =
-    kind === "income"
-      ? Object.fromEntries(INCOME_CATEGORY_OPTIONS.map((o) => [o.value, o.icon]))
-      : Object.fromEntries(EXPENSE_CATEGORY_OPTIONS.map((o) => [o.value, o.icon]));
   const labelFn = kind === "income" ? incomeCategoryLabel : expenseCategoryLabel;
-  return items.map((item) => ({
-    category: item.category,
-    label: labelFn(item.category),
-    icon: iconByKey[item.category] ?? legacyIconByKey[item.category] ?? "•",
-    amount: item.amount,
-    count: item.count,
-  }));
+  const iconFn = kind === "income" ? incomeCategoryIcon : expenseCategoryIcon;
+  const orderFn = kind === "income" ? incomeCategoryOrder : expenseCategoryOrder;
+  return items
+    .map((item) => ({
+      category: item.category,
+      label: labelFn(item.category),
+      icon: iconFn(item.category),
+      amount: item.amount,
+      count: item.count,
+    }))
+    .sort((a, b) => {
+      const oa = orderFn(a.category);
+      const ob = orderFn(b.category);
+      if (oa !== ob) return oa - ob;
+      return toCents(b.amount) - toCents(a.amount);
+    });
 }
 
 function groupEntriesByCategory(
