@@ -30,39 +30,39 @@ export function BoothCloseButton({ boothId }: { boothId: string }) {
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="tap-target w-full rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 active:bg-red-100"
+        className="tap-target w-full rounded-[11px] border-[0.5px] border-rz-red/40 bg-rz-red/10 px-4 py-3 text-sm font-medium text-rz-red active:opacity-90"
       >
         ปิดงานบูธ
       </button>
 
       {error && (
-        <p className="mt-2 text-center text-sm text-red-600" role="alert">
+        <p className="mt-2 text-center text-sm text-rz-red" role="alert">
           {error}
         </p>
       )}
 
       {confirming && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
           role="dialog"
           aria-modal="true"
           aria-labelledby="close-booth-title"
         >
-          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
-            <h2 id="close-booth-title" className="text-lg font-bold text-slate-900">
+          <div className="w-full max-w-sm rounded-[14px] border-[0.5px] border-rz-border bg-rz-card p-5 shadow-xl">
+            <h2 id="close-booth-title" className="text-lg font-medium text-rz-text">
               ปิดงานบูธถาวร
             </h2>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="mt-2 text-sm text-rz-amber">
               ปิดงานบูธถาวร — แก้ไม่ได้อีก ยืนยัน?
             </p>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-rz-hint">
               หลังปิดแล้วจะเพิ่มรายรับ/รายจ่ายไม่ได้อีก
             </p>
             <div className="mt-5 grid grid-cols-2 gap-3">
-              <Button variant="secondary" onClick={() => setConfirming(false)} disabled={closing}>
+              <Button variant="secondary" fullWidth onClick={() => setConfirming(false)} disabled={closing}>
                 ยกเลิก
               </Button>
-              <Button variant="danger" onClick={closeBooth} disabled={closing}>
+              <Button variant="danger" fullWidth onClick={closeBooth} disabled={closing}>
                 {closing ? "กำลังปิด…" : "ยืนยันปิด"}
               </Button>
             </div>

@@ -4,7 +4,9 @@ import { getCurrentUser } from "@/lib/session";
 import { boothSummary, getBooth, splitProfit } from "@/lib/booth-queries";
 import { BoothBack } from "@/components/booth/BoothBack";
 import { BoothCloseButton } from "@/components/booth/BoothCloseButton";
+import { BoothClosedBanner } from "@/components/booth/BoothClosedBanner";
 import { BoothSummaryCard } from "@/components/booth/BoothSummaryCard";
+import { TentIcon } from "@/components/booth/summary/icons";
 import { formatDayShort } from "@/lib/date";
 import { formatMoney } from "@/lib/money";
 
@@ -24,33 +26,40 @@ export default async function BoothHubPage({ params }: { params: Promise<{ id: s
   ]);
 
   return (
-    <div className="px-4 pb-6">
+    <div className="px-4 pb-6" data-context="booth">
       <BoothBack href="/booth" />
-      <h1 className="text-lg font-bold text-slate-900">{booth.name}</h1>
-      <p className="mt-1 text-sm text-slate-500">
-        {formatDayShort(booth.startDate)}
-        {booth.endDate !== booth.startDate && ` – ${formatDayShort(booth.endDate)}`}
-        {" · "}
-        งบ {formatMoney(booth.totalBudget, user.currency)}
-        {closed ? " · ปิดแล้ว" : " · เปิดอยู่"}
-      </p>
+      <div className="mt-1 flex items-start gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border-[0.5px] border-[#5A3F12] bg-[#2E2310] text-rz-amber">
+          <TentIcon className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-medium text-rz-text">{booth.name}</h1>
+          <p className="mt-0.5 text-sm text-rz-amber">
+            {formatDayShort(booth.startDate)}
+            {booth.endDate !== booth.startDate && ` – ${formatDayShort(booth.endDate)}`}
+            {" · "}
+            งบ {formatMoney(booth.totalBudget, user.currency)}
+            {closed ? " · ปิดแล้ว" : " · เปิดอยู่"}
+          </p>
+        </div>
+      </div>
 
       {closed && (
-        <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          งานบูธปิดแล้ว — ไม่สามารถเพิ่มรายการได้
-        </p>
+        <div className="mt-4">
+          <BoothClosedBanner />
+        </div>
       )}
 
       {!closed && (
         <div className="mt-6 grid grid-cols-2 gap-3">
-          <HubAction href={`/booth/${id}/income`} label="+ รายรับ" tone="income" />
-          <HubAction href={`/booth/${id}/expense`} label="− รายจ่าย" tone="expense" />
+          <HubAction href={`/booth/${id}/income`} label="+ รายรับ" />
+          <HubAction href={`/booth/${id}/expense`} label="− รายจ่าย" />
         </div>
       )}
 
       <Link
         href={`/booth/${id}/setup`}
-        className="tap-target mt-4 block rounded-2xl border-2 border-emerald-600 bg-emerald-50 px-4 py-4 text-center text-base font-bold text-emerald-800 shadow-sm active:bg-emerald-100"
+        className="tap-target mt-4 block rounded-[14px] border-[0.5px] border-rz-logo-border bg-rz-logo-bg px-4 py-4 text-center text-base font-medium text-rz-green active:opacity-90"
       >
         ตั้งค่าบูธ / สมาชิก
       </Link>
@@ -68,7 +77,7 @@ export default async function BoothHubPage({ params }: { params: Promise<{ id: s
           ) : (
             <Link
               href={`/booth/${id}/summary`}
-              className="tap-target block rounded-2xl border border-slate-200 bg-white px-4 py-4 text-center text-sm font-semibold text-slate-700 shadow-sm active:bg-slate-50"
+              className="tap-target block rounded-[14px] border-[0.5px] border-rz-border bg-rz-card px-4 py-4 text-center text-sm font-medium text-rz-muted active:bg-rz-elevated"
             >
               ดูสรุปกำไรบูธ
             </Link>
@@ -79,9 +88,9 @@ export default async function BoothHubPage({ params }: { params: Promise<{ id: s
       {closed && summary && (
         <Link
           href={`/booth/${id}/summary`}
-          className="tap-target mt-3 block text-center text-sm font-medium text-slate-500 underline"
+          className="tap-target mt-3 block text-center text-sm font-medium text-rz-amber active:opacity-90"
         >
-          เปิดหน้าสรุปเต็ม
+          เปิดหน้าสรุปเต็ม →
         </Link>
       )}
 
@@ -94,24 +103,11 @@ export default async function BoothHubPage({ params }: { params: Promise<{ id: s
   );
 }
 
-function HubAction({
-  href,
-  label,
-  tone,
-}: {
-  href: string;
-  label: string;
-  tone: "income" | "expense";
-}) {
-  const colors =
-    tone === "income"
-      ? "bg-emerald-600 text-white active:bg-emerald-700"
-      : "bg-red-600 text-white active:bg-red-700";
-
+function HubAction({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className={`tap-target flex h-14 items-center justify-center rounded-2xl text-base font-bold ${colors}`}
+      className="tap-target flex h-14 items-center justify-center rounded-[14px] border-[0.5px] border-[#5A3F12] bg-[#2E2310] text-base font-medium text-rz-amber active:opacity-90"
     >
       {label}
     </Link>

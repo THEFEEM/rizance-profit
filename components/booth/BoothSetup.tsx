@@ -329,26 +329,31 @@ export function BoothRemainingBudget({
   currency?: string;
   /** bar = expense form strip; inline = summary capital section */
   variant?: "bar" | "inline";
-  /** entry = dark +In/−Out expense form styling */
-  appearance?: "default" | "entry";
+  /** entry = dark +In/−Out expense form; hub = dark inline on booth hub summary card */
+  appearance?: "default" | "entry" | "hub";
 }) {
   const remaining = computeProfit(totalBudget, totalExpense);
   const sign = moneySign(remaining);
-  const color =
-    appearance === "entry"
-      ? sign < 0
-        ? "text-rz-red"
-        : sign > 0
-          ? "text-rz-green"
-          : "text-rz-text"
-      : sign < 0
-        ? "text-red-600"
-        : sign > 0
-          ? "text-emerald-700"
-          : "text-slate-700";
+  const isDark = appearance === "entry" || appearance === "hub";
+  const color = isDark
+    ? sign < 0
+      ? "text-rz-red"
+      : sign > 0
+        ? "text-rz-green"
+        : "text-rz-text"
+    : sign < 0
+      ? "text-red-600"
+      : sign > 0
+        ? "text-emerald-700"
+        : "text-slate-700";
 
-  const labelMuted = appearance === "entry" ? "text-rz-hint" : variant === "inline" ? "text-sm text-slate-600" : "text-xs text-slate-500";
-  const subMuted = appearance === "entry" ? "text-rz-hint" : "text-xs text-slate-400";
+  const labelMuted =
+    appearance === "entry" || appearance === "hub"
+      ? "text-sm text-rz-muted"
+      : variant === "inline"
+        ? "text-sm text-slate-600"
+        : "text-xs text-slate-500";
+  const subMuted = isDark ? "text-rz-hint" : "text-xs text-slate-400";
 
   const body = (
     <div className="flex items-center justify-between gap-3">
@@ -370,7 +375,17 @@ export function BoothRemainingBudget({
   );
 
   if (variant === "inline") {
-    return <div className="mt-3 border-t border-slate-100 pt-3">{body}</div>;
+    return (
+      <div
+        className={`mt-3 pt-3 ${
+          appearance === "hub"
+            ? "border-t-[0.5px] border-rz-border"
+            : "border-t border-slate-100"
+        }`}
+      >
+        {body}
+      </div>
+    );
   }
 
   if (appearance === "entry") {
