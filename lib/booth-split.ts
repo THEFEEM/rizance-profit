@@ -27,6 +27,7 @@ export type SplitProfitInput = {
   startDate: string;
   endDate: string;
   totalIncome: string;
+  /** Entry expenses only (fixed + variable from category); wages handled separately. */
   totalExpense: string;
   advances: AdvanceInput[];
   members: SplitMemberInput[];
