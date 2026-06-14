@@ -17,7 +17,9 @@ export default async function EditIngredientPage({ params }: { params: Promise<{
   return (
     <div>
       <PricingBack href="/pricing/ingredients" />
-      <h1 className="px-4 text-lg font-bold text-slate-900">แก้ไข{PRICING_LABELS.ingredientName}</h1>
+      <h1 className="px-4 pt-1 text-lg font-medium text-rz-text">
+        แก้ไข{PRICING_LABELS.ingredientName}
+      </h1>
       <IngredientForm initial={ingredient} />
     </div>
   );

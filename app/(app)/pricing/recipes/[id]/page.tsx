@@ -22,7 +22,7 @@ export default async function RecipeEditPage({ params }: { params: Promise<{ id:
   return (
     <div>
       <PricingBack href="/pricing/recipes" />
-      <h1 className="px-4 text-lg font-bold text-slate-900">{PRICING_LABELS.recipes}</h1>
+      <h1 className="px-4 pt-1 text-lg font-medium text-rz-text">{PRICING_LABELS.recipes}</h1>
       <RecipeEditor menuItem={menuItem} recipe={recipe} ingredients={ingredients} />
     </div>
   );
