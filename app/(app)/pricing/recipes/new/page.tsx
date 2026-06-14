@@ -33,10 +33,19 @@ export default function NewRecipePage() {
   return (
     <div className="px-4 pb-8">
       <PricingBack href="/pricing/recipes" />
-      <h1 className="text-lg font-bold text-slate-900">เพิ่ม{PRICING_LABELS.menu}</h1>
+      <h1 className="pt-1 text-lg font-medium text-rz-text">เพิ่ม{PRICING_LABELS.menu}</h1>
       <div className="mt-4 flex flex-col gap-4">
-        <Input label={PRICING_LABELS.menu} value={name} onChange={(e) => setName(e.target.value)} placeholder="ลาเต้" />
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        <Input
+          label={PRICING_LABELS.menu}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="ลาเต้"
+        />
+        {error && (
+          <p className="text-sm text-rz-red" role="alert">
+            {error}
+          </p>
+        )}
         <Button onClick={create} disabled={saving || !name.trim()}>
           {saving ? "กำลังสร้าง…" : "ถัดไป — ใส่สูตร"}
         </Button>

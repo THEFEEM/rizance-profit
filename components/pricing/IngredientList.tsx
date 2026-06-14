@@ -35,7 +35,7 @@ export function IngredientList({ items }: { items: Ingredient[] }) {
 
   if (items.length === 0) {
     return (
-      <p className="px-4 py-8 text-center text-sm text-slate-400">
+      <p className="px-4 py-10 text-center text-sm text-rz-hint">
         ยังไม่มีวัตถุดิบ — กดเพิ่มด้านล่าง
       </p>
     );
@@ -43,24 +43,29 @@ export function IngredientList({ items }: { items: Ingredient[] }) {
 
   return (
     <>
-      {error && <p className="px-4 py-2 text-sm text-red-600" role="alert">{error}</p>}
-      <ul className="divide-y divide-slate-100">
+      {error && (
+        <p className="px-4 py-2 text-sm text-rz-red" role="alert">
+          {error}
+        </p>
+      )}
+      <ul className="divide-y divide-rz-border">
         {items.map((ing) => (
-          <li key={ing.id} className="flex items-center gap-3 px-4 py-3">
-            <Link href={`/pricing/ingredients/${ing.id}`} className="min-w-0 flex-1">
-              <p className="font-medium text-slate-900">{ing.name}</p>
-              <p className="text-xs text-slate-500">
+          <li key={ing.id} className="flex items-center gap-3 px-4 py-3.5">
+            <Link href={`/pricing/ingredients/${ing.id}`} className="min-w-0 flex-1 active:opacity-90">
+              <p className="font-medium text-rz-text">{ing.name}</p>
+              <p className="text-xs text-rz-hint">
                 ซื้อ {ing.purchaseQuantity} {UNIT_LABELS[ing.purchaseUnit] ?? ing.purchaseUnit} @{" "}
                 {formatMoney(ing.purchasePrice)}
               </p>
-              <p className="text-sm font-semibold text-emerald-700">
-                {PRICING_LABELS.costPerUnit} {formatMoney(ing.costPerUnit)}/{UNIT_LABELS[ing.purchaseUnit]}
+              <p className="rz-tabular text-sm font-medium text-rz-green">
+                {PRICING_LABELS.costPerUnit} {formatMoney(ing.costPerUnit)}/
+                {UNIT_LABELS[ing.purchaseUnit]}
               </p>
             </Link>
             <button
               onClick={() => remove(ing.id)}
               disabled={deleting === ing.id}
-              className="tap-target text-slate-400"
+              className="tap-target -mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-rz-hint active:bg-rz-elevated disabled:opacity-40"
               aria-label="ลบ"
             >
               {deleting === ing.id ? "…" : "✕"}

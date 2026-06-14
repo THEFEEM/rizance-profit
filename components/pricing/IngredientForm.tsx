@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
 import { apiFetch } from "@/lib/api-client";
@@ -19,6 +18,10 @@ const UNIT_LABELS: Record<PurchaseUnit, string> = {
   shot: "ช็อต",
   pump: "ปั๊ม",
 };
+
+const PAD_ACTIVE =
+  "border-rz-logo-border bg-rz-logo-bg text-rz-text";
+const PAD_IDLE = "border-rz-border bg-rz-card text-rz-text";
 
 export function IngredientForm({ initial }: { initial?: Ingredient }) {
   const router = useRouter();
@@ -72,13 +75,13 @@ export function IngredientForm({ initial }: { initial?: Ingredient }) {
       />
 
       <div>
-        <p className="mb-1.5 text-sm font-medium text-slate-700">{PRICING_LABELS.purchaseSize}</p>
+        <p className="mb-1.5 text-xs text-rz-muted">{PRICING_LABELS.purchaseSize}</p>
         <div className="flex gap-2">
           <button
             type="button"
             onClick={() => setPadTarget("qty")}
-            className={`tap-target flex-1 rounded-xl border px-3 py-2 text-left text-lg font-bold tabular-nums ${
-              padTarget === "qty" ? "border-emerald-500 bg-emerald-50" : "border-slate-300"
+            className={`tap-target rz-tabular flex-1 rounded-[11px] border-[0.5px] px-3 py-2.5 text-left text-lg font-medium ${
+              padTarget === "qty" ? PAD_ACTIVE : PAD_IDLE
             }`}
           >
             {formatTyped(qtyRaw) || "0"} {UNIT_LABELS[unit]}
@@ -86,22 +89,24 @@ export function IngredientForm({ initial }: { initial?: Ingredient }) {
           <select
             value={unit}
             onChange={(e) => setUnit(e.target.value as PurchaseUnit)}
-            className="tap-target rounded-xl border border-slate-300 px-2 text-sm"
+            className="tap-target rounded-[11px] border-[0.5px] border-rz-border bg-rz-card px-2 text-sm text-rz-text outline-none focus:border-rz-green"
           >
             {PURCHASE_UNITS.map((u) => (
-              <option key={u} value={u}>{UNIT_LABELS[u]}</option>
+              <option key={u} value={u}>
+                {UNIT_LABELS[u]}
+              </option>
             ))}
           </select>
         </div>
       </div>
 
       <div>
-        <p className="mb-1.5 text-sm font-medium text-slate-700">{PRICING_LABELS.purchasePrice}</p>
+        <p className="mb-1.5 text-xs text-rz-muted">{PRICING_LABELS.purchasePrice}</p>
         <button
           type="button"
           onClick={() => setPadTarget("price")}
-          className={`tap-target w-full rounded-xl border px-3 py-2 text-left text-2xl font-bold tabular-nums ${
-            padTarget === "price" ? "border-emerald-500 bg-emerald-50" : "border-slate-300"
+          className={`tap-target rz-tabular w-full rounded-[11px] border-[0.5px] px-3 py-2.5 text-left text-2xl font-medium ${
+            padTarget === "price" ? PAD_ACTIVE : PAD_IDLE
           }`}
         >
           ฿ {formatTyped(priceRaw) || "0"}
@@ -109,15 +114,19 @@ export function IngredientForm({ initial }: { initial?: Ingredient }) {
       </div>
 
       {previewCost && (
-        <p className="text-center text-sm text-slate-600">
+        <p className="text-center text-sm text-rz-muted">
           {PRICING_LABELS.costPerUnit}:{" "}
-          <span className="font-bold text-emerald-700">
+          <span className="rz-tabular font-medium text-rz-green">
             {formatMoney(previewCost)} / {UNIT_LABELS[unit]}
           </span>
         </p>
       )}
 
-      {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
+      {error && (
+        <p className="text-sm text-rz-red" role="alert">
+          {error}
+        </p>
+      )}
 
       <QuickAmountPad
         value={padValue}

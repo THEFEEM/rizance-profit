@@ -16,17 +16,19 @@ export default async function RecipesPage() {
   return (
     <div className="pb-6">
       <PricingBack />
-      <div className="flex items-center justify-between px-4">
-        <h1 className="text-lg font-bold text-slate-900">{PRICING_LABELS.recipes}</h1>
+      <div className="flex items-center justify-between px-4 pt-1">
+        <h1 className="text-lg font-medium text-rz-text">{PRICING_LABELS.recipes}</h1>
         <Link
           href="/pricing/recipes/new"
-          className="tap-target rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
+          className="tap-target rounded-full border-[0.5px] border-rz-logo-border bg-rz-logo-bg px-4 py-2 text-sm font-medium text-rz-green active:opacity-90"
         >
           + เมนู
         </Link>
       </div>
-      <div className="mx-2 mt-4 overflow-hidden rounded-2xl bg-white shadow-sm">
-        <RecipeList items={items} />
+      <div className="mt-4 px-4">
+        <div className="overflow-hidden rounded-[14px] border-[0.5px] border-rz-border bg-rz-card">
+          <RecipeList items={items} />
+        </div>
       </div>
     </div>
   );

@@ -15,20 +15,26 @@ export function RecipeList({ items }: { items: MenuItem[] }) {
   }
 
   if (items.length === 0) {
-    return <p className="px-4 py-8 text-center text-sm text-slate-400">ยังไม่มีเมนู — กดเพิ่มด้านล่าง</p>;
+    return (
+      <p className="px-4 py-10 text-center text-sm text-rz-hint">ยังไม่มีเมนู — กดเพิ่มด้านล่าง</p>
+    );
   }
 
   return (
-    <ul className="divide-y divide-slate-100">
+    <ul className="divide-y divide-rz-border">
       {items.map((m) => (
-        <li key={m.id} className="flex items-center gap-3 px-4 py-3">
-          <Link href={`/pricing/recipes/${m.id}`} className="min-w-0 flex-1">
-            <p className="font-medium text-slate-900">{m.name}</p>
-            <p className="text-sm text-emerald-700">
+        <li key={m.id} className="flex items-center gap-3 px-4 py-3.5">
+          <Link href={`/pricing/recipes/${m.id}`} className="min-w-0 flex-1 active:opacity-90">
+            <p className="font-medium text-rz-text">{m.name}</p>
+            <p className="rz-tabular text-sm font-medium text-rz-green">
               {PRICING_LABELS.ingredientCost}: {formatMoney(m.ingredientCostPerCup)}/แก้ว
             </p>
           </Link>
-          <button onClick={() => remove(m.id)} className="tap-target text-slate-400" aria-label="ลบ">
+          <button
+            onClick={() => remove(m.id)}
+            className="tap-target -mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-rz-hint active:bg-rz-elevated"
+            aria-label="ลบ"
+          >
             ✕
           </button>
         </li>

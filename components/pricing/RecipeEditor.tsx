@@ -18,6 +18,9 @@ import {
 
 type DraftLine = { ingredientId: string; quantity: string };
 
+const SELECT_CLASS =
+  "tap-target w-full rounded-[11px] border-[0.5px] border-rz-border bg-rz-card px-3 py-2.5 text-sm text-rz-text outline-none focus:border-rz-green";
+
 export function RecipeEditor({
   menuItem,
   recipe,
@@ -137,35 +140,37 @@ export function RecipeEditor({
         placeholder="ใช้ค่าเริ่มต้นจากค่าใช้จ่ายร้าน"
       />
 
-      <div className="rounded-2xl bg-white p-4 shadow-sm">
-        <p className="text-sm font-semibold text-slate-700">เพิ่มวัตถุดิบในสูตร</p>
+      <div className="rounded-[14px] border-[0.5px] border-rz-border bg-rz-card p-4">
+        <p className="text-sm font-medium text-rz-text">เพิ่มวัตถุดิบในสูตร</p>
         {ingredients.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-500">เพิ่มวัตถุดิบก่อนที่ ต้นทุนวัตถุดิบ</p>
+          <p className="mt-2 text-sm text-rz-hint">เพิ่มวัตถุดิบก่อนที่ ต้นทุนวัตถุดิบ</p>
         ) : (
           <>
             <select
               value={pickIngredient}
               onChange={(e) => setPickIngredient(e.target.value)}
-              className="tap-target mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              className={`${SELECT_CLASS} mt-2`}
             >
               {ingredients.map((i) => (
-                <option key={i.id} value={i.id}>{i.name}</option>
+                <option key={i.id} value={i.id}>
+                  {i.name}
+                </option>
               ))}
             </select>
-            <p className="mt-3 text-sm font-medium text-slate-700">{PRICING_LABELS.quantityUsed}</p>
+            <p className="mt-3 text-xs text-rz-muted">{PRICING_LABELS.quantityUsed}</p>
             <div className="mt-1 flex items-center gap-3">
-              <p className="min-w-0 flex-1 text-3xl font-bold tabular-nums text-slate-900">
+              <p className="rz-tabular min-w-0 flex-1 text-3xl font-medium text-rz-text">
                 {formatTyped(qtyRaw) || "0"}
               </p>
               {usageUnitLabel && (
-                <span className="shrink-0 rounded-xl bg-emerald-100 px-4 py-2 text-xl font-bold text-emerald-800">
+                <span className="shrink-0 rounded-[11px] border-[0.5px] border-rz-logo-border bg-rz-logo-bg px-4 py-2 text-xl font-medium text-rz-green">
                   {usageUnitLabel}
                 </span>
               )}
             </div>
             {qtySuspicious && (
               <p
-                className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-sm leading-snug text-amber-900"
+                className="mt-2 rounded-[11px] border-[0.5px] border-rz-amber/30 bg-rz-amber/10 px-3 py-2 text-sm leading-snug text-rz-amber"
                 role="status"
               >
                 ปริมาณน้อยผิดปกติ — กรอกเป็น มล./กรัม ใช่ไหม?
@@ -177,26 +182,26 @@ export function RecipeEditor({
       </div>
 
       {previewLines.length > 0 && (
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+        <div className="overflow-hidden rounded-[14px] border-[0.5px] border-rz-border bg-rz-card">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-slate-100 text-xs text-slate-500">
-                <th className="px-3 py-2">{PRICING_LABELS.menu}</th>
-                <th className="px-2 py-2">{PRICING_LABELS.quantityUsed}</th>
-                <th className="px-2 py-2">{PRICING_LABELS.costPerUnit}</th>
-                <th className="px-2 py-2">{PRICING_LABELS.lineCost}</th>
+              <tr className="border-b-[0.5px] border-rz-border text-xs text-rz-hint">
+                <th className="px-3 py-2 font-medium">{PRICING_LABELS.menu}</th>
+                <th className="px-2 py-2 font-medium">{PRICING_LABELS.quantityUsed}</th>
+                <th className="px-2 py-2 font-medium">{PRICING_LABELS.costPerUnit}</th>
+                <th className="px-2 py-2 font-medium">{PRICING_LABELS.lineCost}</th>
                 <th />
               </tr>
             </thead>
             <tbody>
               {previewLines.map((l) => (
-                <tr key={l.name} className="border-b border-slate-50">
-                  <td className="px-3 py-2">{l.name}</td>
-                  <td className="px-2 py-2 tabular-nums">
+                <tr key={l.name} className="border-b-[0.5px] border-rz-border last:border-b-0">
+                  <td className="px-3 py-2 text-rz-text">{l.name}</td>
+                  <td className="rz-tabular px-2 py-2 text-rz-muted">
                     {l.quantity} {l.unitLabel}
                   </td>
-                  <td className="px-2 py-2 tabular-nums">{formatMoney(l.costPerUnit)}</td>
-                  <td className="px-2 py-2 font-semibold tabular-nums text-emerald-700">
+                  <td className="rz-tabular px-2 py-2 text-rz-muted">{formatMoney(l.costPerUnit)}</td>
+                  <td className="rz-tabular px-2 py-2 font-medium text-rz-green">
                     {formatMoney(l.lineCost)}
                   </td>
                   <td className="px-2 py-2">
@@ -206,7 +211,8 @@ export function RecipeEditor({
                         const ing = ingredients.find((i) => i.name === l.name);
                         if (ing) removeLine(ing.id);
                       }}
-                      className="text-slate-400"
+                      className="tap-target flex h-8 w-8 items-center justify-center rounded-full text-rz-hint active:bg-rz-elevated"
+                      aria-label="ลบ"
                     >
                       ✕
                     </button>
@@ -215,13 +221,17 @@ export function RecipeEditor({
               ))}
             </tbody>
           </table>
-          <p className="px-4 py-3 text-right text-sm font-bold text-emerald-700">
+          <p className="rz-tabular border-t-[0.5px] border-rz-border px-4 py-3 text-right text-sm font-medium text-rz-green">
             รวมต้นทุนวัตถุดิบ/แก้ว: {formatMoney(totalCost)}
           </p>
         </div>
       )}
 
-      {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
+      {error && (
+        <p className="text-sm text-rz-red" role="alert">
+          {error}
+        </p>
+      )}
       <Button onClick={save} disabled={saving || lines.length === 0}>
         {saving ? "กำลังบันทึก…" : "บันทึกสูตร"}
       </Button>

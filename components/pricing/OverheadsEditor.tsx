@@ -12,6 +12,9 @@ import {
   type PricingSettings,
 } from "@/types/pricing";
 
+const AMOUNT_INPUT_CLASS =
+  "tap-target rz-tabular w-28 rounded-[11px] border-[0.5px] border-rz-border bg-rz-card px-2 py-2 text-right text-sm text-rz-text outline-none focus:border-rz-green";
+
 export function OverheadsEditor({
   items: initialItems,
   settings: initialSettings,
@@ -99,8 +102,8 @@ export function OverheadsEditor({
 
   return (
     <div className="flex flex-col gap-4 px-4 pb-8">
-      <section className="rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-700">การตั้งค่า</h2>
+      <section className="rounded-[14px] border-[0.5px] border-rz-border bg-rz-card p-4">
+        <h2 className="text-sm font-medium text-rz-text">การตั้งค่า</h2>
         <div className="mt-3 flex flex-col gap-3">
           <Input
             label={PRICING_LABELS.cupsPerMonth}
@@ -123,15 +126,18 @@ export function OverheadsEditor({
         </div>
       </section>
 
-      <section className="rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-700">{PRICING_LABELS.overheads}</h2>
-        <p className="mt-1 text-xs text-slate-500">
-          รวมต่อเดือน: ฿{Number(monthlyTotal).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+      <section className="rounded-[14px] border-[0.5px] border-rz-border bg-rz-card p-4">
+        <h2 className="text-sm font-medium text-rz-text">{PRICING_LABELS.overheads}</h2>
+        <p className="mt-1 text-xs text-rz-hint">
+          รวมต่อเดือน:{" "}
+          <span className="rz-tabular font-medium text-rz-text">
+            ฿{Number(monthlyTotal).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+          </span>
         </p>
-        <ul className="mt-4 divide-y divide-slate-100">
+        <ul className="mt-4 divide-y divide-rz-border">
           {items.map((o) => (
             <li key={o.id} className="flex items-center gap-2 py-3">
-              <span className="min-w-0 flex-1 text-sm text-slate-800">
+              <span className="min-w-0 flex-1 text-sm text-rz-text">
                 {o.category === "other"
                   ? o.label || OVERHEAD_CATEGORY_LABELS.other
                   : OVERHEAD_CATEGORY_LABELS[o.category]}
@@ -142,13 +148,13 @@ export function OverheadsEditor({
                 step="0.01"
                 value={o.monthlyAmount}
                 onChange={(e) => setAmount(o.id, e.target.value)}
-                className="tap-target w-28 rounded-xl border border-slate-300 px-2 py-2 text-right text-sm tabular-nums"
+                className={AMOUNT_INPUT_CLASS}
               />
               {o.category === "other" && (
                 <button
                   type="button"
                   onClick={() => removeOther(o.id)}
-                  className="tap-target text-slate-400"
+                  className="tap-target flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-rz-hint active:bg-rz-elevated"
                   aria-label="ลบ"
                 >
                   ✕
@@ -158,8 +164,8 @@ export function OverheadsEditor({
           ))}
         </ul>
 
-        <div className="mt-4 border-t border-slate-100 pt-4">
-          <p className="text-sm font-medium text-slate-700">เพิ่ม{OVERHEAD_CATEGORY_LABELS.other}</p>
+        <div className="mt-4 border-t-[0.5px] border-rz-border pt-4">
+          <p className="text-sm font-medium text-rz-text">เพิ่ม{OVERHEAD_CATEGORY_LABELS.other}</p>
           <div className="mt-2 flex flex-col gap-2">
             <Input
               placeholder="ชื่อรายการ (ไม่บังคับ)"
@@ -181,7 +187,11 @@ export function OverheadsEditor({
         </div>
       </section>
 
-      {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
+      {error && (
+        <p className="text-sm text-rz-red" role="alert">
+          {error}
+        </p>
+      )}
       <Button onClick={save} disabled={saving}>
         {saving ? "กำลังบันทึก…" : "บันทึกทั้งหมด"}
       </Button>

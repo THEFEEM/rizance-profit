@@ -19,7 +19,7 @@ export default async function OverheadsPage() {
   return (
     <div>
       <PricingBack />
-      <h1 className="px-4 text-lg font-bold text-slate-900">{PRICING_LABELS.overheads}</h1>
+      <h1 className="px-4 pt-1 text-lg font-medium text-rz-text">{PRICING_LABELS.overheads}</h1>
       <OverheadsEditor items={items} settings={settings} monthlyTotal={monthlyTotal} />
     </div>
   );

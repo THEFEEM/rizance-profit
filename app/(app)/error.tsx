@@ -11,8 +11,8 @@ export default function AppError({
 }) {
   return (
     <div className="flex flex-col items-center gap-4 px-6 py-16 text-center">
-      <p className="text-lg font-semibold text-slate-800">Something went wrong</p>
-      <p className="text-sm text-slate-500">
+      <p className="text-lg font-medium text-rz-text">Something went wrong</p>
+      <p className="text-sm text-rz-muted">
         {error.message || "We couldn't load your data. Check your connection and try again."}
       </p>
       <Button onClick={reset} className="max-w-xs">
