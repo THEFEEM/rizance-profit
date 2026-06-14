@@ -46,6 +46,7 @@ type IncomeRow = {
   id: string;
   amount: string;
   category: string;
+  payment_method?: string;
   note: string | null;
   entry_date: string;
   created_at: Date | string;
@@ -56,6 +57,7 @@ function mapIncome(r: IncomeRow): Income {
     id: r.id,
     amount: r.amount,
     category: r.category as IncomeCategory,
+    paymentMethod: r.payment_method,
     note: r.note,
     entryDate: r.entry_date,
     createdAt: toIso(r.created_at),
@@ -123,11 +125,13 @@ export async function emailExists(email: string): Promise<boolean> {
 
 export async function createIncome(userId: string, input: IncomeInput): Promise<Income> {
   const entryDate = input.entryDate ?? today();
+  const category = input.category ?? "storefront";
+  const paymentMethod = input.paymentMethod ?? "cash";
   const { rows } = await query<IncomeRow>(
-    `INSERT INTO income_entries (user_id, amount, category, note, entry_date)
-     VALUES ($1, $2, COALESCE($3, 'storefront'), $4, $5::date)
-     RETURNING id, amount, category, note, entry_date::text AS entry_date, created_at`,
-    [userId, input.amount.toFixed(2), input.category ?? null, input.note ?? null, entryDate],
+    `INSERT INTO income_entries (user_id, amount, category, payment_method, note, entry_date)
+     VALUES ($1, $2, $3, $4, $5, $6::date)
+     RETURNING id, amount, category, payment_method, note, entry_date::text AS entry_date, created_at`,
+    [userId, input.amount.toFixed(2), category, paymentMethod, input.note ?? null, entryDate],
   );
   return mapIncome(rows[0]);
 }
@@ -171,11 +175,12 @@ export async function deleteIncome(userId: string, id: string): Promise<boolean>
 
 export async function createExpense(userId: string, input: ExpenseInput): Promise<Expense> {
   const entryDate = input.entryDate ?? today();
+  const category = input.category ?? "expense_misc";
   const { rows } = await query<ExpenseRow>(
     `INSERT INTO expense_entries (user_id, amount, category, note, entry_date)
-     VALUES ($1, $2, COALESCE($3, 'other'), $4, $5::date)
+     VALUES ($1, $2, $3, $4, $5::date)
      RETURNING id, amount, category, note, entry_date::text AS entry_date, created_at`,
-    [userId, input.amount.toFixed(2), input.category ?? null, input.note ?? null, entryDate],
+    [userId, input.amount.toFixed(2), category, input.note ?? null, entryDate],
   );
   return mapExpense(rows[0]);
 }

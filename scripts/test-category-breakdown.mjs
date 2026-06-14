@@ -185,9 +185,9 @@ try {
 
   await client.query(
     `INSERT INTO expense_entries (user_id, amount, category, entry_date)
-     VALUES ($1, 80.00, 'supplies', $2::date),
+     VALUES ($1, 80.00, 'materials', $2::date),
             ($1, 20.00, 'rent', $3::date),
-            ($1, 500.00, 'other', $4::date)`,
+            ($1, 500.00, 'expense_misc', $4::date)`,
     [userId, start, end, outOfPeriod],
   );
 
@@ -208,9 +208,9 @@ try {
   assertEq("delivery amount", incMap.delivery?.amount ?? "missing", "50.00");
   assertEq("delivery count", String(incMap.delivery?.count ?? "missing"), "1");
   const expMap = Object.fromEntries(breakdown.expense.map((r) => [r.category, r]));
-  assertEq("supplies amount", expMap.supplies?.amount ?? "missing", "80.00");
+  assertEq("materials amount", expMap.materials?.amount ?? "missing", "80.00");
   assertEq("rent amount", expMap.rent?.amount ?? "missing", "20.00");
-  assertEq("other absent (out of period)", expMap.other ? "present" : "absent", "absent");
+  assertEq("expense_misc absent (out of period)", expMap.expense_misc ? "present" : "absent", "absent");
   console.log("");
 
   console.log("3) Out-of-period entry excluded from totals");

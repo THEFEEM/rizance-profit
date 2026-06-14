@@ -161,7 +161,7 @@ try {
   );
   await client.query(
     `INSERT INTO expense_entries (user_id, amount, category, entry_date)
-     VALUES ($1, 200.00, 'supplies', $2::date)`,
+     VALUES ($1, 200.00, 'materials', $2::date)`,
     [userId, date],
   );
 
@@ -178,8 +178,8 @@ try {
     [boothId, userId, date],
   );
   await client.query(
-    `INSERT INTO booth_expense_entries (booth_id, user_id, amount, cost_type, entry_date)
-     VALUES ($1, $2, 80.00, 'fixed', $3::date), ($1, $2, 20.00, 'variable', $3::date)`,
+    `INSERT INTO booth_expense_entries (booth_id, user_id, amount, cost_type, category, entry_date)
+     VALUES ($1, $2, 80.00, 'fixed', 'rent', $3::date), ($1, $2, 20.00, 'variable', 'materials', $3::date)`,
     [boothId, userId, date],
   );
 

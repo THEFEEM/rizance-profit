@@ -193,8 +193,8 @@ try {
     [boothId, userId, date],
   );
   await client.query(
-    `INSERT INTO booth_expense_entries (booth_id, user_id, amount, cost_type, entry_date)
-     VALUES ($1, $2, 80.00, 'fixed', $3::date), ($1, $2, 20.00, 'variable', $3::date)`,
+    `INSERT INTO booth_expense_entries (booth_id, user_id, amount, cost_type, category, entry_date)
+     VALUES ($1, $2, 80.00, 'fixed', 'rent', $3::date), ($1, $2, 20.00, 'variable', 'materials', $3::date)`,
     [boothId, userId, date],
   );
 

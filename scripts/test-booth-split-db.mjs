@@ -117,8 +117,8 @@ async function seedRevisionBooth(client, userId, { poolGetsShare, method, label 
     [boothId, userId],
   );
   await client.query(
-    `INSERT INTO booth_expense_entries (booth_id, user_id, amount, cost_type, entry_date)
-     VALUES ($1, $2, 7500.00, 'variable', '2026-06-02'::date)`,
+    `INSERT INTO booth_expense_entries (booth_id, user_id, amount, cost_type, category, entry_date)
+     VALUES ($1, $2, 7500.00, 'variable', 'materials', '2026-06-02'::date)`,
     [boothId, userId],
   );
 
@@ -218,8 +218,8 @@ try {
     [dBoothId, userId],
   );
   await client.query(
-    `INSERT INTO booth_expense_entries (booth_id, user_id, amount, cost_type, entry_date)
-     VALUES ($1, $2, 7500.00, 'variable', '2026-06-02'::date)`,
+    `INSERT INTO booth_expense_entries (booth_id, user_id, amount, cost_type, category, entry_date)
+     VALUES ($1, $2, 7500.00, 'variable', 'materials', '2026-06-02'::date)`,
     [dBoothId, userId],
   );
   res = await apiGet(base, `/api/booths/${dBoothId}/split`);

@@ -106,7 +106,7 @@ async function main() {
   // 4. Add expense
   ({ res, body } = await request("/api/expense", {
     method: "POST",
-    body: JSON.stringify({ amount: 640, category: "supplies", note: "Milk run" }),
+    body: JSON.stringify({ amount: 640, category: "materials", note: "Milk run" }),
   }));
   if (!res.ok) {
     log("POST /api/expense", false, body?.error?.message);

@@ -10,12 +10,12 @@ import { apiFetch } from "@/lib/api-client";
 import { today } from "@/lib/date";
 import { CategoryGrid } from "@/components/CategoryGrid";
 import { EntryContextBanner } from "@/components/EntryContextBanner";
-import { INCOME_CATEGORY_OPTIONS, type Income, type IncomeCategory } from "@/types";
+import { INCOME_CATEGORY_OPTIONS, type Income, type LegacyIncomeFormKey } from "@/types";
 
 export default function AddIncomePage() {
   const router = useRouter();
   const [raw, setRaw] = useState("");
-  const [category, setCategory] = useState<IncomeCategory>("storefront");
+  const [category, setCategory] = useState<LegacyIncomeFormKey>("storefront");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(today());
   const [saving, setSaving] = useState(false);
