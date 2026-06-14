@@ -1,11 +1,13 @@
 import type { EntryRow } from "@/components/EntryList";
 import { sumDecimals, toCents } from "@/lib/money";
 import {
+  EXPENSE_CATEGORIES,
   EXPENSE_CATEGORY_OPTIONS,
+  INCOME_CATEGORIES,
   INCOME_CATEGORY_OPTIONS,
-  type ExpenseCategory,
-  type IncomeCategory,
-} from "@/types";
+  expenseCategoryLabel,
+  incomeCategoryLabel,
+} from "@/lib/expense-categories";
 
 export type TodayCategoryGroup = {
   key: string;
@@ -15,15 +17,17 @@ export type TodayCategoryGroup = {
   subtotal: string;
 };
 
+const incomeIconByKey = Object.fromEntries(INCOME_CATEGORIES.map((c) => [c.key, c.icon]));
+const expenseIconByKey = Object.fromEntries(EXPENSE_CATEGORIES.map((c) => [c.key, c.icon]));
+const legacyIncomeIcon = Object.fromEntries(INCOME_CATEGORY_OPTIONS.map((o) => [o.value, o.icon]));
+const legacyExpenseIcon = Object.fromEntries(EXPENSE_CATEGORY_OPTIONS.map((o) => [o.value, o.icon]));
+
 /** Group today's entries by kind+category — client-side from existing entry list. */
 export function buildTodayCategoryGroups(entries: EntryRow[]): TodayCategoryGroup[] {
-  const incomeMeta = new Map(INCOME_CATEGORY_OPTIONS.map((o) => [o.value, o]));
-  const expenseMeta = new Map(EXPENSE_CATEGORY_OPTIONS.map((o) => [o.value, o]));
-
   const totals = new Map<string, { kind: "income" | "expense"; amounts: string[] }>();
 
   for (const e of entries) {
-    const category = e.category ?? (e.kind === "income" ? "storefront" : "other");
+    const category = e.category ?? (e.kind === "income" ? "storefront" : "expense_misc");
     const key = `${e.kind}:${category}`;
     const existing = totals.get(key);
     if (existing) {
@@ -38,15 +42,17 @@ export function buildTodayCategoryGroups(entries: EntryRow[]): TodayCategoryGrou
     const subtotal = sumDecimals(...amounts);
     if (toCents(subtotal) === 0) continue;
     const category = key.split(":")[1]!;
-    const meta =
+    const label =
+      kind === "income" ? incomeCategoryLabel(category) : expenseCategoryLabel(category);
+    const icon =
       kind === "income"
-        ? incomeMeta.get(category as IncomeCategory)
-        : expenseMeta.get(category as ExpenseCategory);
+        ? (incomeIconByKey[category] ?? legacyIncomeIcon[category] ?? "•")
+        : (expenseIconByKey[category] ?? legacyExpenseIcon[category] ?? "•");
     groups.push({
       key,
       kind,
-      icon: meta?.icon ?? "•",
-      label: meta?.label ?? category,
+      icon,
+      label,
       subtotal,
     });
   }

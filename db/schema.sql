@@ -20,14 +20,18 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- =========================================================
 -- income_entries  (money in)
--- category: storefront | delivery | other
+-- category: storefront | online | delivery | service | other_income | misc
 -- =========================================================
 CREATE TABLE IF NOT EXISTS income_entries (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   amount     NUMERIC(12,2) NOT NULL CHECK (amount >= 0),
   category   VARCHAR(40) NOT NULL DEFAULT 'storefront'
-             CHECK (category IN ('storefront', 'delivery', 'other')),
+             CHECK (category IN (
+               'storefront', 'online', 'delivery', 'service', 'other_income', 'misc'
+             )),
+  payment_method VARCHAR(20) NOT NULL DEFAULT 'cash'
+             CHECK (payment_method IN ('cash', 'transfer')),
   note       VARCHAR(255),
   entry_date DATE NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -35,13 +39,17 @@ CREATE TABLE IF NOT EXISTS income_entries (
 
 -- =========================================================
 -- expense_entries  (money out)
--- category: supplies | rent | salary | utilities | equipment | other
+-- category: rent | wage | equipment | materials | utilities | shipping | marketing | expense_misc
 -- =========================================================
 CREATE TABLE IF NOT EXISTS expense_entries (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   amount     NUMERIC(12,2) NOT NULL CHECK (amount >= 0),
-  category   VARCHAR(40) NOT NULL DEFAULT 'other',
+  category   VARCHAR(40) NOT NULL DEFAULT 'expense_misc'
+             CHECK (category IN (
+               'rent', 'wage', 'equipment', 'materials',
+               'utilities', 'shipping', 'marketing', 'expense_misc'
+             )),
   note       VARCHAR(255),
   entry_date DATE NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -139,6 +147,10 @@ CREATE TABLE IF NOT EXISTS booth_income_entries (
   booth_id       UUID NOT NULL REFERENCES booths(id) ON DELETE CASCADE,
   user_id        UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   amount         NUMERIC(12,2) NOT NULL CHECK (amount >= 0),
+  category       VARCHAR(40) NOT NULL DEFAULT 'storefront'
+    CHECK (category IN (
+      'storefront', 'online', 'delivery', 'service', 'other_income', 'misc'
+    )),
   payment_method VARCHAR(20) NOT NULL CHECK (payment_method IN ('cash', 'transfer')),
   note           VARCHAR(255),
   entry_date     DATE NOT NULL,
@@ -153,6 +165,11 @@ CREATE TABLE IF NOT EXISTS booth_expense_entries (
   user_id          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   amount           NUMERIC(12,2) NOT NULL CHECK (amount >= 0),
   cost_type        VARCHAR(20) NOT NULL CHECK (cost_type IN ('fixed', 'variable')),
+  category         VARCHAR(30) NOT NULL
+    CHECK (category IN (
+      'rent', 'wage', 'equipment', 'materials',
+      'utilities', 'shipping', 'marketing', 'expense_misc'
+    )),
   label            VARCHAR(120),
   note             VARCHAR(255),
   payer_member_id      UUID REFERENCES booth_members(id) ON DELETE SET NULL,

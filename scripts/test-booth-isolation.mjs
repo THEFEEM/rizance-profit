@@ -81,7 +81,7 @@ try {
   );
   await client.query(
     `INSERT INTO expense_entries (user_id, amount, category, note, entry_date)
-     VALUES ($1, 200.00, 'supplies', 'regular milk', $2::date)`,
+     VALUES ($1, 200.00, 'materials', 'regular milk', $2::date)`,
     [userId, date],
   );
 
@@ -93,13 +93,13 @@ try {
   );
   const boothId = booths[0].id;
   await client.query(
-    `INSERT INTO booth_income_entries (booth_id, user_id, amount, payment_method, entry_date)
-     VALUES ($1, $2, 999.00, 'cash', $3::date), ($1, $2, 111.00, 'transfer', $3::date)`,
+    `INSERT INTO booth_income_entries (booth_id, user_id, amount, category, payment_method, entry_date)
+     VALUES ($1, $2, 999.00, 'storefront', 'cash', $3::date), ($1, $2, 111.00, 'storefront', 'transfer', $3::date)`,
     [boothId, userId, date],
   );
   await client.query(
-    `INSERT INTO booth_expense_entries (booth_id, user_id, amount, cost_type, label, entry_date)
-     VALUES ($1, $2, 888.00, 'fixed', 'ค่าที่', $3::date), ($1, $2, 77.00, 'variable', 'นม', $3::date)`,
+    `INSERT INTO booth_expense_entries (booth_id, user_id, amount, cost_type, category, label, entry_date)
+     VALUES ($1, $2, 888.00, 'fixed', 'rent', 'ค่าที่', $3::date), ($1, $2, 77.00, 'variable', 'materials', 'นม', $3::date)`,
     [boothId, userId, date],
   );
 
@@ -187,8 +187,8 @@ try {
   threw = false;
   try {
     await client.query(
-      `INSERT INTO booth_expense_entries (booth_id, user_id, amount, cost_type, entry_date)
-       VALUES ($1, $2, 10.00, 'overhead', $3::date)`,
+      `INSERT INTO booth_expense_entries (booth_id, user_id, amount, cost_type, category, entry_date)
+       VALUES ($1, $2, 10.00, 'overhead', 'rent', $3::date)`,
       [boothId, userId, date],
     );
   } catch (e) {

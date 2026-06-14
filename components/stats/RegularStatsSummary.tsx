@@ -30,8 +30,14 @@ import {
 } from "@/components/stats/CategoryBreakdownPanel";
 import { EntryList, type EntryRow } from "@/components/EntryList";
 import {
-  EXPENSE_CATEGORY_OPTIONS,
+  expenseCategoryLabel,
+  incomeCategoryLabel,
+  INCOME_CATEGORIES,
+  EXPENSE_CATEGORIES,
   INCOME_CATEGORY_OPTIONS,
+  EXPENSE_CATEGORY_OPTIONS,
+} from "@/lib/expense-categories";
+import {
   type CategoryBreakdownItem,
   type User,
 } from "@/types";
@@ -92,8 +98,8 @@ export async function RegularStatsSummary({
 
   const entryTotal = periodData.incomeCount + periodData.expenseCount;
 
-  const incomeRows = toBreakdownRows(breakdown.income, INCOME_CATEGORY_OPTIONS);
-  const expenseRows = toBreakdownRows(breakdown.expense, EXPENSE_CATEGORY_OPTIONS);
+  const incomeRows = toBreakdownRows(breakdown.income, "income");
+  const expenseRows = toBreakdownRows(breakdown.expense, "expense");
   const incomeEntries = groupEntriesByCategory(periodIncomes);
   const expenseEntries = groupEntriesByCategory(periodExpenses);
 
@@ -181,13 +187,21 @@ export async function RegularStatsSummary({
 
 function toBreakdownRows(
   items: CategoryBreakdownItem[],
-  options: readonly { value: string; label: string; icon: string }[],
+  kind: "income" | "expense",
 ): CategoryBreakdownRow[] {
-  const byValue = Object.fromEntries(options.map((o) => [o.value, o]));
+  const iconByKey =
+    kind === "income"
+      ? Object.fromEntries(INCOME_CATEGORIES.map((c) => [c.key, c.icon]))
+      : Object.fromEntries(EXPENSE_CATEGORIES.map((c) => [c.key, c.icon]));
+  const legacyIconByKey =
+    kind === "income"
+      ? Object.fromEntries(INCOME_CATEGORY_OPTIONS.map((o) => [o.value, o.icon]))
+      : Object.fromEntries(EXPENSE_CATEGORY_OPTIONS.map((o) => [o.value, o.icon]));
+  const labelFn = kind === "income" ? incomeCategoryLabel : expenseCategoryLabel;
   return items.map((item) => ({
     category: item.category,
-    label: byValue[item.category]?.label ?? item.category,
-    icon: byValue[item.category]?.icon ?? "•",
+    label: labelFn(item.category),
+    icon: iconByKey[item.category] ?? legacyIconByKey[item.category] ?? "•",
     amount: item.amount,
     count: item.count,
   }));

@@ -10,12 +10,12 @@ import { apiFetch } from "@/lib/api-client";
 import { today } from "@/lib/date";
 import { CategoryGrid } from "@/components/CategoryGrid";
 import { EntryContextBanner } from "@/components/EntryContextBanner";
-import { EXPENSE_CATEGORY_OPTIONS, type Expense, type ExpenseCategory } from "@/types";
+import { EXPENSE_CATEGORY_OPTIONS, type Expense, type LegacyExpenseFormKey } from "@/types";
 
 export default function AddExpensePage() {
   const router = useRouter();
   const [raw, setRaw] = useState("");
-  const [category, setCategory] = useState<ExpenseCategory>("supplies");
+  const [category, setCategory] = useState<LegacyExpenseFormKey>("supplies");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(today());
   const [saving, setSaving] = useState(false);

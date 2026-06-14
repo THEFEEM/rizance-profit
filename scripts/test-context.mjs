@@ -161,7 +161,7 @@ try {
   );
   await client.query(
     `INSERT INTO expense_entries (user_id, amount, category, entry_date)
-     VALUES ($1, 200.00, 'supplies', $2::date)`,
+     VALUES ($1, 200.00, 'materials', $2::date)`,
     [userId, date],
   );
 

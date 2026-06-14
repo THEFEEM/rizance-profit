@@ -1,6 +1,7 @@
 // Mode Even (booth/event) data access. Booth data lives in separate tables —
 // nothing in here touches income_entries / expense_entries.
 import { query } from "@/lib/db";
+import { boothCategoryFromCostType } from "@/lib/expense-categories";
 import {
   computeSplitProfit,
   computeWageCost,
@@ -355,8 +356,8 @@ export async function createBoothIncome(
   if (!guard.ok) return guard;
 
   const { rows } = await query<BoothIncomeRow>(
-    `INSERT INTO booth_income_entries (booth_id, user_id, amount, payment_method, note, entry_date)
-     VALUES ($1, $2, $3, $4, $5, $6::date)
+    `INSERT INTO booth_income_entries (booth_id, user_id, amount, category, payment_method, note, entry_date)
+     VALUES ($1, $2, $3, 'storefront', $4, $5, $6::date)
      RETURNING id, booth_id, amount, payment_method, note, entry_date::text AS entry_date, created_at`,
     [boothId, userId, input.amount.toFixed(2), input.paymentMethod, input.note ?? null, entryDate],
   );
@@ -491,16 +492,19 @@ export async function createBoothExpense(
     note = note ? `${note} · ${ADVANCE_NOTE}` : ADVANCE_NOTE;
   }
 
+  const category = boothCategoryFromCostType(input.costType, input.label);
+
   const { rows } = await query<BoothExpenseRow>(
     `INSERT INTO booth_expense_entries
-       (booth_id, user_id, amount, cost_type, label, note, payer_member_id, external_payer_name, entry_date)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::date)
+       (booth_id, user_id, amount, cost_type, category, label, note, payer_member_id, external_payer_name, entry_date)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::date)
      RETURNING ${EXPENSE_RETURN}`,
     [
       boothId,
       userId,
       input.amount.toFixed(2),
       input.costType,
+      category,
       input.label ?? null,
       note,
       payerMemberId,

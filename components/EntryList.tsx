@@ -4,11 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatMoney } from "@/lib/money";
 import {
-  EXPENSE_CATEGORY_LABELS,
-  INCOME_CATEGORY_LABELS,
-  type ExpenseCategory,
-  type IncomeCategory,
-} from "@/types";
+  expenseCategoryLabel,
+  incomeCategoryLabel,
+  type ExpenseCategoryKey,
+  type IncomeCategoryKey,
+} from "@/lib/expense-categories";
 import { DeleteConfirm } from "@/components/DeleteConfirm";
 import { ExpenseArrowIcon, IncomeArrowIcon } from "@/components/today/today-icons";
 
@@ -17,30 +17,28 @@ export type EntryRow = {
   kind: "income" | "expense";
   amount: string;
   note: string | null;
-  category?: ExpenseCategory | IncomeCategory;
+  category?: ExpenseCategoryKey | IncomeCategoryKey | string;
   createdAt: string;
 };
 
 function entryCategoryKey(e: EntryRow): string {
   const category =
-    e.category ?? (e.kind === "income" ? "storefront" : "other");
+    e.category ?? (e.kind === "income" ? "storefront" : "expense_misc");
   return `${e.kind}:${category}`;
 }
 
 function entryTitle(e: EntryRow): string {
-  if (e.kind === "income") {
-    const label = INCOME_CATEGORY_LABELS[(e.category as IncomeCategory) ?? "storefront"];
-    return e.note ? `${label} · ${e.note}` : label;
-  }
-  const label = EXPENSE_CATEGORY_LABELS[(e.category as ExpenseCategory) ?? "other"];
+  const label =
+    e.kind === "income"
+      ? incomeCategoryLabel(e.category ?? "storefront")
+      : expenseCategoryLabel(e.category ?? "expense_misc");
   return e.note ? `${label} · ${e.note}` : label;
 }
 
 function entryCategoryLabel(e: EntryRow): string {
-  if (e.kind === "income") {
-    return INCOME_CATEGORY_LABELS[(e.category as IncomeCategory) ?? "storefront"];
-  }
-  return EXPENSE_CATEGORY_LABELS[(e.category as ExpenseCategory) ?? "other"];
+  return e.kind === "income"
+    ? incomeCategoryLabel(e.category ?? "storefront")
+    : expenseCategoryLabel(e.category ?? "expense_misc");
 }
 
 export function EntryList({
