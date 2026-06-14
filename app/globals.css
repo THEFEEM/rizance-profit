@@ -75,3 +75,8 @@ body {
 .rz-tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* Booth-context primary buttons (amber) — set data-context="booth" on a parent */
+[data-context="booth"] .rz-btn-primary:not(:disabled) {
+  background-color: #ba7517;
+}

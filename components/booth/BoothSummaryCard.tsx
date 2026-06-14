@@ -19,25 +19,26 @@ function SummaryLine({
 }) {
   const color =
     tone === "income"
-      ? "text-emerald-600"
+      ? "text-rz-green"
       : tone === "expense"
-        ? "text-red-600"
+        ? "text-rz-red"
         : tone === "muted"
-          ? "text-slate-400"
-          : "text-slate-700";
+          ? "text-rz-hint"
+          : "text-rz-text";
 
   return (
     <div className={`flex items-center justify-between gap-3 py-2 ${indent ? "pl-3" : ""}`}>
-      <span className={`text-sm ${tone === "muted" ? "text-slate-400" : "text-slate-600"}`}>
+      <span className={`text-sm ${tone === "muted" ? "text-rz-hint" : "text-rz-muted"}`}>
         {label}
       </span>
-      <span className={`text-sm font-semibold tabular-nums ${color}`}>
+      <span className={`rz-tabular text-sm font-medium ${color}`}>
         {formatMoney(amount, currency)}
       </span>
     </div>
   );
 }
 
+/** Compact P&L preview on booth hub (closed) — dark fintech styling. */
 export function BoothSummaryCard({
   summary,
   split,
@@ -53,7 +54,7 @@ export function BoothSummaryCard({
 }) {
   const sign = moneySign(summary.profit);
   const profitColor =
-    sign > 0 ? "text-emerald-600" : sign < 0 ? "text-red-600" : "text-slate-400";
+    sign > 0 ? "text-rz-green" : sign < 0 ? "text-rz-red" : "text-rz-hint";
 
   const { booth } = summary;
   const hasEquity = moneySign(booth.memberEquity) > 0;
@@ -62,19 +63,15 @@ export function BoothSummaryCard({
     <div className={compact ? "" : "px-4 pb-6"}>
       {!compact && (
         <section className="py-6 text-center">
-          <p className="text-sm font-semibold uppercase tracking-wide text-slate-400">
-            กำไร/ขาดทุน
-          </p>
-          <p
-            className={`mt-2 break-all text-5xl font-extrabold leading-tight tracking-tight ${profitColor}`}
-          >
+          <p className="text-sm font-medium text-rz-muted">กำไร/ขาดทุน</p>
+          <p className={`mt-2 break-all text-5xl font-medium leading-tight rz-tabular ${profitColor}`}>
             {formatMoney(summary.profit, currency)}
           </p>
         </section>
       )}
 
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
-        <div className="border-b border-slate-100 px-4 py-3">
+      <div className="overflow-hidden rounded-[14px] border-[0.5px] border-rz-border bg-rz-card">
+        <div className="border-b-[0.5px] border-rz-border px-4 py-3">
           <SummaryLine
             label="งบรวม (อ้างอิง)"
             amount={booth.totalBudget}
@@ -98,22 +95,21 @@ export function BoothSummaryCard({
             />
           )}
           {booth.poolGetsShare && (
-            <p className="text-xs text-emerald-700">กองกลางรับส่วนแบ่งกำไร</p>
+            <p className="text-xs text-rz-blue">กองกลางรับส่วนแบ่งกำไร</p>
           )}
-          <p className="text-xs text-slate-400">แสดงเพื่ออ้างอิง — ไม่หักจากกำไร</p>
+          <p className="text-xs text-rz-hint">แสดงเพื่ออ้างอิง — ไม่หักจากกำไร</p>
           <BoothRemainingBudget
             totalBudget={booth.totalBudget}
             totalExpense={summary.totalExpense}
             currency={currency}
             variant="inline"
+            appearance="hub"
           />
         </div>
 
-        <div className="border-b border-slate-100 px-4 py-1">
+        <div className="border-b-[0.5px] border-rz-border px-4 py-1">
           {!compact && (
-            <p className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-              รายรับ
-            </p>
+            <p className="pt-2 text-xs font-medium uppercase tracking-wide text-rz-hint">รายรับ</p>
           )}
           <SummaryLine
             label="รายรับเงินสด"
@@ -135,9 +131,9 @@ export function BoothSummaryCard({
           />
         </div>
 
-        <div className="border-b border-slate-100 px-4 py-1">
+        <div className="border-b-[0.5px] border-rz-border px-4 py-1">
           {!compact && (
-            <p className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <p className="pt-2 text-xs font-medium uppercase tracking-wide text-rz-hint">
               ค่าใช้จ่าย
             </p>
           )}
@@ -170,11 +166,11 @@ export function BoothSummaryCard({
         </div>
 
         {split && !compact && (
-          <div className="border-b border-slate-100 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <div className="border-b-[0.5px] border-rz-border px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-rz-hint">
               แบ่งกำไร (ตัวอย่าง)
             </p>
-            <p className="mt-1 text-sm text-slate-600">
+            <p className="mt-1 text-sm text-rz-muted">
               {PROFIT_SPLIT_METHOD_LABELS[split.method]}
               {split.poolGetsShare && moneySign(split.poolShare.flooredShare) > 0 && (
                 <> · กอง {formatMoney(split.poolShare.flooredShare, currency)}</>
@@ -185,28 +181,31 @@ export function BoothSummaryCard({
                 .join("")}
             </p>
             {moneySign(split.remainder) !== 0 && (
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-rz-hint">
                 เศษเข้ากองกลาง {formatMoney(split.remainder, currency)}
               </p>
             )}
             {split.warning && (
-              <p className="mt-1 text-xs text-amber-700">{split.warning}</p>
+              <p className="mt-1 text-xs text-rz-amber">{split.warning}</p>
             )}
           </div>
         )}
 
         {compact && (
           <div className="px-4 py-4 text-center">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <p className="text-xs font-medium uppercase tracking-wide text-rz-hint">
               กำไร/ขาดทุน
             </p>
-            <p className={`mt-1 text-3xl font-extrabold tabular-nums ${profitColor}`}>
+            <p className={`mt-1 text-3xl font-medium rz-tabular ${profitColor}`}>
               {formatMoney(summary.profit, currency)}
             </p>
+            {sign < 0 && (
+              <p className="mt-1 text-sm font-medium text-rz-red">ขาดทุน</p>
+            )}
             {split && boothId && (
               <Link
                 href={`/booth/${boothId}/summary`}
-                className="tap-target mt-2 inline-block text-xs font-medium text-emerald-700"
+                className="tap-target mt-2 inline-block text-xs font-medium text-rz-amber active:opacity-90"
               >
                 ดูการแบ่งกำไร →
               </Link>

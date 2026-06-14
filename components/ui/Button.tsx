@@ -3,10 +3,13 @@ import { forwardRef } from "react";
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
 const VARIANTS: Record<Variant, string> = {
-  primary: "bg-emerald-600 text-white active:bg-emerald-700 disabled:bg-emerald-300",
-  secondary: "bg-slate-100 text-slate-900 active:bg-slate-200 disabled:opacity-50",
-  ghost: "bg-transparent text-slate-600 active:bg-slate-100 disabled:opacity-50",
-  danger: "bg-red-600 text-white active:bg-red-700 disabled:bg-red-300",
+  primary:
+    "rz-btn-primary border-[0.5px] border-transparent bg-rz-btn text-rz-bg active:opacity-90 disabled:opacity-40",
+  secondary:
+    "border-[0.5px] border-rz-border bg-rz-card text-rz-muted active:bg-rz-elevated disabled:opacity-40",
+  ghost: "bg-transparent text-rz-muted active:bg-rz-elevated disabled:opacity-40",
+  danger:
+    "border-[0.5px] border-transparent bg-[#991B1B] text-rz-text active:opacity-90 disabled:opacity-40",
 };
 
 type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -21,7 +24,8 @@ export const Button = forwardRef<HTMLButtonElement, Props>(function Button(
   return (
     <button
       ref={ref}
-      className={`tap-target no-select inline-flex items-center justify-center gap-2 rounded-2xl px-5 text-base font-semibold transition-colors ${
+      data-variant={variant}
+      className={`tap-target no-select inline-flex items-center justify-center gap-2 rounded-[11px] px-5 text-sm font-medium transition-opacity ${
         fullWidth ? "w-full" : ""
       } ${VARIANTS[variant]} ${className}`}
       {...props}

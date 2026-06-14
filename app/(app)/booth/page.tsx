@@ -13,21 +13,21 @@ export default async function BoothListPage() {
   const booths = await listBooths(user.id);
 
   return (
-    <div className="pb-6">
+    <div className="pb-6" data-context="booth">
       <BoothBack href="/" />
-      <div className="flex items-center justify-between px-4">
+      <div className="flex items-center justify-between px-4 pt-1">
         <div>
-          <h1 className="text-lg font-bold text-slate-900">Mode Even</h1>
-          <p className="text-xs text-slate-500">งานบูธ / อีเวนต์</p>
+          <h1 className="text-lg font-medium text-rz-text">งานบูธ</h1>
+          <p className="text-xs text-rz-hint">งานบูธ / อีเวนต์</p>
         </div>
         <Link
           href="/booth/new"
-          className="tap-target rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
+          className="tap-target rounded-full border-[0.5px] border-[#5A3F12] bg-[#2E2310] px-4 py-2 text-sm font-medium text-rz-amber active:opacity-90"
         >
           + สร้างงาน
         </Link>
       </div>
-      <div className="mx-2 mt-4 overflow-hidden rounded-2xl bg-white shadow-sm">
+      <div className="mt-4 px-4">
         <BoothList booths={booths} currency={user.currency} />
       </div>
     </div>
