@@ -1,14 +1,14 @@
 // Mode Even (booth/event) data access. Booth data lives in separate tables —
 // nothing in here touches income_entries / expense_entries.
 import { query } from "@/lib/db";
-import { boothCategoryFromCostType } from "@/lib/expense-categories";
+import { boothCategoryFromCostType, isFixed } from "@/lib/expense-categories";
 import {
   computeSplitProfit,
   computeWageCost,
   inclusiveEventDays,
   type SplitProfitResult,
 } from "@/lib/booth-split";
-import { computeProfit, sumDecimals } from "@/lib/money";
+import { centsToDecimalString, computeProfit, sumDecimals, toCents } from "@/lib/money";
 import { today } from "@/lib/date";
 import type {
   Booth,
@@ -107,6 +107,7 @@ type BoothExpenseRow = {
   booth_id: string;
   amount: string;
   cost_type: string;
+  category: string;
   label: string | null;
   note: string | null;
   payer_member_id: string | null;
@@ -122,6 +123,7 @@ function mapBoothExpense(r: BoothExpenseRow): BoothExpense {
     boothId: r.booth_id,
     amount: r.amount,
     costType: r.cost_type as BoothCostType,
+    category: r.category,
     label: r.label,
     note: r.note,
     payerMemberId: r.payer_member_id,
@@ -155,8 +157,25 @@ function mapBoothMember(r: BoothMemberRow): BoothMember {
   };
 }
 
-const EXPENSE_RETURN = `id, booth_id, amount, cost_type, label, note, payer_member_id,
+const EXPENSE_RETURN = `id, booth_id, amount, cost_type, category, label, note, payer_member_id,
   external_payer_name, entry_date::text AS entry_date, created_at`;
+
+/** Fixed vs variable totals from expense category — never from cost_type. */
+function aggregateBoothExpenseTotals(
+  rows: { amount: string; category: string }[],
+): { fixedExpense: string; variableExpense: string } {
+  let fixedCents = 0;
+  let variableCents = 0;
+  for (const row of rows) {
+    const cents = toCents(row.amount);
+    if (isFixed(row.category)) fixedCents += cents;
+    else variableCents += cents;
+  }
+  return {
+    fixedExpense: centsToDecimalString(fixedCents),
+    variableExpense: centsToDecimalString(variableCents),
+  };
+}
 
 const MEMBER_RETURN = `id, booth_id, name, role, investment_amount, wage_amount, wage_type, created_at`;
 
@@ -770,30 +789,29 @@ export async function boothSummary(userId: string, boothId: string): Promise<Boo
   const eventDays = inclusiveEventDays(booth.startDate, booth.endDate);
   const wageCost = computeWageCost(members.map(toSplitMemberInput), eventDays);
 
-  const { rows } = await query<{
-    cash_income: string;
-    transfer_income: string;
-    fixed_expense: string;
-    variable_expense: string;
-    income_count: string;
-    expense_count: string;
-  }>(
-    `SELECT
-       COALESCE((SELECT SUM(amount) FROM booth_income_entries
-                 WHERE booth_id = $1 AND payment_method = 'cash'), 0)::text AS cash_income,
-       COALESCE((SELECT SUM(amount) FROM booth_income_entries
-                 WHERE booth_id = $1 AND payment_method = 'transfer'), 0)::text AS transfer_income,
-       COALESCE((SELECT SUM(amount) FROM booth_expense_entries
-                 WHERE booth_id = $1 AND cost_type = 'fixed'), 0)::text AS fixed_expense,
-       COALESCE((SELECT SUM(amount) FROM booth_expense_entries
-                 WHERE booth_id = $1 AND cost_type = 'variable'), 0)::text AS variable_expense,
-       (SELECT COUNT(*) FROM booth_income_entries  WHERE booth_id = $1)::text AS income_count,
-       (SELECT COUNT(*) FROM booth_expense_entries WHERE booth_id = $1)::text AS expense_count`,
-    [boothId],
-  );
-  const r = rows[0];
+  const [{ rows: incomeRows }, { rows: expenseRows }] = await Promise.all([
+    query<{
+      cash_income: string;
+      transfer_income: string;
+      income_count: string;
+    }>(
+      `SELECT
+         COALESCE((SELECT SUM(amount) FROM booth_income_entries
+                   WHERE booth_id = $1 AND payment_method = 'cash'), 0)::text AS cash_income,
+         COALESCE((SELECT SUM(amount) FROM booth_income_entries
+                   WHERE booth_id = $1 AND payment_method = 'transfer'), 0)::text AS transfer_income,
+         (SELECT COUNT(*) FROM booth_income_entries WHERE booth_id = $1)::text AS income_count`,
+      [boothId],
+    ),
+    query<{ amount: string; category: string }>(
+      `SELECT amount, category FROM booth_expense_entries WHERE booth_id = $1`,
+      [boothId],
+    ),
+  ]);
+  const r = incomeRows[0];
+  const { fixedExpense, variableExpense } = aggregateBoothExpenseTotals(expenseRows);
   const totalIncome = sumDecimals(r.cash_income, r.transfer_income);
-  const entryExpense = sumDecimals(r.fixed_expense, r.variable_expense);
+  const entryExpense = sumDecimals(fixedExpense, variableExpense);
   const totalExpense = sumDecimals(entryExpense, wageCost);
 
   return {
@@ -801,14 +819,14 @@ export async function boothSummary(userId: string, boothId: string): Promise<Boo
     cashIncome: r.cash_income,
     transferIncome: r.transfer_income,
     totalIncome,
-    fixedExpense: r.fixed_expense,
-    variableExpense: r.variable_expense,
+    fixedExpense,
+    variableExpense,
     entryExpense,
     wageCost,
     totalExpense,
     profit: computeProfit(totalIncome, totalExpense),
     incomeCount: Number(r.income_count),
-    expenseCount: Number(r.expense_count),
+    expenseCount: expenseRows.length,
   };
 }
 

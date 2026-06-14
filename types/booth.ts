@@ -80,6 +80,8 @@ export type BoothExpense = {
   boothId: string;
   amount: string;
   costType: BoothCostType;
+  /** Canonical expense category — fixed/variable derived via isFixed(category). */
+  category: string;
   label: string | null;
   note: string | null;
   payerMemberId: string | null;

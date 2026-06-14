@@ -15,6 +15,7 @@
     "test:pricing-edge": "node scripts/test-pricing-edge.mjs",
     "test:break-even": "node scripts/test-break-even.mjs",
     "test:expense-categories": "node scripts/test-expense-categories.mjs",
+    "test:category-costtype-crosscheck": "node scripts/test-category-costtype-crosscheck.mjs",
     "test:booth-split": "node scripts/test-booth-split.mjs",
     "test:booth-split-db": "node scripts/test-booth-split-db.mjs",
     "test:period-ranges": "node scripts/test-period-ranges.mjs",
