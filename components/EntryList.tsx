@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { formatMoney } from "@/lib/money";
 import {
   expenseCategoryLabel,
+  expenseCostTypeLabel,
   incomeCategoryLabel,
   type ExpenseCategoryKey,
   type IncomeCategoryKey,
@@ -39,6 +40,15 @@ function entryCategoryLabel(e: EntryRow): string {
   return e.kind === "income"
     ? incomeCategoryLabel(e.category ?? "storefront")
     : expenseCategoryLabel(e.category ?? "expense_misc");
+}
+
+function entryMeta(e: EntryRow): string {
+  const label = entryCategoryLabel(e);
+  if (e.kind === "expense") {
+    const typeLabel = expenseCostTypeLabel(e.category ?? "expense_misc");
+    return typeLabel ? `${label} · ${typeLabel}` : label;
+  }
+  return label;
 }
 
 export function EntryList({
@@ -103,7 +113,7 @@ export function EntryList({
         {visible.map((e) => {
           const isIncome = e.kind === "income";
           const title = entryTitle(e);
-          const categoryLabel = entryCategoryLabel(e);
+          const categoryLabel = entryMeta(e);
           const displayAmount = `${isIncome ? "+ " : "− "}${formatMoney(e.amount, currency)}`;
 
           if (isToday) {

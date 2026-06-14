@@ -101,3 +101,22 @@ export function normalizeExpenseCategory(value, fallback = "expense_misc") {
   if (value in LEGACY_EXPENSE_TO_CANONICAL) return LEGACY_EXPENSE_TO_CANONICAL[value];
   return fallback;
 }
+
+const INCOME_LABEL_BY_KEY = Object.fromEntries(INCOME_CATEGORIES.map((c) => [c.key, c.label]));
+const EXPENSE_LABEL_BY_KEY = Object.fromEntries(EXPENSE_CATEGORIES.map((c) => [c.key, c.label]));
+
+export function incomeCategoryLabel(key) {
+  if (INCOME_CATEGORY_KEYS.includes(key)) return INCOME_LABEL_BY_KEY[key];
+  if (key in LEGACY_INCOME_TO_CANONICAL) {
+    return INCOME_LABEL_BY_KEY[LEGACY_INCOME_TO_CANONICAL[key]];
+  }
+  return key;
+}
+
+export function expenseCategoryLabel(key) {
+  if (EXPENSE_CATEGORY_KEYS.includes(key)) return EXPENSE_LABEL_BY_KEY[key];
+  if (key in LEGACY_EXPENSE_TO_CANONICAL) {
+    return EXPENSE_LABEL_BY_KEY[LEGACY_EXPENSE_TO_CANONICAL[key]];
+  }
+  return key;
+}

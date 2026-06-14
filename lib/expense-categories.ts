@@ -97,6 +97,14 @@ export const LEGACY_EXPENSE_FORM_KEYS = [
 ] as const;
 export type LegacyExpenseFormKey = (typeof LEGACY_EXPENSE_FORM_KEYS)[number];
 
+const INCOME_ICON_BY_KEY = Object.fromEntries(
+  INCOME_CATEGORIES.map((c) => [c.key, c.icon]),
+) as Record<IncomeCategoryKey, string>;
+
+const EXPENSE_ICON_BY_KEY = Object.fromEntries(
+  EXPENSE_CATEGORIES.map((c) => [c.key, c.icon]),
+) as Record<ExpenseCategoryKey, string>;
+
 const INCOME_LABEL_BY_KEY = Object.fromEntries(
   INCOME_CATEGORIES.map((c) => [c.key, c.label]),
 ) as Record<IncomeCategoryKey, string>;
@@ -170,6 +178,35 @@ export function expenseCategoryLabel(key: string): string {
     return EXPENSE_LABEL_BY_KEY[LEGACY_EXPENSE_TO_CANONICAL[key as LegacyExpenseFormKey]];
   }
   return key;
+}
+
+export function incomeCategoryIcon(key: string): string {
+  if (isIncomeCategoryKey(key)) return INCOME_ICON_BY_KEY[key];
+  if ((LEGACY_INCOME_FORM_KEYS as readonly string[]).includes(key)) {
+    return INCOME_ICON_BY_KEY[LEGACY_INCOME_TO_CANONICAL[key as LegacyIncomeFormKey]];
+  }
+  return "•";
+}
+
+export function expenseCategoryIcon(key: string): string {
+  if (isExpenseCategoryKey(key)) return EXPENSE_ICON_BY_KEY[key];
+  if ((LEGACY_EXPENSE_FORM_KEYS as readonly string[]).includes(key)) {
+    return EXPENSE_ICON_BY_KEY[LEGACY_EXPENSE_TO_CANONICAL[key as LegacyExpenseFormKey]];
+  }
+  return "•";
+}
+
+/** Canonical sort index for display lists (unknown keys sort last). */
+export function incomeCategoryOrder(key: string): number {
+  const canonical = normalizeIncomeCategory(key);
+  const idx = (INCOME_CATEGORY_KEYS as readonly string[]).indexOf(canonical);
+  return idx >= 0 ? idx : INCOME_CATEGORY_KEYS.length;
+}
+
+export function expenseCategoryOrder(key: string): number {
+  const canonical = normalizeExpenseCategory(key);
+  const idx = (EXPENSE_CATEGORY_KEYS as readonly string[]).indexOf(canonical);
+  return idx >= 0 ? idx : EXPENSE_CATEGORY_KEYS.length;
 }
 
 export function getExpenseType(categoryKey: string): ExpenseCostType | null {
