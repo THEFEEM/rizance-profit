@@ -24,46 +24,48 @@ export default async function MonthlySummaryPage({
   return (
     <div className="pb-6">
       <div className="flex items-center justify-between px-4 pt-3">
-        <h1 className="text-lg font-bold text-slate-900">Monthly Summary</h1>
-        <Link href="/summary" className="text-sm font-medium text-emerald-700">
+        <h1 className="text-lg font-medium text-rz-text">Monthly Summary</h1>
+        <Link href="/summary" className="text-sm font-medium text-rz-green active:opacity-90">
           Daily →
         </Link>
       </div>
 
       <MonthNav month={month} label={formatMonthLabel(month)} />
 
-      <SummaryRows
-        income={summary.income}
-        expense={summary.expense}
-        profit={summary.profit}
-        currency={user.currency}
-      />
+      <div className="mt-4">
+        <SummaryRows
+          income={summary.income}
+          expense={summary.expense}
+          profit={summary.profit}
+          currency={user.currency}
+          appearance="stats"
+        />
+      </div>
 
       <div className="mt-6">
-        <h2 className="px-4 pb-2 text-sm font-semibold text-slate-500">By day</h2>
+        <h2 className="px-4 pb-2 text-sm font-medium text-rz-muted">By day</h2>
         {summary.days.length === 0 ? (
-          <p className="px-4 py-6 text-center text-sm text-slate-400">No entries this month.</p>
+          <p className="px-4 py-6 text-center text-sm text-rz-hint">No entries this month.</p>
         ) : (
-          <ul className="mx-4 divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm">
+          <ul className="mx-4 divide-y divide-rz-border overflow-hidden rounded-[14px] border-[0.5px] border-rz-border bg-rz-card">
             {summary.days.map((day) => {
               const sign = moneySign(day.profit);
               const profitColor =
-                sign > 0 ? "text-emerald-600" : sign < 0 ? "text-red-600" : "text-slate-400";
+                sign > 0 ? "text-rz-green" : sign < 0 ? "text-rz-red" : "text-rz-hint";
               return (
                 <li key={day.date}>
                   <Link
                     href={`/summary?date=${day.date}`}
-                    className="flex items-center justify-between gap-2 px-4 py-3 active:bg-slate-50"
+                    className="tap-target flex items-center justify-between gap-2 px-4 py-3.5 active:bg-rz-elevated"
                   >
-                    <span className="text-sm font-medium text-slate-700">
+                    <span className="text-sm font-medium text-rz-text">
                       {formatDayShort(day.date)}
                     </span>
-                    <span className="text-right text-xs tabular-nums text-slate-500">
-                      <span className="text-emerald-600">+{formatMoney(day.income, user.currency)}</span>
-                      {" "}
-                      <span className="text-red-600">−{formatMoney(day.expense, user.currency)}</span>
+                    <span className="rz-tabular text-right text-xs text-rz-muted">
+                      <span className="text-rz-green">+{formatMoney(day.income, user.currency)}</span>{" "}
+                      <span className="text-rz-red">−{formatMoney(day.expense, user.currency)}</span>
                       {" = "}
-                      <span className={`font-semibold ${profitColor}`}>
+                      <span className={`font-medium ${profitColor}`}>
                         {formatMoney(day.profit, user.currency)}
                       </span>
                     </span>

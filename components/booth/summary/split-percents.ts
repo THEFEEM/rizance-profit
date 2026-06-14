@@ -6,7 +6,7 @@ function formatSplitPercent(numerator: number, denominator: number): string {
   return `${((numerator / denominator) * 100).toFixed(1)}%`;
 }
 
-/** Display-only percentages — mirrors BoothSplitTable, not split math. */
+/** Display-only percentages — mirrors booth summary split display, not split math. */
 export function splitPercents(split: SplitProfitResult) {
   const participants = split.memberShares.filter(
     (s) =>
