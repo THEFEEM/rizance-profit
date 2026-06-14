@@ -1,7 +1,11 @@
 // Mode Even (booth/event) data access. Booth data lives in separate tables —
 // nothing in here touches income_entries / expense_entries.
 import { query } from "@/lib/db";
-import { boothCategoryFromCostType, isFixed } from "@/lib/expense-categories";
+import {
+  boothCategoryFromCostType,
+  isFixed,
+  type IncomeCategoryKey,
+} from "@/lib/expense-categories";
 import {
   computeSplitProfit,
   computeWageCost,
@@ -84,17 +88,22 @@ type BoothIncomeRow = {
   id: string;
   booth_id: string;
   amount: string;
+  category: string;
   payment_method: string;
   note: string | null;
   entry_date: string;
   created_at: Date | string;
 };
 
+const INCOME_RETURN = `id, booth_id, amount, category, payment_method, note,
+  entry_date::text AS entry_date, created_at`;
+
 function mapBoothIncome(r: BoothIncomeRow): BoothIncome {
   return {
     id: r.id,
     boothId: r.booth_id,
     amount: r.amount,
+    category: r.category,
     paymentMethod: r.payment_method as PaymentMethod,
     note: r.note,
     entryDate: r.entry_date,
@@ -360,6 +369,7 @@ async function memberBelongsToBooth(boothId: string, memberId: string): Promise<
 
 export type BoothIncomeInput = {
   amount: number;
+  category?: IncomeCategoryKey;
   paymentMethod: PaymentMethod;
   note?: string;
   entryDate?: string;
@@ -374,11 +384,12 @@ export async function createBoothIncome(
   const guard = await guardBoothEntry(userId, boothId, entryDate);
   if (!guard.ok) return guard;
 
+  const category = input.category ?? "storefront";
   const { rows } = await query<BoothIncomeRow>(
     `INSERT INTO booth_income_entries (booth_id, user_id, amount, category, payment_method, note, entry_date)
-     VALUES ($1, $2, $3, 'storefront', $4, $5, $6::date)
-     RETURNING id, booth_id, amount, payment_method, note, entry_date::text AS entry_date, created_at`,
-    [boothId, userId, input.amount.toFixed(2), input.paymentMethod, input.note ?? null, entryDate],
+     VALUES ($1, $2, $3, $4, $5, $6, $7::date)
+     RETURNING ${INCOME_RETURN}`,
+    [boothId, userId, input.amount.toFixed(2), category, input.paymentMethod, input.note ?? null, entryDate],
   );
   return { ok: true, entry: mapBoothIncome(rows[0]) };
 }
@@ -419,7 +430,7 @@ export async function listBoothIncomeByDate(
   date: string,
 ): Promise<BoothIncome[]> {
   const { rows } = await query<BoothIncomeRow>(
-    `SELECT id, booth_id, amount, payment_method, note, entry_date::text AS entry_date, created_at
+    `SELECT ${INCOME_RETURN}
      FROM booth_income_entries
      WHERE user_id = $1 AND booth_id = $2 AND entry_date = $3::date
      ORDER BY created_at DESC`,
@@ -445,7 +456,7 @@ export async function listBoothExpenseByDate(
 
 export async function listBoothIncome(userId: string, boothId: string): Promise<BoothIncome[]> {
   const { rows } = await query<BoothIncomeRow>(
-    `SELECT id, booth_id, amount, payment_method, note, entry_date::text AS entry_date, created_at
+    `SELECT ${INCOME_RETURN}
      FROM booth_income_entries
      WHERE user_id = $1 AND booth_id = $2
      ORDER BY entry_date DESC, created_at DESC`,

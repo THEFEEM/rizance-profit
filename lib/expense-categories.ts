@@ -47,9 +47,16 @@ export const INCOME_CATEGORIES: IncomeCategoryDef[] = [
   { key: "online", label: "ขายออนไลน์", icon: "🛒" },
   { key: "delivery", label: "เดลิเวอรี", icon: "🛵" },
   { key: "service", label: "บริการ", icon: "🧰" },
-  { key: "other_income", label: "รายได้อื่น", icon: "💡" },
   { key: "misc", label: "อื่นๆ", icon: "⋯" },
+  { key: "other_income", label: "รายได้อื่น", icon: "💡" },
 ];
+
+/** CategoryGrid options — labels/icons from INCOME_CATEGORIES only. */
+export const INCOME_CATEGORY_GRID_OPTIONS = INCOME_CATEGORIES.map((c) => ({
+  value: c.key,
+  label: c.label,
+  icon: c.icon,
+}));
 
 export const EXPENSE_CATEGORIES: ExpenseCategoryDef[] = [
   { key: "rent", label: "ค่าเช่า", icon: "🏢", type: "fixed" },

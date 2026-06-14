@@ -30,6 +30,12 @@ export const EXPENSE_CATEGORIES = [
   { key: "expense_misc", label: "อื่นๆ", type: "variable" },
 ];
 
+export const PAYMENT_METHODS = ["cash", "transfer"];
+export const PAYMENT_METHOD_LABELS = {
+  cash: "เงินสด",
+  transfer: "เงินโอน",
+};
+
 export const INCOME_CATEGORIES = [
   { key: "storefront", label: "ขายหน้าร้าน" },
   { key: "online", label: "ขายออนไลน์" },

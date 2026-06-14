@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatMoney } from "@/lib/money";
 import { formatDayShort } from "@/lib/date";
+import { incomeCategoryLabel } from "@/lib/expense-categories";
 import { DeleteConfirm } from "@/components/DeleteConfirm";
 import { ExpenseArrowIcon, IncomeArrowIcon } from "@/components/today/today-icons";
 import {
@@ -51,8 +52,8 @@ export function BoothEntryList({
   function title(row: Row): string {
     if (row.kind === "income") {
       const e = row.entry;
-      const method = PAYMENT_METHOD_LABELS[e.paymentMethod];
-      return e.note ? `${method} · ${e.note}` : method;
+      const cat = incomeCategoryLabel(e.category);
+      return e.note ? `${cat} · ${e.note}` : cat;
     }
     const e = row.entry;
     const type = BOOTH_COST_TYPE_LABELS[e.costType];

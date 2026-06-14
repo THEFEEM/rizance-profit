@@ -1,9 +1,14 @@
 import { z } from "zod";
 import { isValidDate } from "@/lib/date";
 import {
+  INCOME_CATEGORY_KEYS,
+  LEGACY_INCOME_FORM_KEYS,
+  normalizeIncomeCategory,
+  PAYMENT_METHODS,
+} from "@/lib/expense-categories";
+import {
   BOOTH_COST_TYPES,
   MEMBER_ROLES,
-  PAYMENT_METHODS,
   PROFIT_SPLIT_METHODS,
   WAGE_TYPES,
 } from "@/types/booth";
@@ -28,8 +33,14 @@ const note = z.preprocess(
 
 const uuid = z.string().uuid();
 
+const boothIncomeCategory = z
+  .union([z.enum(INCOME_CATEGORY_KEYS), z.enum(LEGACY_INCOME_FORM_KEYS)])
+  .optional()
+  .transform((v) => normalizeIncomeCategory(v));
+
 export const boothIncomeSchema = z.object({
   amount: amountPositive,
+  category: boothIncomeCategory,
   paymentMethod: z.enum(PAYMENT_METHODS),
   note,
   entryDate: boothDate.optional(),

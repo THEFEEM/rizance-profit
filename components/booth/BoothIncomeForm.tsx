@@ -10,14 +10,17 @@ import { BoothBack } from "@/components/booth/BoothBack";
 import { BoothClosedBanner } from "@/components/booth/BoothClosedBanner";
 import { EntryContextBanner } from "@/components/EntryContextBanner";
 import { BoothEntryList } from "@/components/booth/BoothEntryList";
+import { CategoryGrid } from "@/components/CategoryGrid";
 import { apiFetch } from "@/lib/api-client";
 import { clampDateToRange } from "@/lib/date";
 import {
+  INCOME_CATEGORY_GRID_OPTIONS,
   PAYMENT_METHOD_LABELS,
   PAYMENT_METHODS,
-  type BoothIncome,
+  type IncomeCategoryKey,
   type PaymentMethod,
-} from "@/types/booth";
+} from "@/types";
+import { type BoothIncome } from "@/types/booth";
 
 export function BoothIncomeForm({
   boothId,
@@ -40,6 +43,7 @@ export function BoothIncomeForm({
 }) {
   const router = useRouter();
   const [raw, setRaw] = useState("");
+  const [category, setCategory] = useState<IncomeCategoryKey>("storefront");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(defaultDate);
@@ -56,6 +60,7 @@ export function BoothIncomeForm({
       method: "POST",
       body: JSON.stringify({
         amount: Number(raw),
+        category,
         paymentMethod,
         note: note.trim() || undefined,
         entryDate: date,
@@ -89,6 +94,17 @@ export function BoothIncomeForm({
       <AmountInput value={formatTyped(raw)} tone="income" />
 
       <div className="flex flex-col gap-3 px-4">
+        <div>
+          <p className="mb-1.5 text-xs text-rz-muted">ประเภทรายรับ</p>
+          <CategoryGrid
+            options={INCOME_CATEGORY_GRID_OPTIONS}
+            value={category}
+            onChange={setCategory}
+            columns={3}
+            accent="amber"
+          />
+        </div>
+
         <div>
           <p className="mb-1.5 text-xs text-rz-muted">ช่องทางรับเงิน</p>
           <div className="flex flex-wrap gap-2">
