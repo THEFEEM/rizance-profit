@@ -1,5 +1,13 @@
 import { z } from "zod";
-import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@/types";
+import {
+  EXPENSE_CATEGORY_KEYS,
+  INCOME_CATEGORY_KEYS,
+  LEGACY_EXPENSE_FORM_KEYS,
+  LEGACY_INCOME_FORM_KEYS,
+  PAYMENT_METHODS,
+  normalizeExpenseCategory,
+  normalizeIncomeCategory,
+} from "@/lib/expense-categories";
 import { isValidDate } from "@/lib/date";
 
 const email = z.preprocess(
@@ -42,16 +50,30 @@ const entryDate = z
   .refine(isValidDate, "Date must be a valid YYYY-MM-DD")
   .optional();
 
+/** Accept canonical + legacy form keys; normalize to DB keys on parse. */
+const incomeCategory = z
+  .union([z.enum(INCOME_CATEGORY_KEYS), z.enum(LEGACY_INCOME_FORM_KEYS)])
+  .optional()
+  .transform((v) => normalizeIncomeCategory(v));
+
+const expenseCategory = z
+  .union([z.enum(EXPENSE_CATEGORY_KEYS), z.enum(LEGACY_EXPENSE_FORM_KEYS)])
+  .optional()
+  .transform((v) => normalizeExpenseCategory(v));
+
+const paymentMethod = z.enum(PAYMENT_METHODS).optional();
+
 export const incomeSchema = z.object({
   amount,
-  category: z.enum(INCOME_CATEGORIES).optional(),
+  category: incomeCategory,
+  paymentMethod,
   note,
   entryDate,
 });
 
 export const expenseSchema = z.object({
   amount,
-  category: z.enum(EXPENSE_CATEGORIES).optional(),
+  category: expenseCategory,
   note,
   entryDate,
 });

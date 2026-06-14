@@ -1,3 +1,40 @@
+// Re-export canonical category model (Round 1 migration).
+export type {
+  ExpenseCategoryKey,
+  ExpenseCostType,
+  IncomeCategoryKey,
+  LegacyExpenseFormKey,
+  LegacyIncomeFormKey,
+  PaymentMethod,
+} from "@/lib/expense-categories";
+
+export {
+  EXPENSE_CATEGORIES,
+  EXPENSE_CATEGORY_KEYS,
+  EXPENSE_CATEGORY_OPTIONS,
+  INCOME_CATEGORIES,
+  INCOME_CATEGORY_KEYS,
+  INCOME_CATEGORY_OPTIONS,
+  LEGACY_EXPENSE_FORM_KEYS,
+  LEGACY_INCOME_FORM_KEYS,
+  PAYMENT_METHOD_LABELS,
+  PAYMENT_METHODS,
+  expenseCategoryLabel,
+  getExpenseType,
+  incomeCategoryLabel,
+  isFixed,
+  isExpenseCategoryKey,
+  isIncomeCategoryKey,
+  normalizeExpenseCategory,
+  normalizeIncomeCategory,
+} from "@/lib/expense-categories";
+
+import type { ExpenseCategoryKey, IncomeCategoryKey } from "@/lib/expense-categories";
+
+/** Canonical keys stored in DB after Round 1 migration. */
+export type IncomeCategory = IncomeCategoryKey;
+export type ExpenseCategory = ExpenseCategoryKey;
+
 export type User = {
   id: string;
   email: string;
@@ -7,66 +44,15 @@ export type User = {
 };
 
 // Money fields are decimal STRINGS (e.g. "420.00") to preserve exact decimals.
-export const INCOME_CATEGORIES = ["storefront", "delivery", "other"] as const;
-export type IncomeCategory = (typeof INCOME_CATEGORIES)[number];
-
-export const INCOME_CATEGORY_LABELS: Record<IncomeCategory, string> = {
-  storefront: "ขายหน้าร้าน",
-  delivery: "เดลิเวอรี",
-  other: "อื่นๆ",
-};
-
-export const INCOME_CATEGORY_OPTIONS: {
-  value: IncomeCategory;
-  label: string;
-  icon: string;
-}[] = [
-  { value: "storefront", label: "ขายหน้าร้าน", icon: "🏪" },
-  { value: "delivery", label: "เดลิเวอรี", icon: "🛵" },
-  { value: "other", label: "อื่นๆ", icon: "⋯" },
-];
-
 export type Income = {
   id: string;
   amount: string;
   category: IncomeCategory;
+  paymentMethod?: string;
   note: string | null;
   entryDate: string; // YYYY-MM-DD
   createdAt: string;
 };
-
-export const EXPENSE_CATEGORIES = [
-  "supplies",
-  "rent",
-  "salary",
-  "utilities",
-  "equipment",
-  "other",
-] as const;
-
-export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
-
-export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
-  supplies: "วัตถุดิบ",
-  rent: "ค่าเช่า",
-  salary: "ค่าแรง",
-  utilities: "สาธารณูปโภค",
-  equipment: "อุปกรณ์",
-  other: "อื่นๆ",
-};
-
-export const EXPENSE_CATEGORY_OPTIONS: {
-  value: ExpenseCategory;
-  label: string;
-  icon: string;
-}[] = [
-  { value: "supplies", label: "วัตถุดิบ", icon: "📦" },
-  { value: "rent", label: "ค่าเช่า", icon: "🏢" },
-  { value: "salary", label: "ค่าแรง", icon: "👥" },
-  { value: "utilities", label: "สาธารณูปโภค", icon: "⚡" },
-  { value: "equipment", label: "อุปกรณ์", icon: "🔧" },
-  { value: "other", label: "อื่นๆ", icon: "⋯" },
-];
 
 export type Expense = {
   id: string;
