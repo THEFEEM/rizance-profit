@@ -69,6 +69,20 @@ export const EXPENSE_CATEGORIES: ExpenseCategoryDef[] = [
   { key: "expense_misc", label: "อื่นๆ", icon: "⋯", type: "variable" },
 ];
 
+/** Display-only fixed/variable badge text under expense category chips. */
+export const EXPENSE_COST_TYPE_LABELS: Record<ExpenseCostType, string> = {
+  fixed: "คงที่",
+  variable: "ผันแปร",
+};
+
+/** CategoryGrid options — labels/icons/badges from EXPENSE_CATEGORIES only. */
+export const EXPENSE_CATEGORY_GRID_OPTIONS = EXPENSE_CATEGORIES.map((c) => ({
+  value: c.key,
+  label: c.label,
+  icon: c.icon,
+  badge: EXPENSE_COST_TYPE_LABELS[c.type],
+}));
+
 /** Round 1 forms still expose legacy picker values until Round 3 UI. */
 export const LEGACY_INCOME_FORM_KEYS = ["storefront", "delivery", "other"] as const;
 export type LegacyIncomeFormKey = (typeof LEGACY_INCOME_FORM_KEYS)[number];
@@ -161,6 +175,11 @@ export function expenseCategoryLabel(key: string): string {
 export function getExpenseType(categoryKey: string): ExpenseCostType | null {
   if (!isExpenseCategoryKey(categoryKey)) return null;
   return EXPENSE_TYPE_BY_KEY[categoryKey];
+}
+
+export function expenseCostTypeLabel(categoryKey: string): string | null {
+  const type = getExpenseType(categoryKey);
+  return type ? EXPENSE_COST_TYPE_LABELS[type] : null;
 }
 
 export function isFixed(categoryKey: string): boolean {

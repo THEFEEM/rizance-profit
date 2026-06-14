@@ -1,8 +1,13 @@
 import { z } from "zod";
 import { isValidDate } from "@/lib/date";
 import {
+  boothCategoryFromCostType,
+  EXPENSE_CATEGORY_KEYS,
   INCOME_CATEGORY_KEYS,
+  isFixed,
+  LEGACY_EXPENSE_FORM_KEYS,
   LEGACY_INCOME_FORM_KEYS,
+  normalizeExpenseCategory,
   normalizeIncomeCategory,
   PAYMENT_METHODS,
 } from "@/lib/expense-categories";
@@ -51,10 +56,15 @@ const externalPayerName = z.preprocess(
   z.string().max(120).optional(),
 );
 
+const boothExpenseCategory = z
+  .union([z.enum(EXPENSE_CATEGORY_KEYS), z.enum(LEGACY_EXPENSE_FORM_KEYS)])
+  .optional();
+
 export const boothExpenseSchema = z
   .object({
     amount: amountPositive,
-    costType: z.enum(BOOTH_COST_TYPES),
+    category: boothExpenseCategory,
+    costType: z.enum(BOOTH_COST_TYPES).optional(),
     label: z.preprocess(
       (v) => (typeof v === "string" && v.trim() !== "" ? v.trim() : undefined),
       z.string().max(120).optional(),
@@ -82,6 +92,14 @@ export const boothExpenseSchema = z
         path: ["payerMemberId"],
       });
     }
+  })
+  .transform((d) => {
+    const category =
+      d.category !== undefined
+        ? normalizeExpenseCategory(d.category)
+        : boothCategoryFromCostType(d.costType ?? "variable", d.label);
+    const costType = isFixed(category) ? ("fixed" as const) : ("variable" as const);
+    return { ...d, category, costType };
   });
 
 export const boothSchema = z

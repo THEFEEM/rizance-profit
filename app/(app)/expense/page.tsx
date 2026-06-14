@@ -10,12 +10,16 @@ import { apiFetch } from "@/lib/api-client";
 import { today } from "@/lib/date";
 import { CategoryGrid } from "@/components/CategoryGrid";
 import { EntryContextBanner } from "@/components/EntryContextBanner";
-import { EXPENSE_CATEGORY_OPTIONS, type Expense, type LegacyExpenseFormKey } from "@/types";
+import {
+  EXPENSE_CATEGORY_GRID_OPTIONS,
+  type Expense,
+  type ExpenseCategoryKey,
+} from "@/types";
 
 export default function AddExpensePage() {
   const router = useRouter();
   const [raw, setRaw] = useState("");
-  const [category, setCategory] = useState<LegacyExpenseFormKey>("supplies");
+  const [category, setCategory] = useState<ExpenseCategoryKey>("materials");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(today());
   const [saving, setSaving] = useState(false);
@@ -54,10 +58,10 @@ export default function AddExpensePage() {
         <div>
           <p className="mb-1.5 text-xs text-rz-muted">ประเภทรายจ่าย</p>
           <CategoryGrid
-            options={EXPENSE_CATEGORY_OPTIONS}
+            options={EXPENSE_CATEGORY_GRID_OPTIONS}
             value={category}
             onChange={setCategory}
-            columns={3}
+            columns={2}
             accent="green"
           />
         </div>

@@ -11,15 +11,14 @@ import { BoothRemainingBar } from "@/components/booth/BoothSetup";
 import { BoothClosedBanner } from "@/components/booth/BoothClosedBanner";
 import { EntryContextBanner } from "@/components/EntryContextBanner";
 import { BoothEntryList } from "@/components/booth/BoothEntryList";
+import { CategoryGrid } from "@/components/CategoryGrid";
 import { apiFetch } from "@/lib/api-client";
 import { clampDateToRange } from "@/lib/date";
 import {
-  BOOTH_COST_TYPE_LABELS,
-  BOOTH_COST_TYPES,
-  type BoothCostType,
-  type BoothExpense,
-  type BoothMember,
-} from "@/types/booth";
+  EXPENSE_CATEGORY_GRID_OPTIONS,
+  type ExpenseCategoryKey,
+} from "@/types";
+import { type BoothExpense, type BoothMember } from "@/types/booth";
 
 type PayerKind = "member" | "external";
 
@@ -50,7 +49,7 @@ export function BoothExpenseForm({
 }) {
   const router = useRouter();
   const [raw, setRaw] = useState("");
-  const [costType, setCostType] = useState<BoothCostType>("variable");
+  const [category, setCategory] = useState<ExpenseCategoryKey>("materials");
   const [label, setLabel] = useState("");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(defaultDate);
@@ -71,7 +70,7 @@ export function BoothExpenseForm({
       method: "POST",
       body: JSON.stringify({
         amount: Number(raw),
-        costType,
+        category,
         label: label.trim() || undefined,
         note: note.trim() || undefined,
         entryDate: date,
@@ -128,21 +127,14 @@ export function BoothExpenseForm({
 
       <div className="flex flex-col gap-3 px-4">
         <div>
-          <p className="mb-1.5 text-xs text-rz-muted">ประเภทต้นทุน</p>
-          <div className="flex flex-col gap-2">
-            {BOOTH_COST_TYPES.map((t) => (
-              <EntryOptionButton
-                key={t}
-                selected={costType === t}
-                disabled={closed}
-                onClick={() => setCostType(t)}
-                accent="amber"
-                layout="row"
-              >
-                {BOOTH_COST_TYPE_LABELS[t]}
-              </EntryOptionButton>
-            ))}
-          </div>
+          <p className="mb-1.5 text-xs text-rz-muted">ประเภทรายจ่าย</p>
+          <CategoryGrid
+            options={EXPENSE_CATEGORY_GRID_OPTIONS}
+            value={category}
+            onChange={setCategory}
+            columns={2}
+            accent="amber"
+          />
         </div>
 
         <label className="flex items-center gap-3 rounded-[11px] border-[0.5px] border-rz-border bg-rz-card px-4 py-3">

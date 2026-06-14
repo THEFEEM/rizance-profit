@@ -6,7 +6,13 @@ import { dirname, join } from "node:path";
 import { SignJWT } from "jose";
 import pg from "pg";
 import { pgClientOptions } from "./pg-config.mjs";
-import { INCOME_CATEGORIES, PAYMENT_METHOD_LABELS, PAYMENT_METHODS } from "./expense-categories-core.mjs";
+import {
+  EXPENSE_CATEGORIES,
+  EXPENSE_COST_TYPE_LABELS,
+  INCOME_CATEGORIES,
+  PAYMENT_METHOD_LABELS,
+  PAYMENT_METHODS,
+} from "./expense-categories-core.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -149,11 +155,32 @@ try {
   assertEq("booth category", res.body?.data?.category ?? "missing", "service");
   console.log("");
 
-  console.log("5) Expense form still shows legacy CategoryGrid (GROUP 2 pending)");
+  console.log("5) Shop expense form — 8 category chips + fixed/variable badges");
   const expPage = await fetch(`${base}/expense`, { headers: { Cookie: cookie } });
   const expHtml = await expPage.text();
   assertEq("expense page status", String(expPage.status), "200");
-  assertEq("has วัตถุดิบ", expHtml.includes("วัตถุดิบ") ? "yes" : "no", "yes");
+  for (const c of EXPENSE_CATEGORIES) {
+    assertEq(`has ${c.label}`, expHtml.includes(c.label) ? "yes" : "no", "yes");
+    assertEq(
+      `has ${EXPENSE_COST_TYPE_LABELS[c.type]} for ${c.key}`,
+      expHtml.includes(EXPENSE_COST_TYPE_LABELS[c.type]) ? "yes" : "no",
+      "yes",
+    );
+  }
+  console.log("");
+
+  console.log("6) Booth expense API accepts category");
+  res = await apiJson(base, `/api/booths/${boothId}/expense`, {
+    method: "POST",
+    body: JSON.stringify({
+      amount: 150,
+      category: "rent",
+      entryDate: "2026-06-10",
+    }),
+  });
+  assertEq("booth expense status", String(res.status), "201");
+  assertEq("booth expense category", res.body?.data?.category ?? "missing", "rent");
+  assertEq("booth expense costType derived", res.body?.data?.costType ?? "missing", "fixed");
   console.log("");
 
   if (failed === 0) console.log("All assertions passed.");

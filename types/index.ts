@@ -10,8 +10,10 @@ export type {
 
 export {
   EXPENSE_CATEGORIES,
+  EXPENSE_CATEGORY_GRID_OPTIONS,
   EXPENSE_CATEGORY_KEYS,
   EXPENSE_CATEGORY_OPTIONS,
+  EXPENSE_COST_TYPE_LABELS,
   INCOME_CATEGORIES,
   INCOME_CATEGORY_GRID_OPTIONS,
   INCOME_CATEGORY_KEYS,
@@ -21,6 +23,7 @@ export {
   PAYMENT_METHOD_LABELS,
   PAYMENT_METHODS,
   expenseCategoryLabel,
+  expenseCostTypeLabel,
   getExpenseType,
   incomeCategoryLabel,
   isFixed,

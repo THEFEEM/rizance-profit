@@ -20,15 +20,20 @@ export const INCOME_CATEGORY_KEYS = [
 ];
 
 export const EXPENSE_CATEGORIES = [
-  { key: "rent", label: "ค่าเช่า", type: "fixed" },
-  { key: "wage", label: "ค่าแรง", type: "fixed" },
-  { key: "equipment", label: "อุปกรณ์", type: "fixed" },
-  { key: "materials", label: "วัตถุดิบ", type: "variable" },
-  { key: "utilities", label: "สาธารณูปโภค", type: "variable" },
-  { key: "shipping", label: "ขนส่ง", type: "variable" },
-  { key: "marketing", label: "การตลาด", type: "variable" },
-  { key: "expense_misc", label: "อื่นๆ", type: "variable" },
+  { key: "rent", label: "ค่าเช่า", icon: "🏢", type: "fixed" },
+  { key: "wage", label: "ค่าแรง", icon: "👥", type: "fixed" },
+  { key: "equipment", label: "อุปกรณ์", icon: "🔧", type: "fixed" },
+  { key: "materials", label: "วัตถุดิบ", icon: "📦", type: "variable" },
+  { key: "utilities", label: "สาธารณูปโภค", icon: "⚡", type: "variable" },
+  { key: "shipping", label: "ขนส่ง", icon: "🚚", type: "variable" },
+  { key: "marketing", label: "การตลาด", icon: "📣", type: "variable" },
+  { key: "expense_misc", label: "อื่นๆ", icon: "⋯", type: "variable" },
 ];
+
+export const EXPENSE_COST_TYPE_LABELS = {
+  fixed: "คงที่",
+  variable: "ผันแปร",
+};
 
 export const PAYMENT_METHODS = ["cash", "transfer"];
 export const PAYMENT_METHOD_LABELS = {

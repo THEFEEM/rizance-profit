@@ -4,6 +4,8 @@ import { query } from "@/lib/db";
 import {
   boothCategoryFromCostType,
   isFixed,
+  normalizeExpenseCategory,
+  type ExpenseCategoryKey,
   type IncomeCategoryKey,
 } from "@/lib/expense-categories";
 import {
@@ -481,7 +483,9 @@ export async function deleteBoothIncome(
 
 export type BoothExpenseInput = {
   amount: number;
-  costType: BoothCostType;
+  category?: ExpenseCategoryKey;
+  /** @deprecated Legacy API — derived from category when omitted. */
+  costType?: BoothCostType;
   label?: string;
   note?: string;
   entryDate?: string;
@@ -522,7 +526,11 @@ export async function createBoothExpense(
     note = note ? `${note} · ${ADVANCE_NOTE}` : ADVANCE_NOTE;
   }
 
-  const category = boothCategoryFromCostType(input.costType, input.label);
+  const category =
+    input.category !== undefined
+      ? normalizeExpenseCategory(input.category)
+      : boothCategoryFromCostType(input.costType ?? "variable", input.label);
+  const costType: BoothCostType = isFixed(category) ? "fixed" : "variable";
 
   const { rows } = await query<BoothExpenseRow>(
     `INSERT INTO booth_expense_entries
@@ -533,7 +541,7 @@ export async function createBoothExpense(
       boothId,
       userId,
       input.amount.toFixed(2),
-      input.costType,
+      costType,
       category,
       input.label ?? null,
       note,
