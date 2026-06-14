@@ -46,35 +46,41 @@ export function BreakEvenRowCard({
   needsSetup: boolean;
 }) {
   const be = row;
+  const contribNegative = Number(be.contributionPerCup) < 0;
 
   return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm">
-      <p className="font-semibold text-slate-900">{be.menuName}</p>
-      <p className="mt-0.5 text-xs text-slate-400">{PRICING_LABELS.breakEvenSingleMenu}</p>
+    <div className="rounded-[14px] border-[0.5px] border-rz-border bg-rz-card p-4">
+      <p className="font-medium text-rz-text">{be.menuName}</p>
+      <p className="mt-0.5 text-xs text-rz-hint">{PRICING_LABELS.breakEvenSingleMenu}</p>
 
-      <div className="mt-3 space-y-1 text-sm text-slate-600">
+      <div className="mt-3 space-y-2 text-sm text-rz-muted">
         <p>
           {PRICING_LABELS.contributionPerCup}:{" "}
-          <span className="font-semibold tabular-nums text-emerald-700">
+          <span
+            className={`rz-tabular font-medium ${contribNegative ? "text-rz-red" : "text-rz-green"}`}
+          >
             {formatMoney(be.contributionPerCup)}
           </span>
         </p>
 
         {be.noBreakEven ? (
-          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+          <p
+            className="rounded-[11px] border-[0.5px] border-rz-red/30 bg-rz-red/10 px-3 py-2 text-xs font-medium text-rz-red"
+            role="status"
+          >
             {be.warning}
           </p>
         ) : needsSetup ? (
-          <p className="text-sm text-slate-500">
+          <p>
             {PRICING_LABELS.needsFixedCosts}{" "}
-            <Link href="/pricing/overheads" className="font-medium text-emerald-700">
+            <Link href="/pricing/overheads" className="font-medium text-rz-green">
               เพิ่มต้นทุนคงที่ →
             </Link>
           </p>
         ) : be.breakEvenCups !== null ? (
           <p>
             {PRICING_LABELS.breakEvenCups}:{" "}
-            <span className="text-base font-extrabold tabular-nums text-slate-900">
+            <span className="rz-tabular text-base font-medium text-rz-green">
               {be.breakEvenCups.toLocaleString()}
             </span>{" "}
             แก้ว/เดือน

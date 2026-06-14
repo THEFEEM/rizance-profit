@@ -3,73 +3,85 @@ import { BreakEvenRowCard } from "@/components/pricing/BreakEvenDisplay";
 import { formatMoney } from "@/lib/money";
 import { PRICING_LABELS, type PricingSummary } from "@/types/pricing";
 
+function profitTone(amount: string): string {
+  return Number(amount) < 0 ? "text-rz-red" : "text-rz-green";
+}
+
 export function PricingSummaryTable({ summary }: { summary: PricingSummary }) {
   const { settings, monthlyOverheadTotal, overheadPerCup, breakEvenNeedsSetup, rows } = summary;
 
   return (
     <div className="px-4 pb-8">
-      <div className="mb-4 rounded-2xl bg-white p-4 text-sm text-slate-600 shadow-sm">
+      <div className="mb-4 rounded-[14px] border-[0.5px] border-rz-border bg-rz-card p-4 text-sm text-rz-muted">
         <p>
           ค่าใช้จ่ายร้านรวม/เดือน:{" "}
-          <span className="font-semibold">{formatMoney(monthlyOverheadTotal)}</span>
+          <span className="rz-tabular font-medium text-rz-text">
+            {formatMoney(monthlyOverheadTotal)}
+          </span>
         </p>
-        <p>
+        <p className="mt-1">
           แก้ว/เดือน (ประมาณ):{" "}
-          <span className="font-semibold">{settings.estimatedCupsPerMonth.toLocaleString()}</span>
+          <span className="rz-tabular font-medium text-rz-text">
+            {settings.estimatedCupsPerMonth.toLocaleString()}
+          </span>
           {settings.estimatedCupsPerMonth === 0 && (
-            <Link href="/pricing/overheads" className="ml-2 text-emerald-700">
+            <Link href="/pricing/overheads" className="ml-2 font-medium text-rz-green">
               ตั้งค่า →
             </Link>
           )}
         </p>
-        <p>
+        <p className="mt-1">
           {PRICING_LABELS.overheadPerCup}:{" "}
-          <span className="font-semibold">
+          <span className="rz-tabular font-medium text-rz-text">
             {overheadPerCup ? formatMoney(overheadPerCup) : "—"}
           </span>
         </p>
       </div>
 
       {rows.length === 0 ? (
-        <p className="py-8 text-center text-sm text-slate-400">
+        <p className="py-8 text-center text-sm text-rz-hint">
           ยังไม่มีเมนู —{" "}
-          <Link href="/pricing/recipes" className="text-emerald-700">
+          <Link href="/pricing/recipes" className="font-medium text-rz-green">
             เพิ่มสูตรเครื่องดื่ม
           </Link>
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-2xl bg-white shadow-sm">
+        <div className="overflow-x-auto rounded-[14px] border-[0.5px] border-rz-border bg-rz-card">
           <table className="w-full min-w-[640px] text-left text-xs sm:text-sm">
             <thead>
-              <tr className="border-b border-slate-100 bg-slate-50 text-slate-500">
-                <th className="px-3 py-3">{PRICING_LABELS.menu}</th>
-                <th className="px-2 py-3">{PRICING_LABELS.ingredientCost}</th>
-                <th className="px-2 py-3">{PRICING_LABELS.overheadPerCup}</th>
-                <th className="px-2 py-3">{PRICING_LABELS.totalCost}</th>
-                <th className="px-2 py-3">{PRICING_LABELS.desiredProfit}</th>
-                <th className="px-2 py-3 font-bold text-slate-800">{PRICING_LABELS.sellingPrice}</th>
+              <tr className="border-b-[0.5px] border-rz-border text-rz-hint">
+                <th className="px-3 py-3 font-medium">{PRICING_LABELS.menu}</th>
+                <th className="px-2 py-3 font-medium">{PRICING_LABELS.ingredientCost}</th>
+                <th className="px-2 py-3 font-medium">{PRICING_LABELS.overheadPerCup}</th>
+                <th className="px-2 py-3 font-medium">{PRICING_LABELS.totalCost}</th>
+                <th className="px-2 py-3 font-medium">{PRICING_LABELS.desiredProfit}</th>
+                <th className="px-2 py-3 font-medium text-rz-text">{PRICING_LABELS.sellingPrice}</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.menuItemId} className="border-b border-slate-50">
-                  <td className="px-3 py-3 font-medium text-slate-900">{r.menuName}</td>
-                  <td className="px-2 py-3 tabular-nums">{formatMoney(r.ingredientCostPerCup)}</td>
-                  <td className="px-2 py-3 tabular-nums">
+                <tr key={r.menuItemId} className="border-b-[0.5px] border-rz-border last:border-b-0">
+                  <td className="px-3 py-3 font-medium text-rz-text">{r.menuName}</td>
+                  <td className="rz-tabular px-2 py-3 text-rz-muted">
+                    {formatMoney(r.ingredientCostPerCup)}
+                  </td>
+                  <td className="rz-tabular px-2 py-3 text-rz-muted">
                     {r.overheadPerCup ? formatMoney(r.overheadPerCup) : "—"}
                   </td>
-                  <td className="px-2 py-3 tabular-nums">{formatMoney(r.totalCostPerCup)}</td>
-                  <td className="px-2 py-3 tabular-nums text-emerald-700">
+                  <td className="rz-tabular px-2 py-3 text-rz-muted">
+                    {formatMoney(r.totalCostPerCup)}
+                  </td>
+                  <td className={`rz-tabular px-2 py-3 font-medium ${profitTone(r.profitPerCup)}`}>
                     {formatMoney(r.profitPerCup)}
                   </td>
-                  <td className="px-2 py-3 text-base font-extrabold tabular-nums text-emerald-700">
+                  <td className="rz-tabular px-2 py-3 text-base font-medium text-rz-green">
                     {r.sellingPriceDisplay}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className="px-3 py-2 text-xs text-slate-400">
+          <p className="border-t-[0.5px] border-rz-border px-3 py-2 text-xs text-rz-hint">
             ราคาขายปัดเป็นจำนวนเต็มบาท (แสดงผลเท่านั้น) · คำนวณภายในใช้ทศนิยม 2 ตำแหน่ง
           </p>
         </div>
@@ -77,7 +89,7 @@ export function PricingSummaryTable({ summary }: { summary: PricingSummary }) {
 
       {rows.length > 0 && (
         <section className="mt-6">
-          <h2 className="mb-3 text-base font-bold text-slate-900">{PRICING_LABELS.breakEven}</h2>
+          <h2 className="mb-3 text-base font-medium text-rz-text">{PRICING_LABELS.breakEven}</h2>
           <div className="grid gap-3">
             {rows.map((r) => (
               <BreakEvenRowCard

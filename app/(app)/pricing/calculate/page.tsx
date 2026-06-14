@@ -15,7 +15,7 @@ export default async function PricingCalculatePage() {
   return (
     <div>
       <PricingBack />
-      <h1 className="px-4 text-lg font-bold text-slate-900">{PRICING_LABELS.calculate}</h1>
+      <h1 className="px-4 pt-1 text-lg font-medium text-rz-text">{PRICING_LABELS.calculate}</h1>
       <PricingSummaryTable summary={summary} />
     </div>
   );
