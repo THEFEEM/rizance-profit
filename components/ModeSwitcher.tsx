@@ -101,6 +101,9 @@ export function ModeSwitcher({
     setPickerOpen(true);
   }
 
+  const openBooths = booths?.filter((b) => b.status === "open") ?? [];
+  const closedCount = booths?.filter((b) => b.status === "closed").length ?? 0;
+
   return (
     <>
       <div className="px-4 pt-1">
@@ -163,69 +166,84 @@ export function ModeSwitcher({
           onClick={() => !switching && setPickerOpen(false)}
         >
           <div
-            className="max-h-[80dvh] w-full max-w-sm overflow-y-auto rounded-2xl border-[0.5px] border-rz-border bg-rz-card p-4 shadow-xl"
+            className="flex max-h-[80dvh] w-full max-w-sm flex-col rounded-2xl border-[0.5px] border-rz-border bg-rz-card shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 id="booth-picker-title" className="text-lg font-medium text-rz-text">
-              เลือกงานบูธ
-            </h2>
-            <p className="mt-1 text-sm text-rz-muted">เลือกงานบูธที่เปิดอยู่</p>
+            <div className="shrink-0 p-4 pb-3">
+              <h2 id="booth-picker-title" className="text-lg font-medium text-rz-text">
+                เลือกงานบูธ
+              </h2>
+              <p className="mt-1 text-sm text-rz-muted">เลือกงานบูธที่เปิดอยู่</p>
 
-            {error && (
-              <p className="mt-3 text-sm text-rz-red" role="alert">
-                {error}
-              </p>
-            )}
-
-            <ul className="mt-4 divide-y divide-rz-border">
-              {loading && (
-                <li className="px-2 py-3 text-sm text-rz-hint">กำลังโหลดงานบูธ…</li>
+              {error && (
+                <p className="mt-3 text-sm text-rz-red" role="alert">
+                  {error}
+                </p>
               )}
 
-              {booths?.map((b) => {
-                const isActive = mode === "booth" && boothId === b.id;
-                const disabled = b.status !== "open" || switching;
-                return (
-                  <li key={b.id}>
-                    <button
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => selectContext({ mode: "booth", boothId: b.id })}
-                      className={`tap-target w-full px-2 py-3 text-left text-sm font-medium disabled:opacity-40 ${
-                        isActive ? "text-rz-amber" : "text-rz-text"
-                      }`}
-                    >
-                      {b.name}
-                      {b.status === "closed" && (
-                        <span className="ml-1 text-xs text-rz-hint">(ปิดแล้ว)</span>
-                      )}
-                      {isActive && " ✓"}
-                    </button>
+              <Link
+                href="/booth/new"
+                onClick={() => setPickerOpen(false)}
+                className="tap-target mt-4 flex min-h-11 w-full items-center justify-center rounded-[12px] border-[0.5px] border-[#5A3F12] bg-[#2E2310] text-sm font-medium text-rz-amber active:opacity-90"
+              >
+                ＋ สร้างงานบูธใหม่
+              </Link>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-4">
+              <ul className="divide-y divide-rz-border border-t-[0.5px] border-rz-border">
+                {loading && (
+                  <li className="px-2 py-3 text-sm text-rz-hint">กำลังโหลดงานบูธ…</li>
+                )}
+
+                {!loading &&
+                  openBooths.map((b) => {
+                      const isActive = mode === "booth" && boothId === b.id;
+                      return (
+                        <li key={b.id}>
+                          <button
+                            type="button"
+                            disabled={switching}
+                            onClick={() => selectContext({ mode: "booth", boothId: b.id })}
+                            className={`tap-target min-h-11 w-full px-2 py-3 text-left text-sm font-medium disabled:opacity-40 ${
+                              isActive ? "text-rz-amber" : "text-rz-text"
+                            }`}
+                          >
+                            {b.name}
+                            {isActive && " ✓"}
+                          </button>
+                        </li>
+                      );
+                    })}
+
+                {!loading && booths !== null && openBooths.length === 0 && (
+                  <li className="px-2 py-4 text-center text-sm text-rz-hint">
+                    ยังไม่มีงานบูธที่เปิดอยู่
                   </li>
-                );
-              })}
+                )}
+              </ul>
+            </div>
 
-              {!loading && booths?.every((b) => b.status !== "open") && (
-                <li className="px-2 py-3 text-sm text-rz-hint">ยังไม่มีงานบูธที่เปิดอยู่</li>
+            <div className="shrink-0 border-t-[0.5px] border-rz-border p-4 pt-3">
+              {!loading && booths !== null && closedCount > 0 && (
+                <Link
+                  href="/booth"
+                  onClick={() => setPickerOpen(false)}
+                  className="tap-target mb-3 flex min-h-11 w-full items-center px-1 text-sm text-rz-hint active:text-rz-muted"
+                >
+                  ดูบูธที่ปิดแล้ว ({closedCount}) →
+                </Link>
               )}
-            </ul>
 
-            <Link
-              href="/booth/new"
-              onClick={() => setPickerOpen(false)}
-              className="tap-target mt-4 flex w-full items-center justify-center rounded-2xl border border-dashed border-rz-border py-3 text-sm font-medium text-rz-muted active:bg-rz-elevated"
-            >
-              + สร้างงานบูธ
-            </Link>
-
-            <button
-              type="button"
-              onClick={() => setPickerOpen(false)}
-              disabled={switching}
-              className="tap-target mt-3 w-full py-2 text-sm font-medium text-rz-hint"
-            >
-              ปิด
-            </button>
+              <button
+                type="button"
+                onClick={() => setPickerOpen(false)}
+                disabled={switching}
+                className="tap-target min-h-11 w-full py-2 text-sm font-medium text-rz-hint"
+              >
+                ปิด
+              </button>
+            </div>
           </div>
         </div>
       )}
