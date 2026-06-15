@@ -6,6 +6,10 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import pg from "pg";
 import { pgClientOptions } from "./pg-config.mjs";
+import {
+  buildProjectSummary,
+  loadProjectBundle,
+} from "./project-summary-core.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -163,6 +167,23 @@ try {
   );
   assert("other user sees 0 projects", scoped[0].n === "0");
   await client.query(`DELETE FROM users WHERE id = $1`, [otherId]);
+  console.log("");
+
+  console.log("4) Summary integration — insert then summarize");
+  const bundleShort = await loadProjectBundle(client, userId, shortProjectId);
+  if (!bundleShort) {
+    assert("loadProjectBundle returns data", false);
+  } else {
+    const shortSummary = buildProjectSummary(
+      bundleShort.project,
+      bundleShort.activities,
+      bundleShort.incomes,
+      bundleShort.expenses,
+    );
+    assert("summarize totalFunding", shortSummary.totalFunding === "10000.00");
+    assert("summarize totalSpent", shortSummary.totalSpent === "2500.00");
+    assert("summarize remaining", shortSummary.remaining === "7500.00");
+  }
   console.log("");
 
   if (failed) {

@@ -30,7 +30,8 @@
     "test:stats-context": "node scripts/test-stats-context.mjs",
     "test:combined-summary": "node scripts/test-combined-summary.mjs",
     "test:project-categories": "node scripts/test-project-categories.mjs",
-    "test:project-queries": "node scripts/test-project-queries.mjs"
+    "test:project-queries": "node scripts/test-project-queries.mjs",
+    "test:project-summary": "node scripts/test-project-summary.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

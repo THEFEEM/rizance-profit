@@ -75,3 +75,60 @@ export type ProjectMember = {
   note: string | null;
   createdAt: string;
 };
+
+/** Derived activity totals — never stored. */
+export type ActivitySummary = {
+  activityId: string;
+  name: string;
+  budgetTarget: string;
+  totalFunding: string;
+  totalSpent: string;
+  remaining: string;
+  budgetRemaining: string;
+  budgetUsedPct: number;
+  isOverBudget: boolean;
+  incomeBySource: Record<string, string>;
+  expenseByCategory: Record<string, string>;
+  incomeCount: number;
+  expenseCount: number;
+  status: ProjectStatus;
+  startDate: string | null;
+  endDate: string | null;
+};
+
+/** Derived project rollup — never stored. */
+export type ProjectSummary = {
+  projectId: string;
+  name: string;
+  projectType: ProjectType;
+  orgName: string | null;
+  status: ProjectStatus;
+  startDate: string | null;
+  endDate: string | null;
+  totalBudgetTarget: string;
+  totalFunding: string;
+  totalSpent: string;
+  remaining: string;
+  budgetRemaining: string;
+  isOverBudget: boolean;
+  budgetUsedPct: number;
+  incomeBySource: Record<string, string>;
+  expenseByCategory: Record<string, string>;
+  activities: ActivitySummary[];
+  activityCount: number;
+  closedActivityCount: number;
+};
+
+/** Compact list row for GET /api/projects. */
+export type ProjectListItem = {
+  id: string;
+  name: string;
+  projectType: ProjectType;
+  orgName: string | null;
+  status: ProjectStatus;
+  startDate: string | null;
+  endDate: string | null;
+  totalFunding: string;
+  totalSpent: string;
+  remaining: string;
+};
