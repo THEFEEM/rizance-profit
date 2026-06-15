@@ -1,7 +1,7 @@
 import Image from "next/image";
 
 /** Centered brand mark + title. Swap logo by changing LOGO_SRC only. */
-const LOGO_SRC = "/Log-rizance.png";
+const LOGO_SRC = "/Logo.png";
 
 export function AuthBrand() {
   return (
