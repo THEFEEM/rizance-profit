@@ -13,6 +13,7 @@ import type {
   ProjectExpense,
   ProjectIncome,
   ProjectMember,
+  PaymentStatus,
   ProjectStatus,
   ProjectType,
 } from "@/types/project";
@@ -26,6 +27,8 @@ type ProjectRow = {
   name: string;
   project_type: string;
   org_name: string | null;
+  project_code: string | null;
+  objective: string | null;
   budget_target: string;
   start_date: string | null;
   end_date: string | null;
@@ -40,6 +43,8 @@ function mapProject(r: ProjectRow): Project {
     name: r.name,
     projectType: r.project_type as ProjectType,
     orgName: r.org_name,
+    projectCode: r.project_code,
+    objective: r.objective,
     budgetTarget: r.budget_target,
     startDate: r.start_date,
     endDate: r.end_date,
@@ -49,7 +54,7 @@ function mapProject(r: ProjectRow): Project {
   };
 }
 
-const PROJECT_RETURN = `id, name, project_type, org_name, budget_target,
+const PROJECT_RETURN = `id, name, project_type, org_name, project_code, objective, budget_target,
   start_date::text AS start_date, end_date::text AS end_date,
   status, note, created_at`;
 
@@ -94,6 +99,7 @@ type IncomeRow = {
   entry_date: string;
   note: string | null;
   receipt_url: string | null;
+  payment_status: string;
   created_at: Date | string;
 };
 
@@ -107,12 +113,13 @@ function mapIncome(r: IncomeRow): ProjectIncome {
     entryDate: r.entry_date,
     note: r.note,
     receiptUrl: r.receipt_url,
+    paymentStatus: r.payment_status as PaymentStatus,
     createdAt: toIso(r.created_at),
   };
 }
 
 const INCOME_RETURN = `id, activity_id, amount, source, label,
-  entry_date::text AS entry_date, note, receipt_url, created_at`;
+  entry_date::text AS entry_date, note, receipt_url, payment_status, created_at`;
 
 type ExpenseRow = {
   id: string;
@@ -124,6 +131,7 @@ type ExpenseRow = {
   entry_date: string;
   note: string | null;
   receipt_url: string | null;
+  payment_status: string;
   created_at: Date | string;
 };
 
@@ -138,12 +146,13 @@ function mapExpense(r: ExpenseRow): ProjectExpense {
     entryDate: r.entry_date,
     note: r.note,
     receiptUrl: r.receipt_url,
+    paymentStatus: r.payment_status as PaymentStatus,
     createdAt: toIso(r.created_at),
   };
 }
 
 const EXPENSE_RETURN = `id, activity_id, amount, category, label, payer_name,
-  entry_date::text AS entry_date, note, receipt_url, created_at`;
+  entry_date::text AS entry_date, note, receipt_url, payment_status, created_at`;
 
 type MemberRow = {
   id: string;
@@ -209,17 +218,20 @@ export async function createProject(userId: string, input: ProjectInput): Promis
   try {
     await client.query("BEGIN");
     const { rows } = await client.query<{ id: string }>(
-      `INSERT INTO projects (user_id, name, project_type, org_name, budget_target, start_date, end_date, note)
-       VALUES ($1, $2, $3, $4, $5, $6::date, $7::date, $8)
+      `INSERT INTO projects (user_id, name, project_type, org_name, project_code, objective, budget_target, start_date, end_date, status, note)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::date, $9::date, $10, $11)
        RETURNING id`,
       [
         userId,
         input.name,
         input.projectType,
         input.orgName ?? null,
+        input.projectCode ?? null,
+        input.objective ?? null,
         budget,
         input.startDate ?? null,
         input.endDate ?? null,
+        input.status ?? "active",
         input.note ?? null,
       ],
     );
@@ -331,8 +343,8 @@ export async function createProjectIncome(
   if (!activity) return null;
 
   const { rows } = await pool.query<IncomeRow>(
-    `INSERT INTO project_income_entries (activity_id, user_id, amount, source, label, entry_date, note)
-     VALUES ($1, $2, $3, $4, $5, $6::date, $7)
+    `INSERT INTO project_income_entries (activity_id, user_id, amount, source, label, entry_date, note, payment_status)
+     VALUES ($1, $2, $3, $4, $5, $6::date, $7, $8)
      RETURNING ${INCOME_RETURN}`,
     [
       activityId,
@@ -342,6 +354,7 @@ export async function createProjectIncome(
       input.label ?? null,
       input.entryDate,
       input.note ?? null,
+      input.paymentStatus ?? "paid",
     ],
   );
   return rows[0] ? mapIncome(rows[0]) : null;
@@ -374,8 +387,8 @@ export async function createProjectExpense(
   if (!activity) return null;
 
   const { rows } = await pool.query<ExpenseRow>(
-    `INSERT INTO project_expense_entries (activity_id, user_id, amount, category, label, payer_name, entry_date, note)
-     VALUES ($1, $2, $3, $4, $5, $6, $7::date, $8)
+    `INSERT INTO project_expense_entries (activity_id, user_id, amount, category, label, payer_name, entry_date, note, payment_status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::date, $8, $9)
      RETURNING ${EXPENSE_RETURN}`,
     [
       activityId,
@@ -386,6 +399,7 @@ export async function createProjectExpense(
       input.payerName ?? null,
       input.entryDate,
       input.note ?? null,
+      input.paymentStatus ?? "paid",
     ],
   );
   return rows[0] ? mapExpense(rows[0]) : null;

@@ -4,7 +4,7 @@ import {
   PROJECT_EXPENSE_KEYS,
   PROJECT_FUNDING_KEYS,
 } from "@/lib/project-categories";
-import { PROJECT_MEMBER_ROLES, PROJECT_TYPES } from "@/types/project";
+import { PROJECT_MEMBER_ROLES, PROJECT_STATUSES, PROJECT_TYPES, PAYMENT_STATUSES } from "@/types/project";
 
 const moneyNonNegative = z
   .number()
@@ -45,6 +45,12 @@ export const projectSchema = z
       (v) => (typeof v === "string" && v.trim() !== "" ? v.trim() : undefined),
       z.string().max(160).optional(),
     ),
+    projectCode: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() !== "" ? v.trim() : undefined),
+      z.string().max(40).optional(),
+    ),
+    objective: noteText,
+    status: z.enum(PROJECT_STATUSES).optional(),
     budgetTarget: moneyNonNegative.optional(),
     startDate: projectDate,
     endDate: projectDate,
@@ -85,6 +91,7 @@ export const projectIncomeSchema = z.object({
   label: shortLabel,
   entryDate: z.string().refine(isValidDate, "วันที่ต้องเป็น YYYY-MM-DD"),
   note: noteText,
+  paymentStatus: z.enum(PAYMENT_STATUSES).optional(),
 });
 
 export const projectExpenseSchema = z.object({
@@ -94,6 +101,7 @@ export const projectExpenseSchema = z.object({
   payerName,
   entryDate: z.string().refine(isValidDate, "วันที่ต้องเป็น YYYY-MM-DD"),
   note: noteText,
+  paymentStatus: z.enum(PAYMENT_STATUSES).optional(),
 });
 
 export const projectMemberSchema = z.object({
