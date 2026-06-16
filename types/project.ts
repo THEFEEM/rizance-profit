@@ -72,6 +72,8 @@ export type ProjectExpense = {
   category: string;
   label: string | null;
   payerName: string | null;
+  /** Income source key, or null = กองกลาง (unassigned). */
+  fundSource: string | null;
   entryDate: string;
   note: string | null;
   receiptUrl: string | null;
@@ -79,6 +81,16 @@ export type ProjectExpense = {
   reimbursedAt: string | null;
   paymentStatus: PaymentStatus;
   createdAt: string;
+};
+
+/** Per-fund balance — derived, never stored. */
+export type FundBalance = {
+  sourceKey: string;
+  sourceLabel: string;
+  totalReceived: string;
+  totalSpent: string;
+  remaining: string;
+  isOverspent: boolean;
 };
 
 export type ProjectMember = {
@@ -114,6 +126,8 @@ export type ActivitySummary = {
   isOverBudget: boolean;
   incomeBySource: Record<string, string>;
   expenseByCategory: Record<string, string>;
+  fundBreakdown: FundBalance[];
+  unassignedSpent: string;
   incomeCount: number;
   expenseCount: number;
   status: ProjectStatus;
@@ -145,6 +159,8 @@ export type ProjectSummary = {
   budgetUsedPct: number;
   incomeBySource: Record<string, string>;
   expenseByCategory: Record<string, string>;
+  fundBreakdown: FundBalance[];
+  unassignedSpent: string;
   activities: ActivitySummary[];
   activityCount: number;
   closedActivityCount: number;

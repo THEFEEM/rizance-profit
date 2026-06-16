@@ -52,6 +52,10 @@ function assertBool(label, actual, expected) {
   assertEq(label, actual, expected);
 }
 
+function fundOf(summary, key) {
+  return summary.fundBreakdown.find((f) => f.sourceKey === key);
+}
+
 const client = new pg.Client(pgClientOptions(connectionString));
 let userA = null;
 
@@ -82,6 +86,17 @@ try {
   if (tables.length === 0) {
     console.log("=== PROJECT SUMMARY TEST ===\n");
     console.log("⊘ Skipped — projects table not found.");
+    process.exit(0);
+  }
+
+  const { rows: fundCol } = await client.query(
+    `SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'project_expense_entries'
+       AND column_name = 'fund_source'`,
+  );
+  if (fundCol.length === 0) {
+    console.log("=== PROJECT SUMMARY TEST ===\n");
+    console.log("⊘ Skipped — fund_source column not found (run migration 0013 first).");
     process.exit(0);
   }
 
@@ -352,7 +367,175 @@ try {
   assertEq("expenseCount", actI.expenseCount, 2);
   console.log("");
 
-  // (o) Long project — auto กองกลาง exists + rollup includes it
+  // (j) Expense assigned to fund
+  console.log("(j) Expense assigned to fund");
+  const caseJ = await insertShortWithActivity(userA, "fund assign", "30000.00");
+  await client.query(
+    `INSERT INTO project_income_entries (activity_id, user_id, amount, source, entry_date, payment_status)
+     VALUES ($1, $2, 30000.00, 'faculty_grant', '2026-07-01'::date, 'paid')`,
+    [caseJ.activityId, userA],
+  );
+  await client.query(
+    `INSERT INTO project_expense_entries (activity_id, user_id, amount, category, entry_date, payment_status, fund_source)
+     VALUES ($1, $2, 9000.00, 'venue', '2026-07-01'::date, 'paid', 'faculty_grant')`,
+    [caseJ.activityId, userA],
+  );
+  const bundleJ = await loadProjectBundle(client, userA, caseJ.projectId);
+  const actJ = buildProjectSummary(
+    bundleJ.project,
+    bundleJ.activities,
+    bundleJ.incomes,
+    bundleJ.expenses,
+  ).activities[0];
+  assertEq("totalSpent", actJ.totalSpent, "9000.00");
+  assertEq("unassignedSpent", actJ.unassignedSpent, "0.00");
+  assertEq("fundBreakdown count", actJ.fundBreakdown.length, 1);
+  const fundJ = fundOf(actJ, "faculty_grant");
+  assertEq("faculty totalReceived", fundJ.totalReceived, "30000.00");
+  assertEq("faculty totalSpent", fundJ.totalSpent, "9000.00");
+  assertEq("faculty remaining", fundJ.remaining, "21000.00");
+  assertBool("faculty isOverspent", fundJ.isOverspent, false);
+  console.log("");
+
+  // (k) Overspent fund (warning, not blocked)
+  console.log("(k) Overspent fund");
+  const caseK = await insertShortWithActivity(userA, "overspent fund", "0.00");
+  await client.query(
+    `INSERT INTO project_income_entries (activity_id, user_id, amount, source, entry_date, payment_status)
+     VALUES ($1, $2, 10000.00, 'sponsor', '2026-07-01'::date, 'paid')`,
+    [caseK.activityId, userA],
+  );
+  await client.query(
+    `INSERT INTO project_expense_entries (activity_id, user_id, amount, category, entry_date, payment_status, fund_source)
+     VALUES ($1, $2, 12000.00, 'food', '2026-07-01'::date, 'paid', 'sponsor')`,
+    [caseK.activityId, userA],
+  );
+  const bundleK = await loadProjectBundle(client, userA, caseK.projectId);
+  const actK = buildProjectSummary(
+    bundleK.project,
+    bundleK.activities,
+    bundleK.incomes,
+    bundleK.expenses,
+  ).activities[0];
+  assertEq("totalSpent", actK.totalSpent, "12000.00");
+  const fundK = fundOf(actK, "sponsor");
+  assertEq("sponsor totalReceived", fundK.totalReceived, "10000.00");
+  assertEq("sponsor totalSpent", fundK.totalSpent, "12000.00");
+  assertEq("sponsor remaining", fundK.remaining, "-2000.00");
+  assertBool("sponsor isOverspent", fundK.isOverspent, true);
+  console.log("");
+
+  // (l) Multiple funds + unassigned
+  console.log("(l) Multiple funds + unassigned (กองกลาง)");
+  const caseL = await insertShortWithActivity(userA, "multi fund", "0.00");
+  await client.query(
+    `INSERT INTO project_income_entries (activity_id, user_id, amount, source, entry_date, payment_status)
+     VALUES ($1, $2, 20000.00, 'faculty_grant', '2026-07-01'::date, 'paid'),
+            ($1, $2, 15000.00, 'sponsor', '2026-07-01'::date, 'paid')`,
+    [caseL.activityId, userA],
+  );
+  await client.query(
+    `INSERT INTO project_expense_entries (activity_id, user_id, amount, category, entry_date, payment_status, fund_source)
+     VALUES ($1, $2, 9000.00, 'venue', '2026-07-01'::date, 'paid', 'faculty_grant'),
+            ($1, $2, 5000.00, 'food', '2026-07-02'::date, 'paid', 'sponsor'),
+            ($1, $2, 3000.00, 'transport', '2026-07-02'::date, 'paid', NULL)`,
+    [caseL.activityId, userA],
+  );
+  const bundleL = await loadProjectBundle(client, userA, caseL.projectId);
+  const actL = buildProjectSummary(
+    bundleL.project,
+    bundleL.activities,
+    bundleL.incomes,
+    bundleL.expenses,
+  ).activities[0];
+  assertEq("totalSpent", actL.totalSpent, "17000.00");
+  assertEq("unassignedSpent", actL.unassignedSpent, "3000.00");
+  assertEq("fundBreakdown count", actL.fundBreakdown.length, 2);
+  const fundLFaculty = fundOf(actL, "faculty_grant");
+  assertEq("faculty received", fundLFaculty.totalReceived, "20000.00");
+  assertEq("faculty spent", fundLFaculty.totalSpent, "9000.00");
+  assertEq("faculty remaining", fundLFaculty.remaining, "11000.00");
+  const fundLSponsor = fundOf(actL, "sponsor");
+  assertEq("sponsor received", fundLSponsor.totalReceived, "15000.00");
+  assertEq("sponsor spent", fundLSponsor.totalSpent, "5000.00");
+  assertEq("sponsor remaining", fundLSponsor.remaining, "10000.00");
+  console.log("");
+
+  // (m) Rejected expense not counted in fund
+  console.log("(m) Rejected expense not counted in fund");
+  const caseM = await insertShortWithActivity(userA, "rejected fund expense", "0.00");
+  await client.query(
+    `INSERT INTO project_income_entries (activity_id, user_id, amount, source, entry_date, payment_status)
+     VALUES ($1, $2, 20000.00, 'faculty_grant', '2026-07-01'::date, 'paid')`,
+    [caseM.activityId, userA],
+  );
+  await client.query(
+    `INSERT INTO project_expense_entries (activity_id, user_id, amount, category, entry_date, payment_status, fund_source)
+     VALUES ($1, $2, 5000.00, 'venue', '2026-07-01'::date, 'paid', 'faculty_grant'),
+            ($1, $2, 3000.00, 'food', '2026-07-02'::date, 'rejected', 'faculty_grant')`,
+    [caseM.activityId, userA],
+  );
+  const bundleM = await loadProjectBundle(client, userA, caseM.projectId);
+  const actM = buildProjectSummary(
+    bundleM.project,
+    bundleM.activities,
+    bundleM.incomes,
+    bundleM.expenses,
+  ).activities[0];
+  const fundM = fundOf(actM, "faculty_grant");
+  assertEq("faculty totalReceived", fundM.totalReceived, "20000.00");
+  assertEq("faculty totalSpent", fundM.totalSpent, "5000.00");
+  assertEq("faculty remaining", fundM.remaining, "15000.00");
+  console.log("");
+
+  // (n) Long-term rollup with funds
+  console.log("(n) Long-term rollup with funds");
+  const { rows: longN } = await client.query(
+    `INSERT INTO projects (user_id, name, project_type, budget_target)
+     VALUES ($1, 'fund rollup long', 'long', 0)
+     RETURNING id`,
+    [userA],
+  );
+  const longNId = longN[0].id;
+  await client.query(
+    `INSERT INTO project_activities (project_id, user_id, name, budget_target, is_general, sort_order)
+     VALUES ($1, $2, 'กองกลาง', 0, true, -1)`,
+    [longNId, userA],
+  );
+  const { rows: actsN } = await client.query(
+    `INSERT INTO project_activities (project_id, user_id, name, budget_target, sort_order)
+     VALUES ($1, $2, 'act1 fund', 0, 0),
+            ($1, $2, 'act2 fund', 0, 1)
+     RETURNING id`,
+    [longNId, userA],
+  );
+  await client.query(
+    `INSERT INTO project_income_entries (activity_id, user_id, amount, source, entry_date, payment_status)
+     VALUES ($1, $2, 30000.00, 'faculty_grant', '2026-07-01'::date, 'paid'),
+            ($3, $2, 20000.00, 'faculty_grant', '2026-07-02'::date, 'paid')`,
+    [actsN[0].id, userA, actsN[1].id],
+  );
+  await client.query(
+    `INSERT INTO project_expense_entries (activity_id, user_id, amount, category, entry_date, payment_status, fund_source)
+     VALUES ($1, $2, 9000.00, 'venue', '2026-07-01'::date, 'paid', 'faculty_grant'),
+            ($3, $2, 5000.00, 'food', '2026-07-02'::date, 'paid', 'faculty_grant')`,
+    [actsN[0].id, userA, actsN[1].id],
+  );
+  const bundleN = await loadProjectBundle(client, userA, longNId);
+  const summaryN = buildProjectSummary(
+    bundleN.project,
+    bundleN.activities,
+    bundleN.incomes,
+    bundleN.expenses,
+  );
+  const fundN = fundOf(summaryN, "faculty_grant");
+  assertEq("rollup faculty totalReceived", fundN.totalReceived, "50000.00");
+  assertEq("rollup faculty totalSpent", fundN.totalSpent, "14000.00");
+  assertEq("rollup faculty remaining", fundN.remaining, "36000.00");
+  assertBool("rollup faculty isOverspent", fundN.isOverspent, false);
+  console.log("");
+
+  // (o) Long project — กองกลาง activity exists + rollup includes it
   console.log("(o) Long project — กองกลาง activity exists");
   const { rows: oProj } = await client.query(
     `INSERT INTO projects (user_id, name, project_type, budget_target, start_date, end_date)

@@ -43,6 +43,11 @@ const payerName = z.preprocess(
   z.string().max(120).optional(),
 );
 
+const fundSource = z.preprocess(
+  (v) => (v === null || v === "" ? null : v),
+  z.union([z.enum(PROJECT_FUNDING_KEYS), z.null()]).optional(),
+);
+
 export const projectSchema = z
   .object({
     name: z.string().trim().min(1).max(160),
@@ -116,6 +121,7 @@ export const projectExpenseSchema = z.object({
   category: z.enum(PROJECT_EXPENSE_KEYS),
   label: shortLabel,
   payerName,
+  fundSource,
   entryDate: z.string().refine(isValidDate, "วันที่ต้องเป็น YYYY-MM-DD"),
   note: noteText,
   isAdvance: z.boolean().optional(),
