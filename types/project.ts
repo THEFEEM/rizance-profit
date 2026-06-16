@@ -147,6 +147,7 @@ export type ProjectListItem = {
   status: ProjectStatus;
   startDate: string | null;
   endDate: string | null;
+  activityCount: number;
   totalFunding: string;
   totalSpent: string;
   remaining: string;

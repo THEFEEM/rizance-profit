@@ -6,6 +6,11 @@ import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-client";
 import type { Booth } from "@/types/booth";
 import type { AppContext } from "@/types/context";
+import {
+  BuildingStoreIcon,
+  ClipboardListIcon,
+  TentIcon,
+} from "@/components/project/icons";
 
 import { formatDayShort } from "@/lib/date";
 
@@ -14,19 +19,7 @@ function formatBoothDateRange(start: string, end: string): string {
   return `${formatDayShort(start)} – ${formatDayShort(end)}`;
 }
 
-function TentIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0">
-      <path
-        d="M4 20h16M6 20 12 4l6 16M9 14h6"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
+type SwitcherMode = "regular" | "booth" | "project";
 
 export function ModeSwitcher({
   mode,
@@ -35,7 +28,7 @@ export function ModeSwitcher({
   boothStartDate,
   boothEndDate,
 }: {
-  mode: "regular" | "booth";
+  mode: SwitcherMode;
   boothId?: string;
   boothName?: string;
   boothStartDate?: string;
@@ -62,7 +55,10 @@ export function ModeSwitcher({
     return [];
   }
 
-  async function selectContext(body: { mode: "regular" } | { mode: "booth"; boothId: string }) {
+  async function selectContext(
+    body: { mode: "regular" } | { mode: "booth"; boothId: string },
+    opts?: { leaveProject?: boolean },
+  ) {
     setSwitching(true);
     setError(null);
     const res = await apiFetch<AppContext>("/api/context", {
@@ -72,6 +68,7 @@ export function ModeSwitcher({
     setSwitching(false);
     if (res.ok) {
       setPickerOpen(false);
+      if (opts?.leaveProject ?? mode === "project") router.push("/");
       router.refresh();
     } else {
       setError(res.message);
@@ -95,14 +92,34 @@ export function ModeSwitcher({
     const list = await loadBooths();
     const open = list.filter((b) => b.status === "open");
     if (open.length === 1) {
-      await selectContext({ mode: "booth", boothId: open[0].id });
+      setSwitching(true);
+      setError(null);
+      const res = await apiFetch<AppContext>("/api/context", {
+        method: "PATCH",
+        body: JSON.stringify({ mode: "booth", boothId: open[0].id }),
+      });
+      setSwitching(false);
+      if (res.ok) {
+        if (mode === "project") router.push("/");
+        router.refresh();
+      } else {
+        setError(res.message);
+      }
       return;
     }
     setPickerOpen(true);
   }
 
+  function switchToProject() {
+    if (mode === "project" || switching) return;
+    router.push("/projects");
+  }
+
   const openBooths = booths?.filter((b) => b.status === "open") ?? [];
   const closedCount = booths?.filter((b) => b.status === "closed").length ?? 0;
+
+  const tabBase =
+    "tap-target flex flex-1 items-center justify-center gap-1 rounded-full py-2 text-xs font-medium transition-colors disabled:opacity-50 sm:text-sm";
 
   return (
     <>
@@ -118,12 +135,13 @@ export function ModeSwitcher({
             aria-selected={mode === "regular"}
             disabled={switching}
             onClick={switchToRegular}
-            className={`tap-target flex-1 rounded-full py-2.5 text-sm font-medium transition-colors disabled:opacity-50 ${
+            className={`${tabBase} ${
               mode === "regular"
                 ? "bg-rz-green text-rz-bg"
                 : "text-rz-muted active:bg-rz-card"
             }`}
           >
+            <BuildingStoreIcon size={14} />
             ร้านค้า
           </button>
           <button
@@ -132,18 +150,34 @@ export function ModeSwitcher({
             aria-selected={mode === "booth"}
             disabled={switching}
             onClick={switchToBooth}
-            className={`tap-target flex-1 rounded-full py-2.5 text-sm font-medium transition-colors disabled:opacity-50 ${
+            className={`${tabBase} ${
               mode === "booth"
                 ? "bg-rz-amber text-rz-bg"
                 : "text-rz-muted active:bg-rz-card"
             }`}
           >
+            <TentIcon size={14} />
             บูธ
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "project"}
+            disabled={switching}
+            onClick={switchToProject}
+            className={`${tabBase} ${
+              mode === "project"
+                ? "bg-rz-blue text-rz-bg"
+                : "text-rz-muted active:bg-rz-card"
+            }`}
+          >
+            <ClipboardListIcon size={14} />
+            โครงการ
           </button>
         </div>
         {mode === "booth" && boothName && (
           <p className="mt-2 flex items-center justify-center gap-1.5 truncate text-center text-[11px] font-medium text-rz-amber">
-            <TentIcon />
+            <TentIcon size={12} />
             <span className="truncate">
               {boothName}
               {boothStartDate && boothEndDate && (
@@ -153,6 +187,12 @@ export function ModeSwitcher({
                 </span>
               )}
             </span>
+          </p>
+        )}
+        {mode === "project" && (
+          <p className="mt-2 flex items-center justify-center gap-1.5 truncate text-center text-[11px] font-medium text-rz-blue">
+            <ClipboardListIcon size={12} />
+            <span>โหมดโครงการ</span>
           </p>
         )}
       </div>
@@ -198,23 +238,23 @@ export function ModeSwitcher({
 
                 {!loading &&
                   openBooths.map((b) => {
-                      const isActive = mode === "booth" && boothId === b.id;
-                      return (
-                        <li key={b.id}>
-                          <button
-                            type="button"
-                            disabled={switching}
-                            onClick={() => selectContext({ mode: "booth", boothId: b.id })}
-                            className={`tap-target min-h-11 w-full px-2 py-3 text-left text-sm font-medium disabled:opacity-40 ${
-                              isActive ? "text-rz-amber" : "text-rz-text"
-                            }`}
-                          >
-                            {b.name}
-                            {isActive && " ✓"}
-                          </button>
-                        </li>
-                      );
-                    })}
+                    const isActive = mode === "booth" && boothId === b.id;
+                    return (
+                      <li key={b.id}>
+                        <button
+                          type="button"
+                          disabled={switching}
+                          onClick={() => selectContext({ mode: "booth", boothId: b.id })}
+                          className={`tap-target min-h-11 w-full px-2 py-3 text-left text-sm font-medium disabled:opacity-40 ${
+                            isActive ? "text-rz-amber" : "text-rz-text"
+                          }`}
+                        >
+                          {b.name}
+                          {isActive && " ✓"}
+                        </button>
+                      </li>
+                    );
+                  })}
 
                 {!loading && booths !== null && openBooths.length === 0 && (
                   <li className="px-2 py-4 text-center text-sm text-rz-hint">
