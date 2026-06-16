@@ -72,6 +72,18 @@ export function defaultBoothEntryDate(startDate: string, endDate: string): strin
   return clampDateToRange(today(), startDate, endDate);
 }
 
+/** Default entry date for a project activity: Bangkok today, clamped when dates exist. */
+export function defaultProjectEntryDate(
+  startDate: string | null,
+  endDate: string | null,
+): string {
+  const t = today();
+  if (startDate && endDate) return clampDateToRange(t, startDate, endDate);
+  if (startDate && t < startDate) return startDate;
+  if (endDate && t > endDate) return endDate;
+  return t;
+}
+
 /** Add `days` to a "YYYY-MM-DD" string, returning "YYYY-MM-DD". */
 export function addDays(date: string, days: number): string {
   const [y, m, d] = date.split("-").map(Number);

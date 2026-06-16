@@ -80,3 +80,9 @@ body {
 [data-context="booth"] .rz-btn-primary:not(:disabled) {
   background-color: #ba7517;
 }
+
+/* Project-context primary buttons (blue) — set data-context="project" on a parent */
+[data-context="project"] .rz-btn-primary:not(:disabled) {
+  background-color: #15293f;
+  border-color: #1e3a52;
+}

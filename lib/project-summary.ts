@@ -302,11 +302,17 @@ export async function listProjectSummaries(userId: string): Promise<ProjectListI
     status: string;
     start_date: string | null;
     end_date: string | null;
+    activity_count: string;
     total_funding: string;
     total_spent: string;
   }>(
     `SELECT p.id, p.name, p.project_type, p.org_name, p.status,
             p.start_date::text AS start_date, p.end_date::text AS end_date,
+            COALESCE((
+              SELECT COUNT(*)::int
+              FROM project_activities a
+              WHERE a.project_id = p.id AND a.user_id = $1
+            ), 0)::text AS activity_count,
             COALESCE((
               SELECT SUM(CASE WHEN i.payment_status != 'rejected' THEN i.amount ELSE 0 END)
               FROM project_income_entries i
@@ -333,6 +339,7 @@ export async function listProjectSummaries(userId: string): Promise<ProjectListI
     status: r.status as ProjectStatus,
     startDate: r.start_date,
     endDate: r.end_date,
+    activityCount: Number(r.activity_count),
     totalFunding: r.total_funding,
     totalSpent: r.total_spent,
     remaining: computeProfit(r.total_funding, r.total_spent),
