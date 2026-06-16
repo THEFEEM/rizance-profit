@@ -89,7 +89,13 @@ export type ActivitySummary = {
   name: string;
   budgetTarget: string;
   totalFunding: string;
+  paidFunding: string;
+  committedFunding: string;
+  rejectedFundingCount: number;
   totalSpent: string;
+  paidSpent: string;
+  committedSpent: string;
+  rejectedExpenseCount: number;
   remaining: string;
   budgetRemaining: string;
   budgetUsedPct: number;
@@ -114,7 +120,13 @@ export type ProjectSummary = {
   endDate: string | null;
   totalBudgetTarget: string;
   totalFunding: string;
+  paidFunding: string;
+  committedFunding: string;
+  rejectedFundingCount: number;
   totalSpent: string;
+  paidSpent: string;
+  committedSpent: string;
+  rejectedExpenseCount: number;
   remaining: string;
   budgetRemaining: string;
   isOverBudget: boolean;

@@ -1,4 +1,4 @@
-// Project summary canonical cases (a–e) — Option B fetch + JS aggregate.
+// Project summary canonical cases (a–i) — Option B fetch + JS aggregate.
 // Usage: npm run test:project-summary
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -223,6 +223,128 @@ try {
   const bundleE = await loadProjectBundle(client, otherId, short.projectId);
   assertEq("user B bundle is null", bundleE, null);
   await client.query(`DELETE FROM users WHERE id = $1`, [otherId]);
+  console.log("");
+
+  // (f) Rejected expense not counted
+  console.log("(f) Rejected expense not counted");
+  const caseF = await insertShortWithActivity(userA, "rejected expense", "30000.00");
+  await client.query(
+    `INSERT INTO project_income_entries (activity_id, user_id, amount, source, entry_date, payment_status)
+     VALUES ($1, $2, 30000.00, 'faculty_grant', '2026-07-01'::date, 'paid')`,
+    [caseF.activityId, userA],
+  );
+  await client.query(
+    `INSERT INTO project_expense_entries (activity_id, user_id, amount, category, entry_date, payment_status)
+     VALUES ($1, $2, 9000.00, 'venue', '2026-07-01'::date, 'paid'),
+            ($1, $2, 8500.00, 'food', '2026-07-02'::date, 'paid'),
+            ($1, $2, 2000.00, 'reward', '2026-07-02'::date, 'rejected')`,
+    [caseF.activityId, userA],
+  );
+  const bundleF = await loadProjectBundle(client, userA, caseF.projectId);
+  const actF = buildProjectSummary(
+    bundleF.project,
+    bundleF.activities,
+    bundleF.incomes,
+    bundleF.expenses,
+  ).activities[0];
+  assertEq("totalSpent", actF.totalSpent, "17500.00");
+  assertEq("paidSpent", actF.paidSpent, "17500.00");
+  assertEq("committedSpent", actF.committedSpent, "0.00");
+  assertEq("rejectedExpenseCount", actF.rejectedExpenseCount, 1);
+  assertEq("expenseCount", actF.expenseCount, 2);
+  assertEq("remaining", actF.remaining, "12500.00");
+  console.log("");
+
+  // (g) Rejected income not counted
+  console.log("(g) Rejected income not counted");
+  const caseG = await insertShortWithActivity(userA, "rejected income", "0.00");
+  await client.query(
+    `INSERT INTO project_income_entries (activity_id, user_id, amount, source, entry_date, payment_status)
+     VALUES ($1, $2, 20000.00, 'faculty_grant', '2026-07-01'::date, 'paid'),
+            ($1, $2, 5000.00, 'sponsor', '2026-07-01'::date, 'rejected')`,
+    [caseG.activityId, userA],
+  );
+  await client.query(
+    `INSERT INTO project_expense_entries (activity_id, user_id, amount, category, entry_date, payment_status)
+     VALUES ($1, $2, 10000.00, 'venue', '2026-07-01'::date, 'paid')`,
+    [caseG.activityId, userA],
+  );
+  const bundleG = await loadProjectBundle(client, userA, caseG.projectId);
+  const actG = buildProjectSummary(
+    bundleG.project,
+    bundleG.activities,
+    bundleG.incomes,
+    bundleG.expenses,
+  ).activities[0];
+  assertEq("totalFunding", actG.totalFunding, "20000.00");
+  assertEq("rejectedFundingCount", actG.rejectedFundingCount, 1);
+  assertEq("incomeCount", actG.incomeCount, 1);
+  console.log("");
+
+  // (h) Paid vs committed split
+  console.log("(h) Paid vs committed split");
+  const caseH = await insertShortWithActivity(userA, "paid vs committed", "50000.00");
+  await client.query(
+    `INSERT INTO project_income_entries (activity_id, user_id, amount, source, entry_date, payment_status)
+     VALUES ($1, $2, 30000.00, 'faculty_grant', '2026-07-01'::date, 'paid'),
+            ($1, $2, 10000.00, 'participant_fee', '2026-07-01'::date, 'approved'),
+            ($1, $2, 5000.00, 'sponsor', '2026-07-01'::date, 'pending')`,
+    [caseH.activityId, userA],
+  );
+  await client.query(
+    `INSERT INTO project_expense_entries (activity_id, user_id, amount, category, entry_date, payment_status)
+     VALUES ($1, $2, 10000.00, 'venue', '2026-07-01'::date, 'paid'),
+            ($1, $2, 5000.00, 'food', '2026-07-02'::date, 'approved'),
+            ($1, $2, 3000.00, 'transport', '2026-07-02'::date, 'pending')`,
+    [caseH.activityId, userA],
+  );
+  const bundleH = await loadProjectBundle(client, userA, caseH.projectId);
+  const actH = buildProjectSummary(
+    bundleH.project,
+    bundleH.activities,
+    bundleH.incomes,
+    bundleH.expenses,
+  ).activities[0];
+  assertEq("totalFunding", actH.totalFunding, "45000.00");
+  assertEq("paidFunding", actH.paidFunding, "30000.00");
+  assertEq("committedFunding", actH.committedFunding, "15000.00");
+  assertEq("totalSpent", actH.totalSpent, "18000.00");
+  assertEq("paidSpent", actH.paidSpent, "10000.00");
+  assertEq("committedSpent", actH.committedSpent, "8000.00");
+  assertEq("remaining", actH.remaining, "27000.00");
+  assertEq("budgetRemaining", actH.budgetRemaining, "32000.00");
+  console.log("");
+
+  // (i) Mixed rejected + committed
+  console.log("(i) Mixed rejected + committed");
+  const caseI = await insertShortWithActivity(userA, "mixed rejected", "0.00");
+  await client.query(
+    `INSERT INTO project_income_entries (activity_id, user_id, amount, source, entry_date, payment_status)
+     VALUES ($1, $2, 20000.00, 'faculty_grant', '2026-07-01'::date, 'paid'),
+            ($1, $2, 3000.00, 'donation', '2026-07-01'::date, 'rejected')`,
+    [caseI.activityId, userA],
+  );
+  await client.query(
+    `INSERT INTO project_expense_entries (activity_id, user_id, amount, category, entry_date, payment_status)
+     VALUES ($1, $2, 5000.00, 'venue', '2026-07-01'::date, 'paid'),
+            ($1, $2, 2000.00, 'materials', '2026-07-02'::date, 'approved'),
+            ($1, $2, 1000.00, 'printing', '2026-07-02'::date, 'rejected')`,
+    [caseI.activityId, userA],
+  );
+  const bundleI = await loadProjectBundle(client, userA, caseI.projectId);
+  const actI = buildProjectSummary(
+    bundleI.project,
+    bundleI.activities,
+    bundleI.incomes,
+    bundleI.expenses,
+  ).activities[0];
+  assertEq("totalFunding", actI.totalFunding, "20000.00");
+  assertEq("totalSpent", actI.totalSpent, "7000.00");
+  assertEq("remaining", actI.remaining, "13000.00");
+  assertEq("rejectedFundingCount", actI.rejectedFundingCount, 1);
+  assertEq("rejectedExpenseCount", actI.rejectedExpenseCount, 1);
+  assertEq("incomeCount", actI.incomeCount, 1);
+  assertEq("expenseCount", actI.expenseCount, 2);
   console.log("");
 
   if (failed) {

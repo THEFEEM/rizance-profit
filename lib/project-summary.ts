@@ -39,12 +39,14 @@ type IncomeEntryRow = {
   activity_id: string;
   source: string;
   amount: string;
+  payment_status: string;
 };
 
 type ExpenseEntryRow = {
   activity_id: string;
   category: string;
   amount: string;
+  payment_status: string;
 };
 
 export function emptyIncomeBySource(): Record<string, string> {
@@ -72,26 +74,52 @@ export function buildActivitySummary(
 ): ActivitySummary {
   const incomeBySource = emptyIncomeBySource();
   let incomeCount = 0;
+  let paidFunding = "0.00";
+  let committedFunding = "0.00";
+  let rejectedFundingCount = 0;
+
   for (const row of incomes) {
     if (row.activity_id !== activity.id) continue;
+    if (row.payment_status === "rejected") {
+      rejectedFundingCount += 1;
+      continue;
+    }
     incomeCount += 1;
     if (row.source in incomeBySource) {
       incomeBySource[row.source] = sumDecimals(incomeBySource[row.source], row.amount);
+    }
+    if (row.payment_status === "paid") {
+      paidFunding = sumDecimals(paidFunding, row.amount);
+    } else {
+      committedFunding = sumDecimals(committedFunding, row.amount);
     }
   }
 
   const expenseByCategory = emptyExpenseByCategory();
   let expenseCount = 0;
+  let paidSpent = "0.00";
+  let committedSpent = "0.00";
+  let rejectedExpenseCount = 0;
+
   for (const row of expenses) {
     if (row.activity_id !== activity.id) continue;
+    if (row.payment_status === "rejected") {
+      rejectedExpenseCount += 1;
+      continue;
+    }
     expenseCount += 1;
     if (row.category in expenseByCategory) {
       expenseByCategory[row.category] = sumDecimals(expenseByCategory[row.category], row.amount);
     }
+    if (row.payment_status === "paid") {
+      paidSpent = sumDecimals(paidSpent, row.amount);
+    } else {
+      committedSpent = sumDecimals(committedSpent, row.amount);
+    }
   }
 
-  const totalFunding = sumDecimals(...Object.values(incomeBySource));
-  const totalSpent = sumDecimals(...Object.values(expenseByCategory));
+  const totalFunding = sumDecimals(paidFunding, committedFunding);
+  const totalSpent = sumDecimals(paidSpent, committedSpent);
   const budgetTarget = activity.budget_target;
 
   return {
@@ -99,7 +127,13 @@ export function buildActivitySummary(
     name: activity.name,
     budgetTarget,
     totalFunding,
+    paidFunding,
+    committedFunding,
+    rejectedFundingCount,
     totalSpent,
+    paidSpent,
+    committedSpent,
+    rejectedExpenseCount,
     remaining: computeProfit(totalFunding, totalSpent),
     budgetRemaining: computeProfit(budgetTarget, totalSpent),
     budgetUsedPct: budgetUsedPct(budgetTarget, totalSpent),
@@ -138,7 +172,19 @@ export function buildProjectSummary(
   const activitySummaries = activities.map((a) => buildActivitySummary(a, incomes, expenses));
   const totalBudgetTarget = sumDecimals(...activities.map((a) => a.budget_target));
   const totalFunding = sumDecimals(...activitySummaries.map((a) => a.totalFunding));
+  const paidFunding = sumDecimals(...activitySummaries.map((a) => a.paidFunding));
+  const committedFunding = sumDecimals(...activitySummaries.map((a) => a.committedFunding));
+  const rejectedFundingCount = activitySummaries.reduce(
+    (sum, a) => sum + a.rejectedFundingCount,
+    0,
+  );
   const totalSpent = sumDecimals(...activitySummaries.map((a) => a.totalSpent));
+  const paidSpent = sumDecimals(...activitySummaries.map((a) => a.paidSpent));
+  const committedSpent = sumDecimals(...activitySummaries.map((a) => a.committedSpent));
+  const rejectedExpenseCount = activitySummaries.reduce(
+    (sum, a) => sum + a.rejectedExpenseCount,
+    0,
+  );
 
   return {
     projectId: project.id,
@@ -150,7 +196,13 @@ export function buildProjectSummary(
     endDate: project.end_date,
     totalBudgetTarget,
     totalFunding,
+    paidFunding,
+    committedFunding,
+    rejectedFundingCount,
     totalSpent,
+    paidSpent,
+    committedSpent,
+    rejectedExpenseCount,
     remaining: computeProfit(totalFunding, totalSpent),
     budgetRemaining: computeProfit(totalBudgetTarget, totalSpent),
     isOverBudget: computeIsOverBudget(totalBudgetTarget, totalSpent),
@@ -192,14 +244,14 @@ async function loadProjectBundle(userId: string, projectId: string) {
       [userId, projectId],
     ),
     pool.query<IncomeEntryRow>(
-      `SELECT i.activity_id, i.source, i.amount
+      `SELECT i.activity_id, i.source, i.amount, i.payment_status
        FROM project_income_entries i
        JOIN project_activities a ON a.id = i.activity_id
        WHERE a.project_id = $1 AND a.user_id = $2 AND i.user_id = $2`,
       [projectId, userId],
     ),
     pool.query<ExpenseEntryRow>(
-      `SELECT e.activity_id, e.category, e.amount
+      `SELECT e.activity_id, e.category, e.amount, e.payment_status
        FROM project_expense_entries e
        JOIN project_activities a ON a.id = e.activity_id
        WHERE a.project_id = $1 AND a.user_id = $2 AND e.user_id = $2`,
@@ -256,13 +308,13 @@ export async function listProjectSummaries(userId: string): Promise<ProjectListI
     `SELECT p.id, p.name, p.project_type, p.org_name, p.status,
             p.start_date::text AS start_date, p.end_date::text AS end_date,
             COALESCE((
-              SELECT SUM(i.amount)
+              SELECT SUM(CASE WHEN i.payment_status != 'rejected' THEN i.amount ELSE 0 END)
               FROM project_income_entries i
               JOIN project_activities a ON a.id = i.activity_id
               WHERE a.project_id = p.id AND a.user_id = $1 AND i.user_id = $1
             ), 0)::text AS total_funding,
             COALESCE((
-              SELECT SUM(e.amount)
+              SELECT SUM(CASE WHEN e.payment_status != 'rejected' THEN e.amount ELSE 0 END)
               FROM project_expense_entries e
               JOIN project_activities a ON a.id = e.activity_id
               WHERE a.project_id = p.id AND a.user_id = $1 AND e.user_id = $1
