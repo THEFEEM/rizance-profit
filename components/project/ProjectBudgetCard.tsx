@@ -5,6 +5,7 @@ export function ProjectBudgetCard({
   summary,
   currency = "THB",
   title = "สรุปงบประมาณ",
+  fundingLabel = "รายรับรวม",
 }: {
   summary: Pick<
     ActivitySummary,
@@ -22,6 +23,7 @@ export function ProjectBudgetCard({
   >;
   currency?: string;
   title?: string;
+  fundingLabel?: string;
 }) {
   const remainSign = moneySign(summary.remaining);
   const remainColor =
@@ -38,7 +40,7 @@ export function ProjectBudgetCard({
           <span className="text-rz-text">{formatMoney(summary.budgetTarget, currency)}</span>
         </div>
         <div className="flex justify-between gap-2">
-          <span className="text-rz-blue">รายรับรวม</span>
+          <span className="text-rz-blue">{fundingLabel}</span>
           <span className="text-rz-blue">{formatMoney(summary.totalFunding, currency)}</span>
         </div>
         <p className="text-[11px] text-rz-placeholder">
