@@ -8,10 +8,19 @@ type EntryRow =
   | { kind: "income"; entry: ProjectIncome }
   | { kind: "expense"; entry: ProjectExpense };
 
-function mergeEntries(incomes: ProjectIncome[], expenses: ProjectExpense[], limit = 12): EntryRow[] {
+function mergeEntries(
+  incomes: ProjectIncome[],
+  expenses: ProjectExpense[],
+  kind: "all" | "income" | "expense",
+  limit = 12,
+): EntryRow[] {
   const rows: EntryRow[] = [
-    ...incomes.map((entry) => ({ kind: "income" as const, entry })),
-    ...expenses.map((entry) => ({ kind: "expense" as const, entry })),
+    ...(kind !== "expense"
+      ? incomes.map((entry) => ({ kind: "income" as const, entry }))
+      : []),
+    ...(kind !== "income"
+      ? expenses.map((entry) => ({ kind: "expense" as const, entry }))
+      : []),
   ];
   rows.sort((a, b) => {
     const da = a.entry.entryDate;
@@ -19,19 +28,23 @@ function mergeEntries(incomes: ProjectIncome[], expenses: ProjectExpense[], limi
     if (da !== db) return db.localeCompare(da);
     return b.entry.createdAt.localeCompare(a.entry.createdAt);
   });
-  return rows.slice(0, limit);
+  return limit > 0 ? rows.slice(0, limit) : rows;
 }
 
 export function ProjectEntryList({
   incomes,
   expenses,
   currency = "THB",
+  kind = "all",
+  limit,
 }: {
   incomes: ProjectIncome[];
   expenses: ProjectExpense[];
   currency?: string;
+  kind?: "all" | "income" | "expense";
+  limit?: number;
 }) {
-  const rows = mergeEntries(incomes, expenses);
+  const rows = mergeEntries(incomes, expenses, kind, limit ?? (kind === "all" ? 12 : 0));
 
   if (rows.length === 0) {
     return (

@@ -85,14 +85,24 @@ export const projectActivitySchema = z
     }
   });
 
-export const projectIncomeSchema = z.object({
-  amount: amountPositive,
-  source: z.enum(PROJECT_FUNDING_KEYS),
-  label: shortLabel,
-  entryDate: z.string().refine(isValidDate, "วันที่ต้องเป็น YYYY-MM-DD"),
-  note: noteText,
-  paymentStatus: z.enum(PAYMENT_STATUSES).optional(),
-});
+export const projectIncomeSchema = z
+  .object({
+    amount: amountPositive,
+    source: z.enum(PROJECT_FUNDING_KEYS),
+    label: shortLabel,
+    entryDate: z.string().refine(isValidDate, "วันที่ต้องเป็น YYYY-MM-DD"),
+    note: noteText,
+    paymentStatus: z.enum(PAYMENT_STATUSES).optional(),
+  })
+  .superRefine((d, ctx) => {
+    if (d.source === "other_income" && !d.label?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        message: "กรุณาระบุชื่อแหล่งเงิน",
+        path: ["label"],
+      });
+    }
+  });
 
 export const projectExpenseSchema = z.object({
   amount: amountPositive,
