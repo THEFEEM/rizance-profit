@@ -2,10 +2,12 @@
 import { pool } from "@/lib/db";
 import type {
   ProjectActivityInput,
+  ProjectActivityPatchInput,
   ProjectExpenseInput,
   ProjectIncomeInput,
   ProjectInput,
   ProjectMemberInput,
+  ProjectPatchInput,
 } from "@/lib/project-validation";
 import type {
   Project,
@@ -265,6 +267,48 @@ export async function createProject(userId: string, input: ProjectInput): Promis
   }
 }
 
+export async function updateProject(
+  userId: string,
+  projectId: string,
+  input: ProjectPatchInput,
+): Promise<Project | null> {
+  const existing = await getOwnedProject(userId, projectId);
+  if (!existing) return null;
+
+  const startDate =
+    input.startDate !== undefined ? input.startDate : existing.startDate;
+  const endDate = input.endDate !== undefined ? input.endDate : existing.endDate;
+
+  const { rows } = await pool.query<ProjectRow>(
+    `UPDATE projects SET
+       name = $3,
+       org_name = $4,
+       project_code = $5,
+       objective = $6,
+       status = $7,
+       budget_target = $8,
+       start_date = $9::date,
+       end_date = $10::date,
+       note = $11
+     WHERE user_id = $1 AND id = $2
+     RETURNING ${PROJECT_RETURN}`,
+    [
+      userId,
+      projectId,
+      input.name ?? existing.name,
+      input.orgName !== undefined ? input.orgName : existing.orgName,
+      input.projectCode !== undefined ? input.projectCode : existing.projectCode,
+      input.objective !== undefined ? input.objective : existing.objective,
+      input.status ?? existing.status,
+      (input.budgetTarget ?? Number(existing.budgetTarget)).toFixed(2),
+      startDate,
+      endDate,
+      input.note !== undefined ? input.note : existing.note,
+    ],
+  );
+  return rows[0] ? mapProject(rows[0]) : null;
+}
+
 // ---- activities -------------------------------------------------------------
 
 export async function listActivities(
@@ -290,13 +334,33 @@ export async function getActivity(
   return getOwnedActivity(userId, activityId);
 }
 
+export async function getProjectActivity(
+  userId: string,
+  projectId: string,
+  activityId: string,
+): Promise<ProjectActivity | null> {
+  const { rows } = await pool.query<ActivityRow>(
+    `SELECT ${ACTIVITY_RETURN} FROM project_activities
+     WHERE user_id = $1 AND project_id = $2 AND id = $3`,
+    [userId, projectId, activityId],
+  );
+  return rows[0] ? mapActivity(rows[0]) : null;
+}
+
 export async function createActivity(
   userId: string,
   projectId: string,
   input: ProjectActivityInput,
 ): Promise<ProjectActivity | null> {
   const project = await getOwnedProject(userId, projectId);
-  if (!project) return null;
+  if (!project || project.projectType !== "long") return null;
+
+  const { rows: orderRows } = await pool.query<{ next_order: number }>(
+    `SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order
+     FROM project_activities WHERE project_id = $1 AND user_id = $2`,
+    [projectId, userId],
+  );
+  const sortOrder = input.sortOrder ?? orderRows[0]?.next_order ?? 0;
 
   const { rows } = await pool.query<ActivityRow>(
     `INSERT INTO project_activities (project_id, user_id, name, budget_target, start_date, end_date, note, sort_order)
@@ -310,7 +374,47 @@ export async function createActivity(
       input.startDate ?? null,
       input.endDate ?? null,
       input.note ?? null,
-      input.sortOrder ?? 0,
+      sortOrder,
+    ],
+  );
+  return rows[0] ? mapActivity(rows[0]) : null;
+}
+
+export async function updateActivity(
+  userId: string,
+  projectId: string,
+  activityId: string,
+  input: ProjectActivityPatchInput,
+): Promise<ProjectActivity | null> {
+  const existing = await getProjectActivity(userId, projectId, activityId);
+  if (!existing) return null;
+
+  const startDate =
+    input.startDate !== undefined ? input.startDate : existing.startDate;
+  const endDate = input.endDate !== undefined ? input.endDate : existing.endDate;
+
+  const { rows } = await pool.query<ActivityRow>(
+    `UPDATE project_activities SET
+       name = $4,
+       budget_target = $5,
+       start_date = $6::date,
+       end_date = $7::date,
+       note = $8,
+       status = $9,
+       sort_order = $10
+     WHERE user_id = $1 AND project_id = $2 AND id = $3
+     RETURNING ${ACTIVITY_RETURN}`,
+    [
+      userId,
+      projectId,
+      activityId,
+      input.name ?? existing.name,
+      (input.budgetTarget ?? Number(existing.budgetTarget)).toFixed(2),
+      startDate,
+      endDate,
+      input.note !== undefined ? input.note : existing.note,
+      input.status ?? existing.status,
+      input.sortOrder ?? existing.sortOrder,
     ],
   );
   return rows[0] ? mapActivity(rows[0]) : null;

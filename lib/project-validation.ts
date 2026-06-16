@@ -115,3 +115,65 @@ export type ProjectActivityInput = z.infer<typeof projectActivitySchema>;
 export type ProjectIncomeInput = z.infer<typeof projectIncomeSchema>;
 export type ProjectExpenseInput = z.infer<typeof projectExpenseSchema>;
 export type ProjectMemberInput = z.infer<typeof projectMemberSchema>;
+
+export const ACTIVITY_STATUSES = ["active", "closed"] as const;
+
+export const projectPatchSchema = z
+  .object({
+    name: z.string().trim().min(1).max(160).optional(),
+    orgName: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() !== "" ? v.trim() : v === "" ? null : undefined),
+      z.union([z.string().max(160), z.null()]).optional(),
+    ),
+    projectCode: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() !== "" ? v.trim() : v === "" ? null : undefined),
+      z.union([z.string().max(40), z.null()]).optional(),
+    ),
+    objective: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() !== "" ? v.trim() : v === "" ? null : undefined),
+      z.union([z.string().max(2000), z.null()]).optional(),
+    ),
+    status: z.enum(PROJECT_STATUSES).optional(),
+    budgetTarget: moneyNonNegative.optional(),
+    startDate: z.union([projectDate, z.null()]).optional(),
+    endDate: z.union([projectDate, z.null()]).optional(),
+    note: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() !== "" ? v.trim() : v === "" ? null : undefined),
+      z.union([z.string().max(2000), z.null()]).optional(),
+    ),
+  })
+  .superRefine((d, ctx) => {
+    if (d.startDate && d.endDate && d.endDate < d.startDate) {
+      ctx.addIssue({
+        code: "custom",
+        message: "วันสิ้นสุดต้องไม่ก่อนวันเริ่ม",
+        path: ["endDate"],
+      });
+    }
+  });
+
+export const projectActivityPatchSchema = z
+  .object({
+    name: z.string().trim().min(1).max(160).optional(),
+    budgetTarget: moneyNonNegative.optional(),
+    startDate: z.union([projectDate, z.null()]).optional(),
+    endDate: z.union([projectDate, z.null()]).optional(),
+    note: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() !== "" ? v.trim() : v === "" ? null : undefined),
+      z.union([z.string().max(2000), z.null()]).optional(),
+    ),
+    status: z.enum(ACTIVITY_STATUSES).optional(),
+    sortOrder: z.number().int().min(0).max(9999).optional(),
+  })
+  .superRefine((d, ctx) => {
+    if (d.startDate && d.endDate && d.endDate < d.startDate) {
+      ctx.addIssue({
+        code: "custom",
+        message: "วันสิ้นสุดต้องไม่ก่อนวันเริ่ม",
+        path: ["endDate"],
+      });
+    }
+  });
+
+export type ProjectPatchInput = z.infer<typeof projectPatchSchema>;
+export type ProjectActivityPatchInput = z.infer<typeof projectActivityPatchSchema>;
