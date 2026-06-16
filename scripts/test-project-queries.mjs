@@ -186,6 +186,35 @@ try {
   }
   console.log("");
 
+  const { rows: paymentCol } = await client.query(
+    `SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = 'project_expense_entries'
+       AND column_name = 'payment_status'`,
+  );
+  if (paymentCol.length === 0) {
+    console.log("5) payment_status — skipped (run migration 0012_project_accounting.sql first)");
+    console.log("");
+  } else {
+    console.log("5) payment_status — insert rejected + pending, read back");
+    const actId = shortActs[0].id;
+    const { rows: rejRows } = await client.query(
+      `INSERT INTO project_expense_entries (activity_id, user_id, amount, category, entry_date, payment_status)
+       VALUES ($1, $2, 99.00, 'food', '2026-07-02'::date, 'rejected')
+       RETURNING payment_status`,
+      [actId, userId],
+    );
+    assert("rejected expense payment_status", rejRows[0].payment_status === "rejected");
+    const { rows: pendRows } = await client.query(
+      `INSERT INTO project_income_entries (activity_id, user_id, amount, source, entry_date, payment_status)
+       VALUES ($1, $2, 50.00, 'donation', '2026-07-02'::date, 'pending')
+       RETURNING payment_status`,
+      [actId, userId],
+    );
+    assert("pending income payment_status", pendRows[0].payment_status === "pending");
+    console.log("");
+  }
+
   if (failed) {
     console.error(`${failed} assertion(s) failed.`);
     process.exit(1);

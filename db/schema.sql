@@ -215,11 +215,13 @@ CREATE TABLE IF NOT EXISTS projects (
   project_type  VARCHAR(10) NOT NULL
     CHECK (project_type IN ('short', 'long')),
   org_name      VARCHAR(160),
+  project_code  VARCHAR(40),
+  objective     TEXT,
   budget_target NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (budget_target >= 0),
   start_date    DATE,
   end_date      DATE,
   status        VARCHAR(12) NOT NULL DEFAULT 'active'
-    CHECK (status IN ('active', 'closed')),
+    CHECK (status IN ('planning', 'active', 'closed')),
   note          TEXT,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   CHECK (start_date IS NULL OR end_date IS NULL OR end_date >= start_date)
@@ -246,43 +248,49 @@ CREATE INDEX IF NOT EXISTS idx_project_activities_project ON project_activities 
 CREATE INDEX IF NOT EXISTS idx_project_activities_user ON project_activities (user_id, project_id);
 
 CREATE TABLE IF NOT EXISTS project_income_entries (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  activity_id UUID NOT NULL REFERENCES project_activities(id) ON DELETE CASCADE,
-  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  amount      NUMERIC(12,2) NOT NULL CHECK (amount >= 0),
-  source      VARCHAR(30) NOT NULL
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  activity_id     UUID NOT NULL REFERENCES project_activities(id) ON DELETE CASCADE,
+  user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount          NUMERIC(12,2) NOT NULL CHECK (amount >= 0),
+  source          VARCHAR(30) NOT NULL
     CHECK (source IN (
       'faculty_grant', 'membership', 'participant_fee', 'sponsor',
       'donation', 'activity_income', 'other_income'
     )),
-  label       VARCHAR(160),
-  entry_date  DATE NOT NULL,
-  note        TEXT,
-  receipt_url TEXT,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  label           VARCHAR(160),
+  entry_date      DATE NOT NULL,
+  note            TEXT,
+  receipt_url     TEXT,
+  payment_status  VARCHAR(12) NOT NULL DEFAULT 'paid'
+    CHECK (payment_status IN ('pending', 'approved', 'paid', 'rejected')),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_project_income_activity_date ON project_income_entries (activity_id, entry_date);
 CREATE INDEX IF NOT EXISTS idx_project_income_user ON project_income_entries (user_id, activity_id);
+-- idx_project_income_status: created by migration 0012 (column may not exist on legacy tables)
 
 CREATE TABLE IF NOT EXISTS project_expense_entries (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  activity_id UUID NOT NULL REFERENCES project_activities(id) ON DELETE CASCADE,
-  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  amount      NUMERIC(12,2) NOT NULL CHECK (amount >= 0),
-  category    VARCHAR(30) NOT NULL
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  activity_id     UUID NOT NULL REFERENCES project_activities(id) ON DELETE CASCADE,
+  user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount          NUMERIC(12,2) NOT NULL CHECK (amount >= 0),
+  category        VARCHAR(30) NOT NULL
     CHECK (category IN (
       'venue', 'food', 'transport', 'materials',
       'printing', 'reward', 'service', 'other_expense'
     )),
-  label       VARCHAR(160),
-  payer_name  VARCHAR(120),
-  entry_date  DATE NOT NULL,
-  note        TEXT,
-  receipt_url TEXT,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  label           VARCHAR(160),
+  payer_name      VARCHAR(120),
+  entry_date      DATE NOT NULL,
+  note            TEXT,
+  receipt_url     TEXT,
+  payment_status  VARCHAR(12) NOT NULL DEFAULT 'paid'
+    CHECK (payment_status IN ('pending', 'approved', 'paid', 'rejected')),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_project_expense_activity_date ON project_expense_entries (activity_id, entry_date);
 CREATE INDEX IF NOT EXISTS idx_project_expense_user ON project_expense_entries (user_id, activity_id);
+-- idx_project_expense_status: created by migration 0012 (column may not exist on legacy tables)
 
 CREATE TABLE IF NOT EXISTS project_members (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),

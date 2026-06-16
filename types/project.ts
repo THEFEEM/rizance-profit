@@ -4,8 +4,11 @@
 export const PROJECT_TYPES = ["short", "long"] as const;
 export type ProjectType = (typeof PROJECT_TYPES)[number];
 
-export const PROJECT_STATUSES = ["active", "closed"] as const;
+export const PROJECT_STATUSES = ["planning", "active", "closed"] as const;
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
+
+export const PAYMENT_STATUSES = ["pending", "approved", "paid", "rejected"] as const;
+export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
 export const PROJECT_MEMBER_ROLES = ["treasurer", "member", "advisor"] as const;
 export type ProjectMemberRole = (typeof PROJECT_MEMBER_ROLES)[number];
@@ -21,6 +24,8 @@ export type Project = {
   name: string;
   projectType: ProjectType;
   orgName: string | null;
+  projectCode: string | null;
+  objective: string | null;
   budgetTarget: string;
   startDate: string | null;
   endDate: string | null;
@@ -51,6 +56,7 @@ export type ProjectIncome = {
   entryDate: string;
   note: string | null;
   receiptUrl: string | null;
+  paymentStatus: PaymentStatus;
   createdAt: string;
 };
 
@@ -64,6 +70,7 @@ export type ProjectExpense = {
   entryDate: string;
   note: string | null;
   receiptUrl: string | null;
+  paymentStatus: PaymentStatus;
   createdAt: string;
 };
 
