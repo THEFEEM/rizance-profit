@@ -22,6 +22,7 @@ type ActivityRow = {
   start_date: string | null;
   end_date: string | null;
   status: string;
+  is_general: boolean;
   sort_order: number;
 };
 
@@ -39,6 +40,7 @@ type IncomeEntryRow = {
   activity_id: string;
   source: string;
   amount: string;
+  payment_method: string;
   payment_status: string;
 };
 
@@ -46,6 +48,9 @@ type ExpenseEntryRow = {
   activity_id: string;
   category: string;
   amount: string;
+  is_advance: boolean;
+  payer_name: string | null;
+  reimbursed_at: string | null;
   payment_status: string;
 };
 
@@ -76,6 +81,8 @@ export function buildActivitySummary(
   let incomeCount = 0;
   let paidFunding = "0.00";
   let committedFunding = "0.00";
+  let cashFunding = "0.00";
+  let transferFunding = "0.00";
   let rejectedFundingCount = 0;
 
   for (const row of incomes) {
@@ -88,6 +95,11 @@ export function buildActivitySummary(
     if (row.source in incomeBySource) {
       incomeBySource[row.source] = sumDecimals(incomeBySource[row.source], row.amount);
     }
+    if (row.payment_method === "transfer") {
+      transferFunding = sumDecimals(transferFunding, row.amount);
+    } else {
+      cashFunding = sumDecimals(cashFunding, row.amount);
+    }
     if (row.payment_status === "paid") {
       paidFunding = sumDecimals(paidFunding, row.amount);
     } else {
@@ -99,6 +111,9 @@ export function buildActivitySummary(
   let expenseCount = 0;
   let paidSpent = "0.00";
   let committedSpent = "0.00";
+  let advanceTotal = "0.00";
+  let advanceUnreimbursed = "0.00";
+  const advanceByPayerMap = new Map<string, { total: string; unreimbursed: string }>();
   let rejectedExpenseCount = 0;
 
   for (const row of expenses) {
@@ -110,6 +125,17 @@ export function buildActivitySummary(
     expenseCount += 1;
     if (row.category in expenseByCategory) {
       expenseByCategory[row.category] = sumDecimals(expenseByCategory[row.category], row.amount);
+    }
+    if (row.is_advance) {
+      advanceTotal = sumDecimals(advanceTotal, row.amount);
+      const payerName = row.payer_name?.trim() ? row.payer_name.trim() : "ไม่ระบุ";
+      const prev = advanceByPayerMap.get(payerName) ?? { total: "0.00", unreimbursed: "0.00" };
+      const next = { ...prev, total: sumDecimals(prev.total, row.amount) };
+      if (!row.reimbursed_at) {
+        advanceUnreimbursed = sumDecimals(advanceUnreimbursed, row.amount);
+        next.unreimbursed = sumDecimals(prev.unreimbursed, row.amount);
+      }
+      advanceByPayerMap.set(payerName, next);
     }
     if (row.payment_status === "paid") {
       paidSpent = sumDecimals(paidSpent, row.amount);
@@ -129,10 +155,19 @@ export function buildActivitySummary(
     totalFunding,
     paidFunding,
     committedFunding,
+    cashFunding,
+    transferFunding,
     rejectedFundingCount,
     totalSpent,
     paidSpent,
     committedSpent,
+    advanceTotal,
+    advanceUnreimbursed,
+    advanceByPayer: Array.from(advanceByPayerMap.entries()).map(([payerName, v]) => ({
+      payerName,
+      total: v.total,
+      unreimbursed: v.unreimbursed,
+    })),
     rejectedExpenseCount,
     remaining: computeProfit(totalFunding, totalSpent),
     budgetRemaining: computeProfit(budgetTarget, totalSpent),
@@ -237,21 +272,23 @@ async function loadProjectBundle(userId: string, projectId: string) {
   const [activitiesRes, incomesRes, expensesRes] = await Promise.all([
     pool.query<ActivityRow>(
       `SELECT id, project_id, name, budget_target, start_date::text AS start_date,
-              end_date::text AS end_date, status, sort_order
+              end_date::text AS end_date, status, is_general, sort_order
        FROM project_activities
        WHERE user_id = $1 AND project_id = $2
        ORDER BY sort_order ASC, created_at ASC`,
       [userId, projectId],
     ),
     pool.query<IncomeEntryRow>(
-      `SELECT i.activity_id, i.source, i.amount, i.payment_status
+      `SELECT i.activity_id, i.source, i.amount, i.payment_method, i.payment_status
        FROM project_income_entries i
        JOIN project_activities a ON a.id = i.activity_id
        WHERE a.project_id = $1 AND a.user_id = $2 AND i.user_id = $2`,
       [projectId, userId],
     ),
     pool.query<ExpenseEntryRow>(
-      `SELECT e.activity_id, e.category, e.amount, e.payment_status
+      `SELECT e.activity_id, e.category, e.amount, e.is_advance, e.payer_name,
+              e.reimbursed_at::text AS reimbursed_at,
+              e.payment_status
        FROM project_expense_entries e
        JOIN project_activities a ON a.id = e.activity_id
        WHERE a.project_id = $1 AND a.user_id = $2 AND e.user_id = $2`,

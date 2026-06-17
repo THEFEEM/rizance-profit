@@ -54,6 +54,8 @@ export function buildActivitySummary(activity, incomes, expenses) {
   let incomeCount = 0;
   let paidFunding = "0.00";
   let committedFunding = "0.00";
+  let cashFunding = "0.00";
+  let transferFunding = "0.00";
   let rejectedFundingCount = 0;
 
   for (const row of incomes) {
@@ -66,6 +68,11 @@ export function buildActivitySummary(activity, incomes, expenses) {
     if (row.source in incomeBySource) {
       incomeBySource[row.source] = sumDecimals(incomeBySource[row.source], row.amount);
     }
+    if (row.payment_method === "transfer") {
+      transferFunding = sumDecimals(transferFunding, row.amount);
+    } else {
+      cashFunding = sumDecimals(cashFunding, row.amount);
+    }
     if (row.payment_status === "paid") {
       paidFunding = sumDecimals(paidFunding, row.amount);
     } else {
@@ -77,6 +84,9 @@ export function buildActivitySummary(activity, incomes, expenses) {
   let expenseCount = 0;
   let paidSpent = "0.00";
   let committedSpent = "0.00";
+  let advanceTotal = "0.00";
+  let advanceUnreimbursed = "0.00";
+  const advanceByPayerMap = new Map();
   let rejectedExpenseCount = 0;
 
   for (const row of expenses) {
@@ -88,6 +98,17 @@ export function buildActivitySummary(activity, incomes, expenses) {
     expenseCount += 1;
     if (row.category in expenseByCategory) {
       expenseByCategory[row.category] = sumDecimals(expenseByCategory[row.category], row.amount);
+    }
+    if (row.is_advance) {
+      advanceTotal = sumDecimals(advanceTotal, row.amount);
+      const payerName = row.payer_name && String(row.payer_name).trim() ? String(row.payer_name).trim() : "ไม่ระบุ";
+      const prev = advanceByPayerMap.get(payerName) ?? { total: "0.00", unreimbursed: "0.00" };
+      const next = { ...prev, total: sumDecimals(prev.total, row.amount) };
+      if (!row.reimbursed_at) {
+        advanceUnreimbursed = sumDecimals(advanceUnreimbursed, row.amount);
+        next.unreimbursed = sumDecimals(prev.unreimbursed, row.amount);
+      }
+      advanceByPayerMap.set(payerName, next);
     }
     if (row.payment_status === "paid") {
       paidSpent = sumDecimals(paidSpent, row.amount);
@@ -107,10 +128,19 @@ export function buildActivitySummary(activity, incomes, expenses) {
     totalFunding,
     paidFunding,
     committedFunding,
+    cashFunding,
+    transferFunding,
     rejectedFundingCount,
     totalSpent,
     paidSpent,
     committedSpent,
+    advanceTotal,
+    advanceUnreimbursed,
+    advanceByPayer: Array.from(advanceByPayerMap.entries()).map(([payerName, v]) => ({
+      payerName,
+      total: v.total,
+      unreimbursed: v.unreimbursed,
+    })),
     rejectedExpenseCount,
     remaining: computeProfit(totalFunding, totalSpent),
     budgetRemaining: computeProfit(budgetTarget, totalSpent),
@@ -204,21 +234,23 @@ export async function loadProjectBundle(client, userId, projectId) {
 
   const activitiesRes = await client.query(
     `SELECT id, project_id, name, budget_target, start_date::text AS start_date,
-            end_date::text AS end_date, status, sort_order
+            end_date::text AS end_date, status, is_general, sort_order
      FROM project_activities
      WHERE user_id = $1 AND project_id = $2
      ORDER BY sort_order ASC, created_at ASC`,
     [userId, projectId],
   );
   const incomesRes = await client.query(
-    `SELECT i.activity_id, i.source, i.amount, i.payment_status
+    `SELECT i.activity_id, i.source, i.amount, i.payment_method, i.payment_status
      FROM project_income_entries i
      JOIN project_activities a ON a.id = i.activity_id
      WHERE a.project_id = $1 AND a.user_id = $2 AND i.user_id = $2`,
     [projectId, userId],
   );
   const expensesRes = await client.query(
-    `SELECT e.activity_id, e.category, e.amount, e.payment_status
+    `SELECT e.activity_id, e.category, e.amount, e.is_advance, e.payer_name,
+            e.reimbursed_at::text AS reimbursed_at,
+            e.payment_status
      FROM project_expense_entries e
      JOIN project_activities a ON a.id = e.activity_id
      WHERE a.project_id = $1 AND a.user_id = $2 AND e.user_id = $2`,

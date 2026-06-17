@@ -240,12 +240,14 @@ CREATE TABLE IF NOT EXISTS project_activities (
   status        VARCHAR(12) NOT NULL DEFAULT 'active'
     CHECK (status IN ('active', 'closed')),
   note          TEXT,
+  is_general    BOOLEAN NOT NULL DEFAULT false,
   sort_order    INT NOT NULL DEFAULT 0,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   CHECK (start_date IS NULL OR end_date IS NULL OR end_date >= start_date)
 );
 CREATE INDEX IF NOT EXISTS idx_project_activities_project ON project_activities (project_id, sort_order);
 CREATE INDEX IF NOT EXISTS idx_project_activities_user ON project_activities (user_id, project_id);
+CREATE INDEX IF NOT EXISTS idx_project_activities_general ON project_activities (project_id, is_general);
 
 CREATE TABLE IF NOT EXISTS project_income_entries (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -261,6 +263,8 @@ CREATE TABLE IF NOT EXISTS project_income_entries (
   entry_date      DATE NOT NULL,
   note            TEXT,
   receipt_url     TEXT,
+  payment_method  VARCHAR(12) NOT NULL DEFAULT 'cash'
+    CHECK (payment_method IN ('cash', 'transfer')),
   payment_status  VARCHAR(12) NOT NULL DEFAULT 'paid'
     CHECK (payment_status IN ('pending', 'approved', 'paid', 'rejected')),
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -284,12 +288,17 @@ CREATE TABLE IF NOT EXISTS project_expense_entries (
   entry_date      DATE NOT NULL,
   note            TEXT,
   receipt_url     TEXT,
+  is_advance      BOOLEAN NOT NULL DEFAULT false,
+  reimbursed_at   TIMESTAMPTZ,
   payment_status  VARCHAR(12) NOT NULL DEFAULT 'paid'
     CHECK (payment_status IN ('pending', 'approved', 'paid', 'rejected')),
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_project_expense_activity_date ON project_expense_entries (activity_id, entry_date);
 CREATE INDEX IF NOT EXISTS idx_project_expense_user ON project_expense_entries (user_id, activity_id);
+CREATE INDEX IF NOT EXISTS idx_project_expense_advance
+  ON project_expense_entries (activity_id, is_advance)
+  WHERE is_advance = true;
 -- idx_project_expense_status: created by migration 0012 (column may not exist on legacy tables)
 
 CREATE TABLE IF NOT EXISTS project_members (
