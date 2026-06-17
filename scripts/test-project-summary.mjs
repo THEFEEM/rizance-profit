@@ -178,6 +178,11 @@ try {
     [userA],
   );
   const longId = longP[0].id;
+  await client.query(
+    `INSERT INTO project_activities (project_id, user_id, name, budget_target, is_general, sort_order)
+     VALUES ($1, $2, 'กองกลาง', 0, true, -1)`,
+    [longId, userA],
+  );
   const { rows: acts } = await client.query(
     `INSERT INTO project_activities (project_id, user_id, name, budget_target, sort_order)
      VALUES ($1, $2, 'ค่ายรับน้อง', 50000.00, 0),
@@ -209,7 +214,7 @@ try {
   assertEq("project remaining", summaryD.remaining, "6800.00");
   assertEq("rollup faculty_grant", summaryD.incomeBySource.faculty_grant, "30000.00");
   assertEq("rollup membership", summaryD.incomeBySource.membership, "15000.00");
-  assertEq("activity count", summaryD.activityCount, 2);
+  assertEq("activity count", summaryD.activityCount, 3);
   console.log("");
 
   // (e) Scope isolation
@@ -345,6 +350,102 @@ try {
   assertEq("rejectedExpenseCount", actI.rejectedExpenseCount, 1);
   assertEq("incomeCount", actI.incomeCount, 1);
   assertEq("expenseCount", actI.expenseCount, 2);
+  console.log("");
+
+  // (o) Long project — auto กองกลาง exists + rollup includes it
+  console.log("(o) Long project — กองกลาง activity exists");
+  const { rows: oProj } = await client.query(
+    `INSERT INTO projects (user_id, name, project_type, budget_target, start_date, end_date)
+     VALUES ($1, 'งบชมรม ปี 2570', 'long', 50000.00, '2027-01-01'::date, '2027-12-31'::date)
+     RETURNING id`,
+    [userA],
+  );
+  const oProjectId = oProj[0].id;
+  await client.query(
+    `INSERT INTO project_activities (project_id, user_id, name, budget_target, is_general, sort_order)
+     VALUES ($1, $2, 'กองกลาง', 0, true, -1)`,
+    [oProjectId, userA],
+  );
+  const { rows: oGeneralRows } = await client.query(
+    `SELECT id, name, is_general, sort_order
+     FROM project_activities
+     WHERE project_id = $1 AND user_id = $2 AND is_general = true`,
+    [oProjectId, userA],
+  );
+  assertEq("กองกลาง count", oGeneralRows.length, 1);
+  assertBool("กองกลาง is_general", oGeneralRows[0].is_general, true);
+  assertEq("กองกลาง sort_order", oGeneralRows[0].sort_order, -1);
+  const oGeneralId = oGeneralRows[0].id;
+  await client.query(
+    `INSERT INTO project_income_entries (activity_id, user_id, amount, source, entry_date)
+     VALUES ($1, $2, 30000.00, 'faculty_grant', '2027-01-10'::date)`,
+    [oGeneralId, userA],
+  );
+  const { rows: oAct } = await client.query(
+    `INSERT INTO project_activities (project_id, user_id, name, budget_target, sort_order)
+     VALUES ($1, $2, 'ค่ายรับน้อง', 20000.00, 0)
+     RETURNING id`,
+    [oProjectId, userA],
+  );
+  await client.query(
+    `INSERT INTO project_expense_entries (activity_id, user_id, amount, category, entry_date)
+     VALUES ($1, $2, 9000.00, 'venue', '2027-01-11'::date)`,
+    [oAct[0].id, userA],
+  );
+  const bundleO = await loadProjectBundle(client, userA, oProjectId);
+  const summaryO = buildProjectSummary(bundleO.project, bundleO.activities, bundleO.incomes, bundleO.expenses);
+  assertEq("project totalFunding", summaryO.totalFunding, "30000.00");
+  assertEq("project totalSpent", summaryO.totalSpent, "9000.00");
+  assertEq("project remaining", summaryO.remaining, "21000.00");
+  assertEq("activityCount includes กองกลาง", summaryO.activityCount, 2);
+  console.log("");
+
+  // (p) Short project — no กองกลาง
+  console.log("(p) Short project — has NO กองกลาง");
+  const caseP = await insertShortWithActivity(userA, "short no general", "10000.00");
+  const { rows: pActs } = await client.query(
+    `SELECT id, is_general FROM project_activities WHERE project_id = $1 ORDER BY sort_order ASC, created_at ASC`,
+    [caseP.projectId],
+  );
+  assertEq("short activities count", pActs.length, 1);
+  assertBool("short activity is_general=false", pActs[0].is_general, false);
+  console.log("");
+
+  // (q) Advance tracking
+  console.log("(q) Advance tracking — totals + by payer");
+  const caseQ = await insertShortWithActivity(userA, "advance tracking", "0.00");
+  await client.query(
+    `INSERT INTO project_expense_entries (activity_id, user_id, amount, category, payer_name, entry_date, is_advance, reimbursed_at)
+     VALUES ($1, $2, 5000.00, 'venue', 'น้องเอ', '2026-07-01'::date, true, NULL),
+            ($1, $2, 3000.00, 'food', 'น้องเอ', '2026-07-02'::date, true, '2026-07-03T10:00:00.000Z'::timestamptz),
+            ($1, $2, 2000.00, 'transport', NULL, '2026-07-02'::date, false, NULL)`,
+    [caseQ.activityId, userA],
+  );
+  const bundleQ = await loadProjectBundle(client, userA, caseQ.projectId);
+  const actQ = buildProjectSummary(bundleQ.project, bundleQ.activities, bundleQ.incomes, bundleQ.expenses).activities[0];
+  assertEq("totalSpent", actQ.totalSpent, "10000.00");
+  assertEq("advanceTotal", actQ.advanceTotal, "8000.00");
+  assertEq("advanceUnreimbursed", actQ.advanceUnreimbursed, "5000.00");
+  assertEq("advanceByPayer length", actQ.advanceByPayer.length, 1);
+  assertEq("advanceByPayer[0] payerName", actQ.advanceByPayer[0].payerName, "น้องเอ");
+  assertEq("advanceByPayer[0] total", actQ.advanceByPayer[0].total, "8000.00");
+  assertEq("advanceByPayer[0] unreimbursed", actQ.advanceByPayer[0].unreimbursed, "5000.00");
+  console.log("");
+
+  // (r) Income cash/transfer split
+  console.log("(r) Income cash/transfer split");
+  const caseR = await insertShortWithActivity(userA, "cash transfer split", "0.00");
+  await client.query(
+    `INSERT INTO project_income_entries (activity_id, user_id, amount, source, entry_date, payment_method)
+     VALUES ($1, $2, 20000.00, 'faculty_grant', '2026-07-01'::date, 'cash'),
+            ($1, $2, 10000.00, 'membership', '2026-07-01'::date, 'transfer')`,
+    [caseR.activityId, userA],
+  );
+  const bundleR = await loadProjectBundle(client, userA, caseR.projectId);
+  const actR = buildProjectSummary(bundleR.project, bundleR.activities, bundleR.incomes, bundleR.expenses).activities[0];
+  assertEq("totalFunding", actR.totalFunding, "30000.00");
+  assertEq("cashFunding", actR.cashFunding, "20000.00");
+  assertEq("transferFunding", actR.transferFunding, "10000.00");
   console.log("");
 
   if (failed) {

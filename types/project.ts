@@ -43,9 +43,13 @@ export type ProjectActivity = {
   endDate: string | null;
   status: ProjectStatus;
   note: string | null;
+  isGeneral: boolean;
   sortOrder: number;
   createdAt: string;
 };
+
+export const PROJECT_INCOME_PAYMENT_METHODS = ["cash", "transfer"] as const;
+export type ProjectIncomePaymentMethod = (typeof PROJECT_INCOME_PAYMENT_METHODS)[number];
 
 export type ProjectIncome = {
   id: string;
@@ -56,6 +60,7 @@ export type ProjectIncome = {
   entryDate: string;
   note: string | null;
   receiptUrl: string | null;
+  paymentMethod: ProjectIncomePaymentMethod;
   paymentStatus: PaymentStatus;
   createdAt: string;
 };
@@ -70,6 +75,8 @@ export type ProjectExpense = {
   entryDate: string;
   note: string | null;
   receiptUrl: string | null;
+  isAdvance: boolean;
+  reimbursedAt: string | null;
   paymentStatus: PaymentStatus;
   createdAt: string;
 };
@@ -91,10 +98,15 @@ export type ActivitySummary = {
   totalFunding: string;
   paidFunding: string;
   committedFunding: string;
+  cashFunding: string;
+  transferFunding: string;
   rejectedFundingCount: number;
   totalSpent: string;
   paidSpent: string;
   committedSpent: string;
+  advanceTotal: string;
+  advanceUnreimbursed: string;
+  advanceByPayer: Array<{ payerName: string; total: string; unreimbursed: string }>;
   rejectedExpenseCount: number;
   remaining: string;
   budgetRemaining: string;

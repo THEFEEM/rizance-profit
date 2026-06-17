@@ -4,7 +4,13 @@ import {
   PROJECT_EXPENSE_KEYS,
   PROJECT_FUNDING_KEYS,
 } from "@/lib/project-categories";
-import { PROJECT_MEMBER_ROLES, PROJECT_STATUSES, PROJECT_TYPES, PAYMENT_STATUSES } from "@/types/project";
+import {
+  PROJECT_INCOME_PAYMENT_METHODS,
+  PROJECT_MEMBER_ROLES,
+  PROJECT_STATUSES,
+  PROJECT_TYPES,
+  PAYMENT_STATUSES,
+} from "@/types/project";
 
 const moneyNonNegative = z
   .number()
@@ -92,6 +98,7 @@ export const projectIncomeSchema = z
     label: shortLabel,
     entryDate: z.string().refine(isValidDate, "วันที่ต้องเป็น YYYY-MM-DD"),
     note: noteText,
+    paymentMethod: z.enum(PROJECT_INCOME_PAYMENT_METHODS).optional(),
     paymentStatus: z.enum(PAYMENT_STATUSES).optional(),
   })
   .superRefine((d, ctx) => {
@@ -111,6 +118,13 @@ export const projectExpenseSchema = z.object({
   payerName,
   entryDate: z.string().refine(isValidDate, "วันที่ต้องเป็น YYYY-MM-DD"),
   note: noteText,
+  isAdvance: z.boolean().optional(),
+  reimbursedAt: z
+    .preprocess(
+      (v) => (typeof v === "string" && v.trim() !== "" ? v.trim() : undefined),
+      z.string().datetime().optional(),
+    )
+    .optional(),
   paymentStatus: z.enum(PAYMENT_STATUSES).optional(),
 });
 
