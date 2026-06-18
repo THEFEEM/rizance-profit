@@ -43,42 +43,48 @@ export default async function ProjectHubPage({ params }: { params: Promise<{ id:
           <ProjectInfoHeader project={project} />
         </div>
 
-        <div className="mt-6 space-y-6 px-4">
-          <ProjectBudgetCard
-            summary={{
-              budgetTarget: summary.totalBudgetTarget,
-              totalFunding: summary.totalFunding,
-              paidFunding: summary.paidFunding,
-              committedFunding: summary.committedFunding,
-              totalSpent: summary.totalSpent,
-              paidSpent: summary.paidSpent,
-              committedSpent: summary.committedSpent,
-              remaining: summary.remaining,
-              budgetRemaining: summary.budgetRemaining,
-              budgetUsedPct: summary.budgetUsedPct,
-              isOverBudget: summary.isOverBudget,
-            }}
-            currency={user.currency}
-            title="ภาพรวมงบทั้งปี"
-          />
+        <div className="mt-6 space-y-6">
+          <div className="px-4">
+            <ProjectBudgetCard
+              summary={{
+                budgetTarget: summary.totalBudgetTarget,
+                totalFunding: summary.totalFunding,
+                paidFunding: summary.paidFunding,
+                committedFunding: summary.committedFunding,
+                totalSpent: summary.totalSpent,
+                paidSpent: summary.paidSpent,
+                committedSpent: summary.committedSpent,
+                remaining: summary.remaining,
+                budgetRemaining: summary.budgetRemaining,
+                budgetUsedPct: summary.budgetUsedPct,
+                isOverBudget: summary.isOverBudget,
+              }}
+              currency={user.currency}
+              title="ภาพรวมงบทั้งปี"
+            />
+          </div>
 
-          <ActivityListSection
-            projectId={id}
-            activities={summary.activities}
-            currency={user.currency}
-          />
+          <ProjectHubActions projectId={id} scope="project" closed={closed} />
 
-          <ProjectSettingsPanel project={project} />
-          <ProjectMembersPanel projectId={id} members={members} />
+          <div className="space-y-6 px-4">
+            <ActivityListSection
+              projectId={id}
+              activities={summary.activities}
+              currency={user.currency}
+            />
 
-          {!closed && (
-            <Link
-              href={`/projects/${id}/summary`}
-              className="tap-target block rounded-[14px] border-[0.5px] border-rz-border bg-rz-card px-4 py-4 text-center text-sm font-medium text-rz-blue active:bg-rz-elevated"
-            >
-              ดูสรุปโครงการเต็ม →
-            </Link>
-          )}
+            <ProjectSettingsPanel project={project} />
+            <ProjectMembersPanel projectId={id} members={members} />
+
+            {!closed && (
+              <Link
+                href={`/projects/${id}/summary`}
+                className="tap-target block rounded-[14px] border-[0.5px] border-rz-border bg-rz-card px-4 py-4 text-center text-sm font-medium text-rz-blue active:bg-rz-elevated"
+              >
+                ดูสรุปโครงการเต็ม →
+              </Link>
+            )}
+          </div>
         </div>
       </div>
     );

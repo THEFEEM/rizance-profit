@@ -128,6 +128,9 @@ function mapIncome(r: IncomeRow): ProjectIncome {
 const INCOME_RETURN = `id, activity_id, amount, source, label,
   entry_date::text AS entry_date, note, receipt_url, payment_method, payment_status, created_at`;
 
+const INCOME_JOIN_RETURN = `i.id, i.activity_id, i.amount, i.source, i.label,
+  i.entry_date::text AS entry_date, i.note, i.receipt_url, i.payment_method, i.payment_status, i.created_at`;
+
 type ExpenseRow = {
   id: string;
   activity_id: string;
@@ -166,6 +169,9 @@ function mapExpense(r: ExpenseRow): ProjectExpense {
 
 const EXPENSE_RETURN = `id, activity_id, amount, category, label, payer_name, fund_source,
   entry_date::text AS entry_date, note, receipt_url, is_advance, reimbursed_at, payment_status, created_at`;
+
+const EXPENSE_JOIN_RETURN = `e.id, e.activity_id, e.amount, e.category, e.label, e.payer_name, e.fund_source,
+  e.entry_date::text AS entry_date, e.note, e.receipt_url, e.is_advance, e.reimbursed_at, e.payment_status, e.created_at`;
 
 type MemberRow = {
   id: string;
@@ -458,6 +464,24 @@ export async function listProjectIncome(
   return rows.map(mapIncome);
 }
 
+/** All income entries for a project (org-level entry list). */
+export async function listProjectIncomesForProject(
+  userId: string,
+  projectId: string,
+): Promise<ProjectIncome[]> {
+  const project = await getOwnedProject(userId, projectId);
+  if (!project) return [];
+
+  const { rows } = await pool.query<IncomeRow>(
+    `SELECT ${INCOME_JOIN_RETURN} FROM project_income_entries i
+     JOIN project_activities a ON a.id = i.activity_id
+     WHERE a.project_id = $1 AND a.user_id = $2 AND i.user_id = $2
+     ORDER BY i.entry_date DESC, i.created_at DESC`,
+    [projectId, userId],
+  );
+  return rows.map(mapIncome);
+}
+
 export async function createProjectIncome(
   userId: string,
   activityId: string,
@@ -499,6 +523,24 @@ export async function listProjectExpense(
      WHERE user_id = $1 AND activity_id = $2
      ORDER BY entry_date DESC, created_at DESC`,
     [userId, activityId],
+  );
+  return rows.map(mapExpense);
+}
+
+/** All expense entries for a project (org-level entry list). */
+export async function listProjectExpensesForProject(
+  userId: string,
+  projectId: string,
+): Promise<ProjectExpense[]> {
+  const project = await getOwnedProject(userId, projectId);
+  if (!project) return [];
+
+  const { rows } = await pool.query<ExpenseRow>(
+    `SELECT ${EXPENSE_JOIN_RETURN} FROM project_expense_entries e
+     JOIN project_activities a ON a.id = e.activity_id
+     WHERE a.project_id = $1 AND a.user_id = $2 AND e.user_id = $2
+     ORDER BY e.entry_date DESC, e.created_at DESC`,
+    [projectId, userId],
   );
   return rows.map(mapExpense);
 }
