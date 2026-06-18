@@ -2,6 +2,7 @@
 import {
   PROJECT_EXPENSE_KEYS,
   PROJECT_FUNDING_KEYS,
+  projectFundingLabel,
 } from "./project-categories-core.mjs";
 
 function toCents(value) {
@@ -49,6 +50,53 @@ export function computeIsOverBudget(budgetTarget, totalSpent) {
   return toCents(budgetTarget) > 0 && toCents(totalSpent) > toCents(budgetTarget);
 }
 
+function buildFundBreakdown(incomeBySource, expenseByFund) {
+  const breakdown = [];
+  for (const key of PROJECT_FUNDING_KEYS) {
+    const totalReceived = incomeBySource[key] ?? "0.00";
+    const totalSpent = expenseByFund[key] ?? "0.00";
+    if (toCents(totalReceived) <= 0 && toCents(totalSpent) <= 0) continue;
+    const remaining = computeProfit(totalReceived, totalSpent);
+    breakdown.push({
+      sourceKey: key,
+      sourceLabel: projectFundingLabel(key),
+      totalReceived,
+      totalSpent,
+      remaining,
+      isOverspent: toCents(totalSpent) > toCents(totalReceived),
+    });
+  }
+  return breakdown;
+}
+
+function rollupFundBreakdown(activities) {
+  const received = {};
+  const spent = {};
+  for (const act of activities) {
+    for (const fb of act.fundBreakdown) {
+      received[fb.sourceKey] = sumDecimals(received[fb.sourceKey] ?? "0.00", fb.totalReceived);
+      spent[fb.sourceKey] = sumDecimals(spent[fb.sourceKey] ?? "0.00", fb.totalSpent);
+    }
+  }
+  const keys = new Set([...Object.keys(received), ...Object.keys(spent)]);
+  const breakdown = [];
+  for (const key of keys) {
+    const totalReceived = received[key] ?? "0.00";
+    const totalSpent = spent[key] ?? "0.00";
+    if (toCents(totalReceived) <= 0 && toCents(totalSpent) <= 0) continue;
+    const remaining = computeProfit(totalReceived, totalSpent);
+    breakdown.push({
+      sourceKey: key,
+      sourceLabel: projectFundingLabel(key),
+      totalReceived,
+      totalSpent,
+      remaining,
+      isOverspent: toCents(totalSpent) > toCents(totalReceived),
+    });
+  }
+  return breakdown.sort((a, b) => a.sourceKey.localeCompare(b.sourceKey));
+}
+
 export function buildActivitySummary(activity, incomes, expenses) {
   const incomeBySource = emptyIncomeBySource();
   let incomeCount = 0;
@@ -81,6 +129,8 @@ export function buildActivitySummary(activity, incomes, expenses) {
   }
 
   const expenseByCategory = emptyExpenseByCategory();
+  const expenseByFund = Object.fromEntries(PROJECT_FUNDING_KEYS.map((k) => [k, "0.00"]));
+  let unassignedSpent = "0.00";
   let expenseCount = 0;
   let paidSpent = "0.00";
   let committedSpent = "0.00";
@@ -109,6 +159,11 @@ export function buildActivitySummary(activity, incomes, expenses) {
         next.unreimbursed = sumDecimals(prev.unreimbursed, row.amount);
       }
       advanceByPayerMap.set(payerName, next);
+    }
+    if (row.fund_source === null) {
+      unassignedSpent = sumDecimals(unassignedSpent, row.amount);
+    } else if (row.fund_source in expenseByFund) {
+      expenseByFund[row.fund_source] = sumDecimals(expenseByFund[row.fund_source], row.amount);
     }
     if (row.payment_status === "paid") {
       paidSpent = sumDecimals(paidSpent, row.amount);
@@ -148,6 +203,8 @@ export function buildActivitySummary(activity, incomes, expenses) {
     isOverBudget: computeIsOverBudget(budgetTarget, totalSpent),
     incomeBySource,
     expenseByCategory,
+    fundBreakdown: buildFundBreakdown(incomeBySource, expenseByFund),
+    unassignedSpent,
     incomeCount,
     expenseCount,
     status: activity.status,
@@ -216,6 +273,8 @@ export function buildProjectSummary(project, activities, incomes, expenses) {
       (a) => a.expenseByCategory,
       PROJECT_EXPENSE_KEYS,
     ),
+    fundBreakdown: rollupFundBreakdown(activitySummaries),
+    unassignedSpent: sumDecimals(...activitySummaries.map((a) => a.unassignedSpent)),
     activities: activitySummaries,
     activityCount: activitySummaries.length,
     closedActivityCount: activitySummaries.filter((a) => a.status === "closed").length,
@@ -250,7 +309,7 @@ export async function loadProjectBundle(client, userId, projectId) {
   const expensesRes = await client.query(
     `SELECT e.activity_id, e.category, e.amount, e.is_advance, e.payer_name,
             e.reimbursed_at::text AS reimbursed_at,
-            e.payment_status
+            e.payment_status, e.fund_source
      FROM project_expense_entries e
      JOIN project_activities a ON a.id = e.activity_id
      WHERE a.project_id = $1 AND a.user_id = $2 AND e.user_id = $2`,

@@ -135,6 +135,7 @@ type ExpenseRow = {
   category: string;
   label: string | null;
   payer_name: string | null;
+  fund_source: string | null;
   entry_date: string;
   note: string | null;
   receipt_url: string | null;
@@ -152,6 +153,7 @@ function mapExpense(r: ExpenseRow): ProjectExpense {
     category: r.category,
     label: r.label,
     payerName: r.payer_name,
+    fundSource: r.fund_source,
     entryDate: r.entry_date,
     note: r.note,
     receiptUrl: r.receipt_url,
@@ -162,7 +164,7 @@ function mapExpense(r: ExpenseRow): ProjectExpense {
   };
 }
 
-const EXPENSE_RETURN = `id, activity_id, amount, category, label, payer_name,
+const EXPENSE_RETURN = `id, activity_id, amount, category, label, payer_name, fund_source,
   entry_date::text AS entry_date, note, receipt_url, is_advance, reimbursed_at, payment_status, created_at`;
 
 type MemberRow = {
@@ -511,9 +513,9 @@ export async function createProjectExpense(
 
   const { rows } = await pool.query<ExpenseRow>(
     `INSERT INTO project_expense_entries (
-       activity_id, user_id, amount, category, label, payer_name, entry_date, note, is_advance, reimbursed_at, payment_status
+       activity_id, user_id, amount, category, label, payer_name, fund_source, entry_date, note, is_advance, reimbursed_at, payment_status
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7::date, $8, $9, $10, $11)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::date, $9, $10, $11, $12)
      RETURNING ${EXPENSE_RETURN}`,
     [
       activityId,
@@ -522,6 +524,7 @@ export async function createProjectExpense(
       input.category,
       input.label ?? null,
       input.payerName ?? null,
+      input.fundSource ?? null,
       input.entryDate,
       input.note ?? null,
       input.isAdvance ?? false,

@@ -285,6 +285,11 @@ CREATE TABLE IF NOT EXISTS project_expense_entries (
     )),
   label           VARCHAR(160),
   payer_name      VARCHAR(120),
+  fund_source     VARCHAR(30)
+    CHECK (fund_source IS NULL OR fund_source IN (
+      'faculty_grant', 'membership', 'participant_fee', 'sponsor',
+      'donation', 'activity_income', 'other_income'
+    )),
   entry_date      DATE NOT NULL,
   note            TEXT,
   receipt_url     TEXT,
@@ -300,6 +305,7 @@ CREATE INDEX IF NOT EXISTS idx_project_expense_advance
   ON project_expense_entries (activity_id, is_advance)
   WHERE is_advance = true;
 -- idx_project_expense_status: created by migration 0012 (column may not exist on legacy tables)
+-- idx_project_expense_fund_source: created by migration 0013 (column may not exist on legacy tables)
 
 CREATE TABLE IF NOT EXISTS project_members (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
