@@ -4,36 +4,45 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
-  { key: "today", href: "/", label: "Today", icon: "🏠" },
+  { key: "today", label: "Today", icon: "🏠" },
   { key: "income", label: "+In", icon: "➕" },
   { key: "expense", label: "−Out", icon: "➖" },
-  { key: "stats", href: "/summary", label: "Stats", icon: "📊" },
+  { key: "stats", label: "Stats", icon: "📊" },
 ] as const;
 
 function isNavActive(pathname: string, key: string, href: string): boolean {
-  if (key === "today") return pathname === "/";
-  if (key === "stats") return pathname.startsWith("/summary");
+  if (key === "today") return pathname === href;
+  if (key === "stats" && href === "/summary") return pathname.startsWith("/summary");
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 export function BottomNav({
   mode,
+  todayHref,
   incomeHref,
   expenseHref,
+  statsHref,
 }: {
-  mode: "regular" | "booth";
+  mode: "regular" | "booth" | "project";
+  todayHref: string;
   incomeHref: string;
   expenseHref: string;
+  statsHref: string;
 }) {
   const pathname = usePathname();
-  const accentActive = mode === "booth" ? "text-rz-amber" : "text-rz-green";
+  const accentActive =
+    mode === "booth"
+      ? "text-rz-amber"
+      : mode === "project"
+        ? "text-rz-purple"
+        : "text-rz-green";
   const accentIdle = "text-rz-hint";
 
   const hrefByKey: Record<string, string> = {
-    today: "/",
+    today: todayHref,
     income: incomeHref,
     expense: expenseHref,
-    stats: "/summary",
+    stats: statsHref,
   };
 
   return (

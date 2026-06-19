@@ -9,7 +9,7 @@ import {
 } from "@/lib/project-queries";
 import { summarizeProject } from "@/lib/project-summary";
 import { getCurrentUser } from "@/lib/session";
-import { ModeSwitcher } from "@/components/ModeSwitcher";
+import { ProjectModeSwitcher } from "@/components/project/ProjectModeSwitcher";
 import { ActivityListSection } from "@/components/project/ActivityListSection";
 import { ProjectBack } from "@/components/project/ProjectBack";
 import { ProjectBudgetCard } from "@/components/project/ProjectBudgetCard";
@@ -38,7 +38,7 @@ export default async function ProjectHubPage({ params }: { params: Promise<{ id:
     return (
       <div className="pb-8" data-context="project">
         <ProjectBack href="/projects" />
-        <ModeSwitcher mode="project" />
+        <ProjectModeSwitcher userId={user.id} project={project} />
         <div className="mt-1">
           <ProjectInfoHeader project={project} />
         </div>
@@ -79,7 +79,7 @@ export default async function ProjectHubPage({ params }: { params: Promise<{ id:
                 href={`/projects/${id}/summary`}
                 className="tap-target block rounded-[14px] border-[0.5px] border-rz-border bg-rz-card px-4 py-4 text-center text-sm font-medium text-rz-purple active:bg-rz-elevated"
               >
-                ดูสรุปโครงการเต็ม →
+                ดูสรุปองค์กรเต็ม →
               </Link>
             )}
           </div>
@@ -103,7 +103,7 @@ export default async function ProjectHubPage({ params }: { params: Promise<{ id:
   return (
     <div className="pb-8" data-context="project">
       <ProjectBack href="/projects" />
-      <ModeSwitcher mode="project" />
+      <ProjectModeSwitcher userId={user.id} project={project} />
       <div className="mt-1">
         <ProjectInfoHeader project={project} />
       </div>

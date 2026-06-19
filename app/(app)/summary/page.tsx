@@ -31,6 +31,10 @@ export default async function StatsSummaryPage({
     cookieStore.get(CONTEXT_COOKIE)?.value,
   );
 
+  if (ctx.mode === "project") {
+    redirect(`/projects/${ctx.projectId}/summary`);
+  }
+
   const { period, closeDate } = parseRegularStatsParams(params);
 
   return (

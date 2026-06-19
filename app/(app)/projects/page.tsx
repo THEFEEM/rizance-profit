@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { listProjectSummaries } from "@/lib/project-summary";
 import { getCurrentUser } from "@/lib/session";
-import { ModeSwitcher } from "@/components/ModeSwitcher";
+import { ProjectModeSwitcher } from "@/components/project/ProjectModeSwitcher";
 import { ProjectList } from "@/components/project/ProjectList";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +15,7 @@ export default async function ProjectsPage() {
 
   return (
     <div className="pb-6" data-context="project">
-      <ModeSwitcher mode="project" />
+      <ProjectModeSwitcher userId={user.id} />
       <div className="flex items-center justify-between px-4 pt-1">
         <div>
           <h1 className="text-lg font-medium text-rz-text">โครงการทั้งหมด</h1>

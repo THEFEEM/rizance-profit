@@ -1,4 +1,4 @@
-export type AppContextMode = "regular" | "booth";
+export type AppContextMode = "regular" | "booth" | "project";
 
 export type AppContextRegular = { mode: "regular" };
 
@@ -8,4 +8,11 @@ export type AppContextBooth = {
   boothName: string;
 };
 
-export type AppContext = AppContextRegular | AppContextBooth;
+export type AppContextProject = {
+  mode: "project";
+  projectId: string;
+  projectName: string;
+  orgName: string | null;
+};
+
+export type AppContext = AppContextRegular | AppContextBooth | AppContextProject;

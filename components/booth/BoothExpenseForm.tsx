@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AmountInput } from "@/components/ui/AmountInput";
-import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
+import { AmountPadSection } from "@/components/entry/AmountPadSection";
+import { EntryFormLayout } from "@/components/entry/EntryFormLayout";
 import { EntryField } from "@/components/entry/EntryField";
 import { EntryOptionButton } from "@/components/entry/EntryOptionButton";
 import { BoothBack } from "@/components/booth/BoothBack";
@@ -102,7 +102,20 @@ export function BoothExpenseForm({
   }
 
   return (
-    <div className="flex min-h-[calc(100dvh-57px-61px)] flex-col">
+    <EntryFormLayout
+      pad={
+        <AmountPadSection
+          raw={raw}
+          onChange={setRaw}
+          onSave={save}
+          saving={saving}
+          closed={closed}
+          saveLabel="บันทึก"
+          tone="expense"
+          accent="amber"
+        />
+      }
+    >
       <div className="flex items-center justify-between px-4 py-3">
         <BoothBack href={`/booth/${boothId}`} />
         <h1 className="text-base font-medium text-rz-text">รายจ่ายบูธ</h1>
@@ -123,9 +136,7 @@ export function BoothExpenseForm({
         </div>
       )}
 
-      <AmountInput value={formatTyped(raw)} tone="expense" />
-
-      <div className="flex flex-col gap-3 px-4">
+      <div className="flex flex-col gap-3 px-4 pb-4">
         <div>
           <p className="mb-1.5 text-xs text-rz-muted">ประเภทรายจ่าย</p>
           <CategoryGrid
@@ -247,21 +258,6 @@ export function BoothExpenseForm({
         )}
       </div>
 
-      <div className="mt-auto px-2 pb-3">
-        {closed ? (
-          <p className="px-2 py-4 text-center text-sm text-rz-hint">ฟอร์มถูกปิดใช้งาน</p>
-        ) : (
-          <QuickAmountPad
-            value={raw}
-            onChange={setRaw}
-            onSave={save}
-            saving={saving}
-            saveLabel="บันทึก"
-            accent="amber"
-          />
-        )}
-      </div>
-
       <div className="border-t-[0.5px] border-rz-border">
         <h2 className="px-4 pt-4 text-xs font-medium text-rz-muted">รายการที่บันทึกแล้ว</h2>
         <BoothEntryList
@@ -273,6 +269,6 @@ export function BoothExpenseForm({
           appearance="entry"
         />
       </div>
-    </div>
+    </EntryFormLayout>
   );
 }

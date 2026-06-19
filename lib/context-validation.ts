@@ -6,4 +6,8 @@ export const contextPatchSchema = z.discriminatedUnion("mode", [
     mode: z.literal("booth"),
     boothId: z.string().uuid(),
   }),
+  z.object({
+    mode: z.literal("project"),
+    projectId: z.string().uuid(),
+  }),
 ]);

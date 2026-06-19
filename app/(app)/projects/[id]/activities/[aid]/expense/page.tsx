@@ -35,6 +35,7 @@ export default async function ActivityExpensePage({
       projectId={id}
       activityId={aid}
       activityName={activity.name}
+      projectType={project.projectType}
       startDate={startDate}
       endDate={endDate}
       closed={closed}

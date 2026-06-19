@@ -41,6 +41,7 @@ export default async function ProjectExpensePage({
       <ProjectExpenseForm
         projectId={id}
         activityId={activity.id}
+        projectType={project.projectType}
         activityName={activity.name}
         startDate={startDate}
         endDate={endDate}

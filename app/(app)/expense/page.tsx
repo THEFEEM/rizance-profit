@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AmountInput } from "@/components/ui/AmountInput";
-import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
+import { AmountPadSection } from "@/components/entry/AmountPadSection";
+import { EntryFormLayout } from "@/components/entry/EntryFormLayout";
 import { EntryField } from "@/components/entry/EntryField";
 import { EntryPageHeader } from "@/components/entry/EntryPageHeader";
 import { apiFetch } from "@/lib/api-client";
@@ -47,14 +47,22 @@ export default function AddExpensePage() {
   }
 
   return (
-    <div className="flex min-h-[calc(100dvh-57px-61px)] flex-col">
+    <EntryFormLayout
+      pad={
+        <AmountPadSection
+          raw={raw}
+          onChange={setRaw}
+          onSave={save}
+          saving={saving}
+          tone="expense"
+          accent="green"
+        />
+      }
+    >
       <EntryPageHeader title="Add Expense" />
-
       <EntryContextBanner target="regular" />
 
-      <AmountInput value={formatTyped(raw)} tone="expense" />
-
-      <div className="flex flex-col gap-3 px-4">
+      <div className="flex flex-col gap-3 px-4 pb-4">
         <div>
           <p className="mb-1.5 text-xs text-rz-muted">ประเภทรายจ่าย</p>
           <CategoryGrid
@@ -88,17 +96,6 @@ export default function AddExpensePage() {
           </p>
         )}
       </div>
-
-      <div className="mt-auto px-2 pb-3">
-        <QuickAmountPad
-          value={raw}
-          onChange={setRaw}
-          onSave={save}
-          saving={saving}
-          saveLabel="SAVE"
-          accent="green"
-        />
-      </div>
-    </div>
+    </EntryFormLayout>
   );
 }

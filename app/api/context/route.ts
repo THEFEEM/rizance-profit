@@ -11,6 +11,26 @@ import {
   shouldClearContextCookie,
 } from "@/lib/context";
 import { getBooth } from "@/lib/booth-queries";
+import { getProject } from "@/lib/project-queries";
+
+function contextResponse(
+  resolved: Awaited<ReturnType<typeof resolveTodayContext>>,
+) {
+  if (resolved.mode === "regular") return { mode: "regular" as const };
+  if (resolved.mode === "project") {
+    return {
+      mode: "project" as const,
+      projectId: resolved.projectId,
+      projectName: resolved.project.name,
+      orgName: resolved.project.orgName,
+    };
+  }
+  return {
+    mode: "booth" as const,
+    boothId: resolved.boothId,
+    boothName: resolved.booth.name,
+  };
+}
 
 export async function GET(req: NextRequest) {
   const userId = await getUserId(req);
@@ -18,14 +38,7 @@ export async function GET(req: NextRequest) {
 
   const raw = req.cookies.get(CONTEXT_COOKIE)?.value;
   const resolved = await resolveTodayContext(userId, req, raw);
-  const data =
-    resolved.mode === "regular"
-      ? { mode: "regular" as const }
-      : {
-          mode: "booth" as const,
-          boothId: resolved.boothId,
-          boothName: resolved.booth.name,
-        };
+  const data = contextResponse(resolved);
 
   const res = NextResponse.json({ data });
   if (shouldClearContextCookie(raw, resolved)) {
@@ -56,6 +69,43 @@ export async function PATCH(req: NextRequest) {
   if (parsed.data.mode === "regular") {
     const res = NextResponse.json({ data: { mode: "regular" as const } });
     res.cookies.set(CONTEXT_COOKIE, "regular", contextCookieOptions());
+    return res;
+  }
+
+  if (parsed.data.mode === "project") {
+    const project = await getProject(userId, parsed.data.projectId);
+    if (!project) {
+      return NextResponse.json(
+        { error: { message: "ไม่พบองค์กรนี้", reason: "project_not_found" } },
+        { status: 404 },
+      );
+    }
+    if (project.status === "closed") {
+      return NextResponse.json(
+        { error: { message: "องค์กรปิดแล้ว — สลับบริบทไม่ได้", reason: "project_closed" } },
+        { status: 409 },
+      );
+    }
+    if (project.projectType !== "long") {
+      return NextResponse.json(
+        { error: { message: "โครงการระยะสั้นใช้บริบทองค์กรไม่ได้", reason: "project_not_org" } },
+        { status: 409 },
+      );
+    }
+
+    const res = NextResponse.json({
+      data: {
+        mode: "project" as const,
+        projectId: project.id,
+        projectName: project.name,
+        orgName: project.orgName,
+      },
+    });
+    res.cookies.set(
+      CONTEXT_COOKIE,
+      encodeContextCookie({ projectId: project.id }),
+      contextCookieOptions(),
+    );
     return res;
   }
 
