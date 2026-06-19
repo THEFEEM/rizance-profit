@@ -210,12 +210,14 @@ try {
   assertEq("PATCH project", String(res.status), "200");
   assertEq("PATCH project mode", res.body?.data?.mode, "project");
 
-  page = await fetchHtml(base, `/projects/${projectId}`);
+  page = await fetchHtml(base, "/");
   assertTrue("nav project income href", hrefPresent(page.html, `/projects/${projectId}/income`));
   assertTrue("nav project expense href", hrefPresent(page.html, `/projects/${projectId}/expense`));
   assertTrue("nav project stats href", hrefPresent(page.html, `/projects/${projectId}/summary`));
   assertTrue("no regular income nav", !hrefPresent(page.html, 'href="/income"'));
   assertTrue("nav blue accent", page.html.includes("text-rz-blue"));
+  assertTrue("OrgToday budget card", page.html.includes("ภาพรวมงบทั้งปี"));
+  assertTrue("OrgToday org name", page.html.includes("ชมรมนำทาง"));
   console.log("");
 
   console.log("8) Closed project cookie → nav falls back to regular routes");

@@ -1,6 +1,6 @@
 import { HeaderSettings } from "@/components/HeaderSettings";
 
-function shopInitials(name: string): string {
+function displayInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length >= 2) {
     return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
@@ -9,11 +9,11 @@ function shopInitials(name: string): string {
 }
 
 export function TodayHeader({
-  shopName,
+  displayName,
   dateLabel,
   mode,
 }: {
-  shopName: string;
+  displayName: string;
   dateLabel: string;
   mode: "regular" | "booth" | "project";
 }) {
@@ -31,10 +31,10 @@ export function TodayHeader({
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rz-elevated text-sm font-medium text-rz-text ring-2 ${ringColor}`}
           aria-hidden
         >
-          {shopInitials(shopName)}
+          {displayInitials(displayName)}
         </div>
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-rz-text">{shopName}</p>
+          <p className="truncate text-sm font-medium text-rz-text">{displayName}</p>
           <p className="text-[11px] text-rz-hint">{dateLabel}</p>
         </div>
       </div>

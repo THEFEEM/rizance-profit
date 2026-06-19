@@ -10,13 +10,18 @@ type Row =
 function mergeRows(
   incomes: ProjectIncome[],
   expenses: ProjectExpense[],
-  kind: "income" | "expense",
+  kind: "income" | "expense" | "all",
   limit = 20,
 ): Row[] {
   const rows: Row[] =
-    kind === "income"
-      ? incomes.map((entry) => ({ kind: "income" as const, entry }))
-      : expenses.map((entry) => ({ kind: "expense" as const, entry }));
+    kind === "all"
+      ? [
+          ...incomes.map((entry) => ({ kind: "income" as const, entry })),
+          ...expenses.map((entry) => ({ kind: "expense" as const, entry })),
+        ]
+      : kind === "income"
+        ? incomes.map((entry) => ({ kind: "income" as const, entry }))
+        : expenses.map((entry) => ({ kind: "expense" as const, entry }));
   rows.sort((a, b) => {
     const da = a.entry.entryDate;
     const db = b.entry.entryDate;
@@ -33,15 +38,17 @@ export function OrgProjectEntryList({
   generalActivityId,
   currency = "THB",
   kind,
+  limit = 20,
 }: {
   incomes: ProjectIncome[];
   expenses: ProjectExpense[];
   activityNames: Record<string, string>;
   generalActivityId: string;
   currency?: string;
-  kind: "income" | "expense";
+  kind: "income" | "expense" | "all";
+  limit?: number;
 }) {
-  const rows = mergeRows(incomes, expenses, kind);
+  const rows = mergeRows(incomes, expenses, kind, limit);
 
   if (rows.length === 0) {
     return (

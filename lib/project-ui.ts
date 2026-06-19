@@ -24,6 +24,11 @@ export const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {
   long: "ระยะยาว",
 };
 
+/** Display label for org mode — org_name when set, else project name. */
+export function orgDisplayName(project: { orgName: string | null; name: string }): string {
+  return project.orgName?.trim() || project.name;
+}
+
 /** List-card status badges (GROUP 1) */
 export const PROJECT_LIST_STATUS_BADGE: Record<
   ProjectStatus,

@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { getProject } from "@/lib/project-queries";
 import { getCurrentUser } from "@/lib/session";
-import { ModeSwitcher } from "@/components/ModeSwitcher";
+import { ProjectModeSwitcher } from "@/components/project/ProjectModeSwitcher";
 import { CreateActivityForm } from "@/components/project/CreateActivityForm";
 import { ProjectBack } from "@/components/project/ProjectBack";
 
@@ -23,7 +23,7 @@ export default async function NewActivityPage({
   return (
     <div className="pb-6" data-context="project">
       <ProjectBack href={`/projects/${id}`} />
-      <ModeSwitcher mode="project" />
+      <ProjectModeSwitcher userId={user.id} project={project} />
       <div className="px-4 pt-1">
         <h1 className="text-lg font-medium text-rz-text">เพิ่มกิจกรรมย่อย</h1>
         <p className="text-xs text-rz-hint">{project.name}</p>

@@ -5,6 +5,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { TodayHeader } from "@/components/TodayHeader";
 import { today, formatDateLabel } from "@/lib/date";
 import { CONTEXT_COOKIE, entryNavRoutes, resolveTodayContext } from "@/lib/context";
+import { orgDisplayName } from "@/lib/project-ui";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -17,7 +18,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-rz-bg">
       <TodayHeader
-        shopName={user.shopName}
+        displayName={
+          resolved.mode === "project"
+            ? orgDisplayName(resolved.project)
+            : user.shopName
+        }
         dateLabel={formatDateLabel(today())}
         mode={resolved.mode}
       />
