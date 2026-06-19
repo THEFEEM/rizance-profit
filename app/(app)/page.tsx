@@ -19,6 +19,10 @@ export default async function TodayPage() {
     cookieStore.get(CONTEXT_COOKIE)?.value,
   );
 
+  if (ctx.mode === "project") {
+    redirect(`/projects/${ctx.projectId}`);
+  }
+
   return (
     <div className="pb-3">
       <ModeSwitcher

@@ -194,6 +194,38 @@ try {
   assertTrue("booth expense amber style", page.html.includes('data-entry-context="booth"'));
   console.log("");
 
+  console.log("7) Open project context → nav routes to org entry forms");
+  const { rows: projects } = await client.query(
+    `INSERT INTO projects (user_id, name, project_type, org_name, budget_target, start_date, end_date, status)
+     VALUES ($1, 'Org Nav Test', 'long', 'ชมรมนำทาง', 50000.00, '2026-01-01'::date, '2026-12-31'::date, 'active')
+     RETURNING id`,
+    [userId],
+  );
+  const projectId = projects[0].id;
+
+  res = await apiJson(base, "/api/context", {
+    method: "PATCH",
+    body: JSON.stringify({ mode: "project", projectId }),
+  });
+  assertEq("PATCH project", String(res.status), "200");
+  assertEq("PATCH project mode", res.body?.data?.mode, "project");
+
+  page = await fetchHtml(base, `/projects/${projectId}`);
+  assertTrue("nav project income href", hrefPresent(page.html, `/projects/${projectId}/income`));
+  assertTrue("nav project expense href", hrefPresent(page.html, `/projects/${projectId}/expense`));
+  assertTrue("nav project stats href", hrefPresent(page.html, `/projects/${projectId}/summary`));
+  assertTrue("no regular income nav", !hrefPresent(page.html, 'href="/income"'));
+  assertTrue("nav blue accent", page.html.includes("text-rz-blue"));
+  console.log("");
+
+  console.log("8) Closed project cookie → nav falls back to regular routes");
+  await client.query(`UPDATE projects SET status = 'closed' WHERE id = $1`, [projectId]);
+  page = await fetchHtml(base, "/");
+  assertTrue("closed project: nav /income", hrefPresent(page.html, "/income"));
+  assertTrue("closed project: nav /expense", hrefPresent(page.html, "/expense"));
+  assertTrue("closed project: no project nav", !hrefPresent(page.html, `/projects/${projectId}/income`));
+  console.log("");
+
   console.log("5) Closed booth cookie → nav falls back to regular routes");
   await client.query(
     `UPDATE booths SET status = 'closed', closed_at = now() WHERE id = $1`,

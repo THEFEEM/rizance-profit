@@ -26,8 +26,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       <BottomNav
         mode={resolved.mode}
+        todayHref={navRoutes.today}
         incomeHref={navRoutes.income}
         expenseHref={navRoutes.expense}
+        statsHref={navRoutes.stats}
       />
     </div>
   );

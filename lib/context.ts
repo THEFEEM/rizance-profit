@@ -2,7 +2,9 @@ import type { NextRequest } from "next/server";
 import { useSecureCookies } from "@/lib/env";
 import { defaultBoothEntryDate } from "@/lib/date";
 import { getBooth } from "@/lib/booth-queries";
+import { getProject } from "@/lib/project-queries";
 import type { Booth } from "@/types/booth";
+import type { Project } from "@/types/project";
 import type { AppContext } from "@/types/context";
 
 export const CONTEXT_COOKIE = "rizance_context";
@@ -28,17 +30,29 @@ export function clearContextCookieOptions() {
   };
 }
 
-export function encodeContextCookie(mode: "regular" | { boothId: string }): string {
-  return mode === "regular" ? "regular" : `booth:${mode.boothId}`;
+export function encodeContextCookie(
+  mode: "regular" | { boothId: string } | { projectId: string },
+): string {
+  if (mode === "regular") return "regular";
+  if ("boothId" in mode) return `booth:${mode.boothId}`;
+  return `project:${mode.projectId}`;
 }
 
 export function parseContextCookie(
   raw: string | undefined,
-): { type: "regular" } | { type: "booth"; boothId: string } | { type: "invalid" } {
+):
+  | { type: "regular" }
+  | { type: "booth"; boothId: string }
+  | { type: "project"; projectId: string }
+  | { type: "invalid" } {
   if (!raw || raw === "regular") return { type: "regular" };
   if (raw.startsWith("booth:")) {
     const boothId = raw.slice(6);
     if (UUID_RE.test(boothId)) return { type: "booth", boothId };
+  }
+  if (raw.startsWith("project:")) {
+    const projectId = raw.slice(8);
+    if (UUID_RE.test(projectId)) return { type: "project", projectId };
   }
   return { type: "invalid" };
 }
@@ -47,14 +61,19 @@ function readContextRaw(req?: NextRequest): string | undefined {
   return req?.cookies.get(CONTEXT_COOKIE)?.value;
 }
 
+function isActiveOrgProject(project: Project): boolean {
+  return project.projectType === "long" && project.status !== "closed";
+}
+
 /** Resolved context for Today — read-only; never mutates cookies (safe in Server Components). */
 export type ResolvedTodayContext =
   | { mode: "regular" }
-  | { mode: "booth"; booth: Booth; boothId: string; date: string };
+  | { mode: "booth"; booth: Booth; boothId: string; date: string }
+  | { mode: "project"; project: Project; projectId: string };
 
 /**
  * Resolve effective Today context from a cookie value.
- * Invalid/stale booth cookies fall back to regular WITHOUT writing cookies here —
+ * Invalid/stale booth/project cookies fall back to regular WITHOUT writing cookies here —
  * cookie cleanup belongs in Route Handlers (see GET /api/context).
  */
 export async function resolveTodayContext(
@@ -73,6 +92,14 @@ export async function resolveTodayContext(
     return { mode: "regular" };
   }
 
+  if (parsed.type === "project") {
+    const project = await getProject(userId, parsed.projectId);
+    if (!project || !isActiveOrgProject(project)) {
+      return { mode: "regular" };
+    }
+    return { mode: "project", project, projectId: project.id };
+  }
+
   const booth = await getBooth(userId, parsed.boothId);
   if (!booth || booth.status !== "open") {
     return { mode: "regular" };
@@ -86,7 +113,7 @@ export async function resolveTodayContext(
   };
 }
 
-/** True when the stored cookie should be cleared (stale/invalid booth reference). */
+/** True when the stored cookie should be cleared (stale/invalid booth/project reference). */
 export function shouldClearContextCookie(
   raw: string | undefined,
   resolved: ResolvedTodayContext,
@@ -94,14 +121,23 @@ export function shouldClearContextCookie(
   if (!raw || raw === "regular") return false;
   const parsed = parseContextCookie(raw);
   if (parsed.type === "invalid") return true;
-  if (parsed.type === "booth" && resolved.mode === "regular") return true;
+  if (parsed.type === "booth" && resolved.mode !== "booth") return true;
+  if (parsed.type === "project" && resolved.mode !== "project") return true;
   return false;
 }
 
-/** API-facing context (no booth domain object). */
+/** API-facing context (no booth/project domain objects). */
 export async function getAppContext(userId: string, req?: NextRequest): Promise<AppContext> {
   const resolved = await resolveTodayContext(userId, req);
   if (resolved.mode === "regular") return { mode: "regular" };
+  if (resolved.mode === "project") {
+    return {
+      mode: "project",
+      projectId: resolved.projectId,
+      projectName: resolved.project.name,
+      orgName: resolved.project.orgName,
+    };
+  }
   return {
     mode: "booth",
     boothId: resolved.boothId,
@@ -111,18 +147,47 @@ export async function getAppContext(userId: string, req?: NextRequest): Promise<
 
 export type SetContextResult =
   | { ok: true; context: AppContext }
-  | { ok: false; reason: "invalid_input" | "booth_not_found" | "booth_closed" };
+  | {
+      ok: false;
+      reason:
+        | "invalid_input"
+        | "booth_not_found"
+        | "booth_closed"
+        | "project_not_found"
+        | "project_closed"
+        | "project_not_org";
+    };
 
-/** Bottom-nav +In / −Out targets from resolved context (closed/invalid booth → regular). */
-export function entryNavRoutes(resolved: ResolvedTodayContext): {
+export type EntryNavRoutes = {
+  today: string;
   income: string;
   expense: string;
-} {
+  stats: string;
+};
+
+/** Bottom-nav targets from resolved context (stale/invalid → regular routes). */
+export function entryNavRoutes(resolved: ResolvedTodayContext): EntryNavRoutes {
   if (resolved.mode === "booth") {
     return {
+      today: "/",
       income: `/booth/${resolved.boothId}/income`,
       expense: `/booth/${resolved.boothId}/expense`,
+      stats: "/summary",
     };
   }
-  return { income: "/income", expense: "/expense" };
+  if (resolved.mode === "project") {
+    const base = `/projects/${resolved.projectId}`;
+    return {
+      today: "/",
+      income: `${base}/income`,
+      expense: `${base}/expense`,
+      stats: `${base}/summary`,
+    };
+  }
+  return {
+    today: "/",
+    income: "/income",
+    expense: "/expense",
+    stats: "/summary",
+  };
 }

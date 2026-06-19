@@ -15,9 +15,14 @@ export function TodayHeader({
 }: {
   shopName: string;
   dateLabel: string;
-  mode: "regular" | "booth";
+  mode: "regular" | "booth" | "project";
 }) {
-  const ringColor = mode === "booth" ? "ring-rz-amber" : "ring-rz-green";
+  const ringColor =
+    mode === "booth"
+      ? "ring-rz-amber"
+      : mode === "project"
+        ? "ring-rz-blue"
+        : "ring-rz-green";
 
   return (
     <header className="flex items-center justify-between px-4 py-3">
