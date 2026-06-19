@@ -6,11 +6,11 @@
 import type { PaymentStatus, ProjectStatus, ProjectType } from "@/types/project";
 import { PAYMENT_STATUS_LABELS, PROJECT_STATUS_LABELS } from "@/lib/project-status";
 
-/** §1 Design tokens — blue accent */
+/** §1 Design tokens — purple accent */
 export const PROJECT_UI = {
-  accent: "#6BB6FF",
-  accentBg: "#15293F",
-  accentBorder: "#1E3A52",
+  accent: "#B69CE8",
+  accentBg: "#241B38",
+  accentBorder: "#3D2F5C",
   positive: "#4ADE9E",
   negative: "#F87171",
   amber: "#EF9F27",
@@ -37,9 +37,9 @@ export const PROJECT_LIST_STATUS_BADGE: Record<
   },
   planning: {
     label: "วางแผน",
-    textClass: "text-rz-blue",
-    bgClass: "bg-[#15293F]",
-    borderClass: "border-[#1E3A52]",
+    textClass: "text-rz-purple",
+    bgClass: "bg-rz-purple-bg",
+    borderClass: "border-rz-purple-border",
   },
   closed: {
     label: "ปิดแล้ว",
@@ -62,9 +62,9 @@ export const PAYMENT_STATUS_UI: Record<
   },
   approved: {
     label: PAYMENT_STATUS_LABELS.approved,
-    textClass: "text-rz-blue",
-    bgClass: "bg-[#15293F]",
-    borderClass: "border-[#1E3A52]",
+    textClass: "text-rz-purple",
+    bgClass: "bg-rz-purple-bg",
+    borderClass: "border-rz-purple-border",
   },
   paid: {
     label: PAYMENT_STATUS_LABELS.paid,
@@ -87,7 +87,7 @@ export const FUNDING_SOURCE_UI = [
     label: "งบจากคณะ",
     icon: "building-bank" as const,
     color: PROJECT_UI.accent,
-    bg: "#1A3A52",
+    bg: "#2A1F45",
     dashed: false,
   },
   {

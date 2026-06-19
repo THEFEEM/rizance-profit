@@ -122,7 +122,7 @@ export function ProjectSettingsPanel({ project }: { project: Project }) {
             type="button"
             disabled={saving}
             onClick={save}
-            className="tap-target w-full rounded-[12px] border-[0.5px] border-[#1E3A52] bg-[#15293F] py-3 text-sm font-medium text-rz-blue disabled:opacity-50"
+            className="tap-target w-full rounded-[12px] border-[0.5px] border-rz-purple-border bg-rz-purple-bg py-3 text-sm font-medium text-rz-purple disabled:opacity-50"
           >
             {saving ? "กำลังบันทึก…" : "บันทึกการแก้ไข"}
           </button>

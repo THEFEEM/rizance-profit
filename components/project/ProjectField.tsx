@@ -18,7 +18,7 @@ export function ProjectField({ label, error, className = "", id, ...props }: Fie
       )}
       <input
         id={inputId}
-        className={`tap-target w-full rounded-[11px] border-[0.5px] bg-rz-card px-[13px] py-[13px] text-sm text-rz-text outline-none transition-colors placeholder:text-rz-placeholder focus:border-rz-blue ${
+        className={`tap-target w-full rounded-[11px] border-[0.5px] bg-rz-card px-[13px] py-[13px] text-sm text-rz-text outline-none transition-colors placeholder:text-rz-placeholder focus:border-rz-purple ${
           error ? "border-rz-red" : "border-rz-border"
         } ${className}`}
         aria-invalid={error ? true : undefined}
@@ -53,7 +53,7 @@ export function ProjectTextArea({
       <textarea
         id={inputId}
         rows={rows}
-        className={`tap-target w-full resize-y rounded-[11px] border-[0.5px] bg-rz-card px-[13px] py-[13px] text-sm text-rz-text outline-none transition-colors placeholder:text-rz-placeholder focus:border-rz-blue ${
+        className={`tap-target w-full resize-y rounded-[11px] border-[0.5px] bg-rz-card px-[13px] py-[13px] text-sm text-rz-text outline-none transition-colors placeholder:text-rz-placeholder focus:border-rz-purple ${
           error ? "border-rz-red" : "border-rz-border"
         } ${className}`}
         aria-invalid={error ? true : undefined}

@@ -9,7 +9,7 @@ import { ProjectStatusBadge } from "@/components/project/ProjectStatusBadge";
 const ACTIVITY_STATUS_BADGE = {
   active: { label: "กำลังทำ", textClass: "text-rz-green", bgClass: "bg-rz-logo-bg", borderClass: "border-rz-logo-border" },
   closed: { label: "ปิดแล้ว", textClass: "text-rz-muted", bgClass: "bg-rz-elevated", borderClass: "border-rz-border" },
-  planning: { label: "วางแผน", textClass: "text-rz-blue", bgClass: "bg-[#15293F]", borderClass: "border-[#1E3A52]" },
+  planning: { label: "วางแผน", textClass: "text-rz-purple", bgClass: "bg-rz-purple-bg", borderClass: "border-rz-purple-border" },
 } as const;
 
 function ActivityStatusBadge({ status }: { status: ActivitySummary["status"] }) {
@@ -38,7 +38,7 @@ export function ActivityListSection({
         <h2 className="text-sm font-medium text-rz-muted">กิจกรรมย่อย ({activities.length})</h2>
         <Link
           href={`/projects/${projectId}/activities/new`}
-          className="tap-target text-xs font-medium text-rz-blue active:opacity-90"
+          className="tap-target text-xs font-medium text-rz-purple active:opacity-90"
         >
           ＋ เพิ่มกิจกรรม
         </Link>

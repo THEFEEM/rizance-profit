@@ -44,12 +44,12 @@ export function ProjectActivityPicker({
             onClick={() => onChange(act.activityId)}
             className={`tap-target rounded-[12px] border-[0.5px] px-4 py-3 text-left transition-colors disabled:opacity-50 ${
               selected
-                ? "border-[#1E3A52] bg-[#15293F]"
+                ? "border-rz-purple-border bg-rz-purple-bg"
                 : "border-rz-border bg-rz-card active:bg-rz-elevated"
             }`}
           >
             <div className="flex items-start justify-between gap-2">
-              <p className={`text-sm font-medium ${selected ? "text-rz-blue" : "text-rz-text"}`}>
+              <p className={`text-sm font-medium ${selected ? "text-rz-purple" : "text-rz-text"}`}>
                 {act.name}
               </p>
               <ProjectStatusBadge
@@ -72,13 +72,13 @@ export function ProjectActivityPicker({
         onClick={() => onChange(generalActivityId)}
         className={`tap-target rounded-[12px] border-[0.5px] px-4 py-3 text-left transition-colors disabled:opacity-50 ${
           selectedActivityId === generalActivityId
-            ? "border-[#1E3A52] bg-[#15293F]"
+            ? "border-rz-purple-border bg-rz-purple-bg"
             : "border-rz-border border-dashed bg-rz-card active:bg-rz-elevated"
         }`}
       >
         <p
           className={`text-sm font-medium ${
-            selectedActivityId === generalActivityId ? "text-rz-blue" : "text-rz-text"
+            selectedActivityId === generalActivityId ? "text-rz-purple" : "text-rz-text"
           }`}
         >
           ไม่ระบุโครงการ (กองกลาง)

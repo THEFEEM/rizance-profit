@@ -2,7 +2,6 @@ import { projectExpenseLabel, projectFundingLabel } from "@/lib/project-categori
 import { formatDayShort } from "@/lib/date";
 import { formatMoney } from "@/lib/money";
 import type { ProjectExpense, ProjectIncome } from "@/types/project";
-import { PaymentStatusBadge } from "@/components/project/ProjectStatusBadge";
 
 type Row =
   | { kind: "income"; entry: ProjectIncome }
@@ -55,7 +54,6 @@ export function OrgProjectEntryList({
   return (
     <ul className="divide-y divide-rz-border rounded-[12px] border-[0.5px] border-rz-border bg-rz-card">
       {rows.map((row) => {
-        const rejected = row.entry.paymentStatus === "rejected";
         const isIncome = row.kind === "income";
         const activityName =
           activityNames[row.entry.activityId] ??
@@ -77,41 +75,31 @@ export function OrgProjectEntryList({
         }
 
         return (
-          <li
-            key={`${row.kind}-${row.entry.id}`}
-            className={`px-4 py-3 ${rejected ? "opacity-60" : ""}`}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p
-                  className={`text-sm font-medium ${
-                    rejected ? "text-rz-muted line-through" : "text-rz-text"
-                  }`}
-                >
-                  {isIncome ? "+" : "−"}
-                  {formatMoney(row.entry.amount, currency)}
-                </p>
-                <p className="mt-0.5 truncate text-xs text-rz-hint">{categoryLabel}</p>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-full border-[0.5px] border-rz-border bg-rz-elevated px-2 py-0.5 text-[10px] text-rz-muted"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                  {!isIncome && row.entry.isAdvance && (
-                    <span className="rounded-full border-[0.5px] border-[#5A3F12] bg-[#2E2310] px-2 py-0.5 text-[10px] text-rz-amber">
-                      สำรองจ่าย
-                    </span>
-                  )}
-                </div>
-                <p className="mt-1 text-[11px] text-rz-placeholder">
-                  {formatDayShort(row.entry.entryDate)}
-                </p>
+          <li key={`${row.kind}-${row.entry.id}`} className="px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-rz-text">
+                {isIncome ? "+" : "−"}
+                {formatMoney(row.entry.amount, currency)}
+              </p>
+              <p className="mt-0.5 truncate text-xs text-rz-hint">{categoryLabel}</p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full border-[0.5px] border-rz-border bg-rz-elevated px-2 py-0.5 text-[10px] text-rz-muted"
+                  >
+                    {tag}
+                  </span>
+                ))}
+                {!isIncome && row.entry.isAdvance && (
+                  <span className="rounded-full border-[0.5px] border-[#5A3F12] bg-[#2E2310] px-2 py-0.5 text-[10px] text-rz-amber">
+                    สำรองจ่าย
+                  </span>
+                )}
               </div>
-              <PaymentStatusBadge status={row.entry.paymentStatus} />
+              <p className="mt-1 text-[11px] text-rz-placeholder">
+                {formatDayShort(row.entry.entryDate)}
+              </p>
             </div>
           </li>
         );

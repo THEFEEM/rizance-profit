@@ -23,7 +23,7 @@ export function ProjectList({
         <p className="mt-1 text-xs text-rz-placeholder">สร้างโครงการแรกเพื่อเริ่มบันทึกงบประมาณ</p>
         <Link
           href="/projects/new"
-          className="tap-target mt-4 inline-flex rounded-full border-[0.5px] border-[#1E3A52] bg-[#15293F] px-5 py-2.5 text-sm font-medium text-rz-blue active:opacity-90"
+          className="tap-target mt-4 inline-flex rounded-full border-[0.5px] border-rz-purple-border bg-rz-purple-bg px-5 py-2.5 text-sm font-medium text-rz-purple active:opacity-90"
         >
           ＋ สร้างโครงการ
         </Link>
@@ -48,7 +48,7 @@ export function ProjectList({
 
       {planning.length > 0 && (
         <section>
-          <SectionHeader label="วางแผน" count={planning.length} dotClass="bg-rz-blue" />
+          <SectionHeader label="วางแผน" count={planning.length} dotClass="bg-rz-purple" />
           <ul className="mt-2.5 space-y-2.5">
             {planning.map((p) => (
               <li key={p.id}>
@@ -153,7 +153,7 @@ function PlanningProjectCard({
   return (
     <Link
       href={`/projects/${project.id}`}
-      className="tap-target flex items-center gap-3 rounded-[12px] border-[0.5px] border-[#1E3A52]/60 bg-rz-card/80 px-4 py-3.5 opacity-95 active:bg-rz-elevated"
+      className="tap-target flex items-center gap-3 rounded-[12px] border-[0.5px] border-rz-purple-border/60 bg-rz-card/80 px-4 py-3.5 opacity-95 active:bg-rz-elevated"
     >
       <ProjectTypeIcon projectType={project.projectType} />
       <div className="min-w-0 flex-1">
@@ -199,7 +199,7 @@ function ClosedProjectCard({
       </div>
 
       <p className="mt-2.5 text-xs leading-relaxed text-rz-hint rz-tabular">
-        <span className="text-rz-blue">รายรับรวม {formatMoney(project.totalFunding, currency)}</span>
+        <span className="text-rz-purple">รายรับรวม {formatMoney(project.totalFunding, currency)}</span>
         {" / "}
         <span className="text-rz-red">รายจ่ายรวม {formatMoney(project.totalSpent, currency)}</span>
         {" / "}
@@ -208,7 +208,7 @@ function ClosedProjectCard({
 
       <Link
         href={`/projects/${project.id}/summary`}
-        className="tap-target mt-2.5 inline-block text-xs font-medium text-rz-blue active:opacity-90"
+        className="tap-target mt-2.5 inline-block text-xs font-medium text-rz-purple active:opacity-90"
       >
         ดูสรุปเต็ม →
       </Link>

@@ -77,7 +77,7 @@ export default async function ActivityHubPage({
           <ActivitySettingsPanel projectId={id} activity={activity} />
           <Link
             href={`/projects/${id}/activities/${aid}/summary`}
-            className="tap-target block rounded-[14px] border-[0.5px] border-rz-border bg-rz-card px-4 py-4 text-center text-sm font-medium text-rz-blue active:bg-rz-elevated"
+            className="tap-target block rounded-[14px] border-[0.5px] border-rz-border bg-rz-card px-4 py-4 text-center text-sm font-medium text-rz-purple active:bg-rz-elevated"
           >
             ดูสรุปกิจกรรม →
           </Link>

@@ -17,7 +17,7 @@ export const EntryField = forwardRef<HTMLInputElement, Props>(function EntryFiel
     accent === "amber"
       ? "focus:border-rz-amber"
       : accent === "blue"
-        ? "focus:border-rz-blue"
+        ? "focus:border-rz-purple"
         : "focus:border-rz-green";
 
   return (

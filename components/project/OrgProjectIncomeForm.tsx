@@ -13,14 +13,12 @@ import type { ProjectFundingKey } from "@/lib/project-categories";
 import type {
   ProjectIncome,
   ProjectIncomePaymentMethod,
-  PaymentStatus,
 } from "@/types/project";
 import { PROJECT_INCOME_PAYMENT_METHODS } from "@/types/project";
 import { ProjectBack } from "@/components/project/ProjectBack";
 import { ProjectClosedBanner } from "@/components/project/ProjectClosedBanner";
 import { FundingSourceGrid } from "@/components/project/ProjectEntryGrids";
 import { OrgProjectEntryList } from "@/components/project/OrgProjectEntryList";
-import { PaymentStatusPicker } from "@/components/project/PaymentStatusPicker";
 import { ProjectTextArea } from "@/components/project/ProjectField";
 
 export function OrgProjectIncomeForm({
@@ -55,7 +53,6 @@ export function OrgProjectIncomeForm({
   const [label, setLabel] = useState("");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(defaultDate);
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("paid");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,7 +78,6 @@ export function OrgProjectIncomeForm({
           label: label.trim() || undefined,
           note: note.trim() || undefined,
           entryDate: date,
-          paymentStatus,
         }),
       },
     );
@@ -102,7 +98,7 @@ export function OrgProjectIncomeForm({
         <ProjectBack href={backHref} />
         <div className="min-w-0 text-center">
           <h1 className="text-base font-medium text-rz-text">บันทึกเงินเข้า</h1>
-          <p className="truncate text-xs text-rz-blue">{projectName} · กองกลาง</p>
+          <p className="truncate text-xs text-rz-purple">{projectName} · กองกลาง</p>
         </div>
         <span className="w-16" aria-hidden />
       </div>
@@ -168,12 +164,6 @@ export function OrgProjectIncomeForm({
             accent="blue"
           />
         )}
-
-        <PaymentStatusPicker
-          value={paymentStatus}
-          onChange={setPaymentStatus}
-          disabled={closed}
-        />
 
         <EntryField
           label="วันที่"

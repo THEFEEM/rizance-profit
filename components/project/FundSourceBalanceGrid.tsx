@@ -50,10 +50,10 @@ export function FundSourceBalanceGrid({
             className={`tap-target flex flex-col items-start gap-1.5 rounded-[12px] px-3 py-3 text-left transition-colors disabled:opacity-50 ${
               tile.dashed
                 ? selected
-                  ? "border border-dashed border-[#1E3A52] bg-[#15293F]"
+                  ? "border border-dashed border-rz-purple-border bg-rz-purple-bg"
                   : "border border-dashed border-rz-border bg-rz-card active:bg-rz-elevated"
                 : selected
-                  ? "border-[0.5px] border-[#1E3A52] bg-[#15293F]"
+                  ? "border-[0.5px] border-rz-purple-border bg-rz-purple-bg"
                   : "border-[0.5px] border-rz-border bg-rz-card active:bg-rz-elevated"
             }`}
           >
@@ -61,7 +61,7 @@ export function FundSourceBalanceGrid({
               <ProjectIconBox name={tile.icon} color={tile.color} bg={tile.bg} size={28} />
               <span
                 className={`text-xs font-medium leading-tight ${
-                  selected ? "text-rz-blue" : "text-rz-text"
+                  selected ? "text-rz-purple" : "text-rz-text"
                 }`}
               >
                 {tile.label}
@@ -86,11 +86,11 @@ export function FundSourceBalanceGrid({
         onClick={() => onChange(null)}
         className={`tap-target col-span-2 flex flex-col items-start gap-1 rounded-[12px] border-[0.5px] border-dashed px-3 py-3 text-left transition-colors disabled:opacity-50 ${
           value === null
-            ? "border-[#1E3A52] bg-[#15293F]"
+            ? "border-rz-purple-border bg-rz-purple-bg"
             : "border-rz-border bg-rz-card active:bg-rz-elevated"
         }`}
       >
-        <span className={`text-xs font-medium ${value === null ? "text-rz-blue" : "text-rz-text"}`}>
+        <span className={`text-xs font-medium ${value === null ? "text-rz-purple" : "text-rz-text"}`}>
           ไม่ระบุ (กองกลาง)
         </span>
         <span className="text-[11px] text-rz-hint">ไม่ผูกกับกองเงินเฉพาะ</span>

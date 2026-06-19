@@ -28,17 +28,17 @@ export function FundingSourceGrid({
             className={`tap-target flex flex-col items-center gap-2 rounded-[12px] px-3 py-3.5 transition-colors disabled:opacity-50 ${
               tile.dashed
                 ? selected
-                  ? "border border-dashed border-[#1E3A52] bg-[#15293F]"
+                  ? "border border-dashed border-rz-purple-border bg-rz-purple-bg"
                   : "border border-dashed border-rz-border bg-rz-card active:bg-rz-elevated"
                 : selected
-                  ? "border-[0.5px] border-[#1E3A52] bg-[#15293F]"
+                  ? "border-[0.5px] border-rz-purple-border bg-rz-purple-bg"
                   : "border-[0.5px] border-rz-border bg-rz-card active:bg-rz-elevated"
             }`}
           >
             <ProjectIconBox name={tile.icon} color={tile.color} bg={tile.bg} size={32} />
             <span
               className={`text-center text-xs font-medium leading-tight ${
-                selected ? "text-rz-blue" : "text-rz-text"
+                selected ? "text-rz-purple" : "text-rz-text"
               }`}
             >
               {tile.label}
@@ -73,7 +73,7 @@ export function ExpenseCategoryGrid({
             onClick={() => onChange(tile.key)}
             className={`tap-target flex flex-col items-center gap-1.5 rounded-[12px] border-[0.5px] px-2 py-3 transition-colors disabled:opacity-50 ${
               selected
-                ? "border-[#1E3A52] bg-[#15293F]"
+                ? "border-rz-purple-border bg-rz-purple-bg"
                 : "border-rz-border bg-rz-card active:bg-rz-elevated"
             }`}
           >
@@ -85,7 +85,7 @@ export function ExpenseCategoryGrid({
             </div>
             <span
               className={`text-center text-[11px] font-medium leading-tight ${
-                selected ? "text-rz-blue" : "text-rz-text"
+                selected ? "text-rz-purple" : "text-rz-text"
               }`}
             >
               {tile.label}

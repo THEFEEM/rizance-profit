@@ -40,21 +40,13 @@ export function ProjectBudgetCard({
           <span className="text-rz-text">{formatMoney(summary.budgetTarget, currency)}</span>
         </div>
         <div className="flex justify-between gap-2">
-          <span className="text-rz-blue">{fundingLabel}</span>
-          <span className="text-rz-blue">{formatMoney(summary.totalFunding, currency)}</span>
+          <span className="text-rz-purple">{fundingLabel}</span>
+          <span className="text-rz-purple">{formatMoney(summary.totalFunding, currency)}</span>
         </div>
-        <p className="text-[11px] text-rz-placeholder">
-          จ่ายจริง {formatMoney(summary.paidFunding, currency)} · ผูกพัน{" "}
-          {formatMoney(summary.committedFunding, currency)}
-        </p>
         <div className="flex justify-between gap-2">
           <span className="text-rz-red">ใช้ไปแล้ว</span>
           <span className="text-rz-red">{formatMoney(summary.totalSpent, currency)}</span>
         </div>
-        <p className="text-[11px] text-rz-placeholder">
-          จ่ายจริง {formatMoney(summary.paidSpent, currency)} · ผูกพัน{" "}
-          {formatMoney(summary.committedSpent, currency)}
-        </p>
         <div className="flex justify-between gap-2 border-t-[0.5px] border-rz-border pt-2">
           <span className="text-rz-hint">คงเหลือ</span>
           <span className={`font-medium ${remainColor}`}>
@@ -67,7 +59,7 @@ export function ProjectBudgetCard({
         <div className="mt-3">
           <div className="h-2 overflow-hidden rounded-full bg-rz-elevated">
             <div
-              className={`h-full rounded-full transition-all ${summary.isOverBudget ? "bg-rz-red" : "bg-rz-blue"}`}
+              className={`h-full rounded-full transition-all ${summary.isOverBudget ? "bg-rz-red" : "bg-rz-purple"}`}
               style={{ width: `${pct}%` }}
             />
           </div>
