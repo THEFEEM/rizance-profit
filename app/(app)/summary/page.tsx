@@ -34,7 +34,7 @@ export default async function StatsSummaryPage({
     redirect(`/projects/${ctx.projectId}/summary`);
   }
 
-  const { period, closeDate } = parseRegularStatsParams(params);
+  const { period } = parseRegularStatsParams(params);
 
   return (
     <div className="pb-6">
@@ -48,7 +48,7 @@ export default async function StatsSummaryPage({
       </div>
 
       {ctx.mode === "regular" ? (
-        <RegularStatsSummary user={user} period={period} closeDate={closeDate} />
+        <RegularStatsSummary user={user} period={period} />
       ) : (
         <BoothStatsSummary
           user={user}

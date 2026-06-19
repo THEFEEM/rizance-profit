@@ -114,6 +114,15 @@ export function formatDateLabel(date: string): string {
   }).format(dt);
 }
 
+/** Single-letter Thai weekday (อา จ อ พ พฤ ศ ส) for chart axis labels. */
+const THAI_WEEKDAY_SHORT = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"] as const;
+
+export function formatWeekdayShortThai(date: string): string {
+  const [y, m, d] = date.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return THAI_WEEKDAY_SHORT[dt.getUTCDay()];
+}
+
 /** Short label like "8 Jun" for a "YYYY-MM-DD" date. */
 export function formatDayShort(date: string): string {
   const [y, m, d] = date.split("-").map(Number);
