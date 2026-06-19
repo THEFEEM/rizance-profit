@@ -77,7 +77,7 @@ export function CreateProjectForm() {
                 onClick={() => setProjectType(type)}
                 className={`tap-target flex flex-col items-center gap-2 rounded-[12px] border-[0.5px] px-3 py-4 transition-colors ${
                   selected
-                    ? "border-[#1E3A52] bg-[#15293F] text-rz-blue"
+                    ? "border-rz-purple-border bg-rz-purple-bg text-rz-purple"
                     : "border-rz-border bg-rz-card text-rz-text active:bg-rz-elevated"
                 }`}
               >
@@ -163,7 +163,7 @@ export function CreateProjectForm() {
       <button
         type="submit"
         disabled={submitting || !name.trim()}
-        className="tap-target rz-btn-primary w-full rounded-[14px] border-[0.5px] border-[#1E3A52] bg-[#15293F] py-3.5 text-base font-medium text-rz-blue disabled:opacity-50"
+        className="tap-target rz-btn-primary w-full rounded-[14px] border-[0.5px] border-rz-purple-border bg-rz-purple-bg py-3.5 text-base font-medium text-rz-purple disabled:opacity-50"
       >
         {submitting ? "กำลังสร้าง…" : "สร้างโครงการ"}
       </button>

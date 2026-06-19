@@ -17,7 +17,7 @@ export function ProjectSummaryHeader({
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
             <h1 className="text-lg font-medium text-rz-text">{project.name}</h1>
-            <p className="mt-0.5 text-sm text-rz-blue">
+            <p className="mt-0.5 text-sm text-rz-purple">
               {project.orgName ?? "โครงการ"}
               {(project.startDate || project.endDate) && (
                 <>
@@ -63,7 +63,7 @@ export function ActivitySummaryHeader({
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
             <h1 className="text-lg font-medium text-rz-text">{activityName}</h1>
-            <p className="mt-0.5 text-sm text-rz-blue">
+            <p className="mt-0.5 text-sm text-rz-purple">
               {orgName ?? projectName}
               {(startDate || endDate) && (
                 <>

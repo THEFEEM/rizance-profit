@@ -98,7 +98,7 @@ export function CreateActivityForm({ projectId }: { projectId: string }) {
       <button
         type="submit"
         disabled={submitting || !name.trim()}
-        className="tap-target rz-btn-primary w-full rounded-[14px] border-[0.5px] border-[#1E3A52] bg-[#15293F] py-3.5 text-base font-medium text-rz-blue disabled:opacity-50"
+        className="tap-target rz-btn-primary w-full rounded-[14px] border-[0.5px] border-rz-purple-border bg-rz-purple-bg py-3.5 text-base font-medium text-rz-purple disabled:opacity-50"
       >
         {submitting ? "กำลังสร้าง…" : "สร้างกิจกรรม"}
       </button>

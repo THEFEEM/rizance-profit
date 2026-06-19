@@ -14,7 +14,7 @@ import { ActivityListSection } from "@/components/project/ActivityListSection";
 import { ProjectBack } from "@/components/project/ProjectBack";
 import { ProjectBudgetCard } from "@/components/project/ProjectBudgetCard";
 import { ProjectEntryList } from "@/components/project/ProjectEntryList";
-import { ProjectHubActions, ProjectInfoHeader } from "@/components/project/ProjectHubParts";
+import { ProjectInfoHeader } from "@/components/project/ProjectHubParts";
 import { ProjectMembersPanel } from "@/components/project/ProjectMembersPanel";
 import { ProjectSettingsPanel } from "@/components/project/ProjectSettingsPanel";
 
@@ -64,8 +64,6 @@ export default async function ProjectHubPage({ params }: { params: Promise<{ id:
             />
           </div>
 
-          <ProjectHubActions projectId={id} scope="project" closed={closed} />
-
           <div className="space-y-6 px-4">
             <ActivityListSection
               projectId={id}
@@ -79,7 +77,7 @@ export default async function ProjectHubPage({ params }: { params: Promise<{ id:
             {!closed && (
               <Link
                 href={`/projects/${id}/summary`}
-                className="tap-target block rounded-[14px] border-[0.5px] border-rz-border bg-rz-card px-4 py-4 text-center text-sm font-medium text-rz-blue active:bg-rz-elevated"
+                className="tap-target block rounded-[14px] border-[0.5px] border-rz-border bg-rz-card px-4 py-4 text-center text-sm font-medium text-rz-purple active:bg-rz-elevated"
               >
                 ดูสรุปโครงการเต็ม →
               </Link>
@@ -115,8 +113,6 @@ export default async function ProjectHubPage({ params }: { params: Promise<{ id:
           <ProjectBudgetCard summary={actSummary} currency={user.currency} />
         </div>
 
-        <ProjectHubActions projectId={id} scope="project" closed={closed} />
-
         <div className="px-4">
           <h2 className="mb-2.5 text-sm font-medium text-rz-muted">รายการล่าสุด</h2>
           <ProjectEntryList incomes={incomes} expenses={expenses} currency={user.currency} />
@@ -128,7 +124,7 @@ export default async function ProjectHubPage({ params }: { params: Promise<{ id:
 
           <Link
             href={`/projects/${id}/summary`}
-            className="tap-target block rounded-[14px] border-[0.5px] border-rz-border bg-rz-card px-4 py-4 text-center text-sm font-medium text-rz-blue active:bg-rz-elevated"
+            className="tap-target block rounded-[14px] border-[0.5px] border-rz-border bg-rz-card px-4 py-4 text-center text-sm font-medium text-rz-purple active:bg-rz-elevated"
           >
             ดูสรุปเต็ม →
           </Link>

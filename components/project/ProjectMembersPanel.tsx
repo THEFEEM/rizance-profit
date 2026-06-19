@@ -12,7 +12,7 @@ import {
 import { ProjectField } from "@/components/project/ProjectField";
 
 const ROLE_BADGE: Record<ProjectMemberRole, { textClass: string; bgClass: string; borderClass: string }> = {
-  treasurer: { textClass: "text-rz-blue", bgClass: "bg-[#15293F]", borderClass: "border-[#1E3A52]" },
+  treasurer: { textClass: "text-rz-purple", bgClass: "bg-rz-purple-bg", borderClass: "border-rz-purple-border" },
   member: { textClass: "text-rz-green", bgClass: "bg-rz-logo-bg", borderClass: "border-rz-logo-border" },
   advisor: { textClass: "text-rz-amber", bgClass: "bg-[#2E2310]", borderClass: "border-[#5A3F12]" },
 };
@@ -109,7 +109,7 @@ export function ProjectMembersPanel({
         <button
           type="submit"
           disabled={adding || !name.trim()}
-          className="tap-target w-full rounded-[12px] border-[0.5px] border-[#1E3A52] bg-[#15293F] py-2.5 text-sm font-medium text-rz-blue disabled:opacity-50"
+          className="tap-target w-full rounded-[12px] border-[0.5px] border-rz-purple-border bg-rz-purple-bg py-2.5 text-sm font-medium text-rz-purple disabled:opacity-50"
         >
           {adding ? "กำลังเพิ่ม…" : "+ เพิ่มสมาชิก"}
         </button>

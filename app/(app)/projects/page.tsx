@@ -23,7 +23,7 @@ export default async function ProjectsPage() {
         </div>
         <Link
           href="/projects/new"
-          className="tap-target rounded-full border-[0.5px] border-[#1E3A52] bg-[#15293F] px-4 py-2 text-sm font-medium text-rz-blue active:opacity-90"
+          className="tap-target rounded-full border-[0.5px] border-rz-purple-border bg-rz-purple-bg px-4 py-2 text-sm font-medium text-rz-purple active:opacity-90"
         >
           ＋ สร้างใหม่
         </Link>

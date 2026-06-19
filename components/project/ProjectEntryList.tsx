@@ -2,7 +2,6 @@ import { projectExpenseLabel, projectFundingLabel } from "@/lib/project-categori
 import { formatDayShort } from "@/lib/date";
 import { formatMoney } from "@/lib/money";
 import type { ProjectExpense, ProjectIncome } from "@/types/project";
-import { PaymentStatusBadge } from "@/components/project/ProjectStatusBadge";
 
 type EntryRow =
   | { kind: "income"; entry: ProjectIncome }
@@ -57,7 +56,6 @@ export function ProjectEntryList({
   return (
     <ul className="divide-y divide-rz-border rounded-[12px] border-[0.5px] border-rz-border bg-rz-card">
       {rows.map((row) => {
-        const rejected = row.entry.paymentStatus === "rejected";
         const isIncome = row.kind === "income";
         const label = isIncome
           ? row.entry.source === "other_income" && row.entry.label
@@ -66,28 +64,22 @@ export function ProjectEntryList({
           : projectExpenseLabel(row.entry.category);
 
         return (
-          <li
-            key={`${row.kind}-${row.entry.id}`}
-            className={`px-4 py-3 ${rejected ? "opacity-60" : ""}`}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className={`text-sm font-medium ${rejected ? "text-rz-muted line-through" : "text-rz-text"}`}>
-                  {isIncome ? "+" : "−"}
-                  {formatMoney(row.entry.amount, currency)}
-                </p>
-                <p className="mt-0.5 truncate text-xs text-rz-hint">
-                  {label}
-                  {isIncome &&
-                    row.entry.label &&
-                    row.entry.source !== "other_income" &&
-                    ` · ${row.entry.label}`}
-                </p>
-                <p className="mt-0.5 text-[11px] text-rz-placeholder">
-                  {formatDayShort(row.entry.entryDate)}
-                </p>
-              </div>
-              <PaymentStatusBadge status={row.entry.paymentStatus} />
+          <li key={`${row.kind}-${row.entry.id}`} className="px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-rz-text">
+                {isIncome ? "+" : "−"}
+                {formatMoney(row.entry.amount, currency)}
+              </p>
+              <p className="mt-0.5 truncate text-xs text-rz-hint">
+                {label}
+                {isIncome &&
+                  row.entry.label &&
+                  row.entry.source !== "other_income" &&
+                  ` · ${row.entry.label}`}
+              </p>
+              <p className="mt-0.5 text-[11px] text-rz-placeholder">
+                {formatDayShort(row.entry.entryDate)}
+              </p>
             </div>
           </li>
         );

@@ -37,7 +37,7 @@ export function ProjectSummaryActivityList({
                   <div className="mt-2.5">
                     <div className="h-1.5 overflow-hidden rounded-full bg-rz-elevated">
                       <div
-                        className={`h-full rounded-full ${act.isOverBudget ? "bg-rz-red" : "bg-rz-blue"}`}
+                        className={`h-full rounded-full ${act.isOverBudget ? "bg-rz-red" : "bg-rz-purple"}`}
                         style={{ width: `${pct}%` }}
                       />
                     </div>

@@ -9,7 +9,7 @@ import { EntryOptionButton } from "@/components/entry/EntryOptionButton";
 import { apiFetch } from "@/lib/api-client";
 import { clampDateToRange } from "@/lib/date";
 import type { ProjectExpenseKey, ProjectFundingKey } from "@/lib/project-categories";
-import type { FundBalance, PaymentStatus, ProjectExpense } from "@/types/project";
+import type { FundBalance, ProjectExpense } from "@/types/project";
 import { ProjectBack } from "@/components/project/ProjectBack";
 import { ProjectClosedBanner } from "@/components/project/ProjectClosedBanner";
 import { FundSourceBalanceGrid } from "@/components/project/FundSourceBalanceGrid";
@@ -17,7 +17,6 @@ import { ProjectActivityPicker } from "@/components/project/ProjectActivityPicke
 import type { ActivityPickerOption } from "@/components/project/ProjectActivityPicker";
 import { ExpenseCategoryGrid } from "@/components/project/ProjectEntryGrids";
 import { OrgProjectEntryList } from "@/components/project/OrgProjectEntryList";
-import { PaymentStatusPicker } from "@/components/project/PaymentStatusPicker";
 import { ProjectTextArea } from "@/components/project/ProjectField";
 
 export function OrgProjectExpenseForm({
@@ -62,7 +61,6 @@ export function OrgProjectExpenseForm({
   const [label, setLabel] = useState("");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(defaultDate);
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("paid");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -94,7 +92,6 @@ export function OrgProjectExpenseForm({
           label: label.trim() || undefined,
           note: note.trim() || undefined,
           entryDate: date,
-          paymentStatus,
         }),
       },
     );
@@ -120,7 +117,7 @@ export function OrgProjectExpenseForm({
         <ProjectBack href={backHref} />
         <div className="min-w-0 text-center">
           <h1 className="text-base font-medium text-rz-text">บันทึกรายจ่าย</h1>
-          <p className="truncate text-xs text-rz-blue">{projectName}</p>
+          <p className="truncate text-xs text-rz-purple">{projectName}</p>
         </div>
         <span className="w-16" aria-hidden />
       </div>
@@ -204,12 +201,6 @@ export function OrgProjectExpenseForm({
           maxLength={120}
           disabled={closed}
           accent="blue"
-        />
-
-        <PaymentStatusPicker
-          value={paymentStatus}
-          onChange={setPaymentStatus}
-          disabled={closed}
         />
 
         <EntryField

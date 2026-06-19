@@ -8,12 +8,11 @@ import { EntryField } from "@/components/entry/EntryField";
 import { apiFetch } from "@/lib/api-client";
 import { clampDateToRange } from "@/lib/date";
 import type { ProjectFundingKey } from "@/lib/project-categories";
-import type { ProjectIncome, PaymentStatus } from "@/types/project";
+import type { ProjectIncome } from "@/types/project";
 import { ProjectBack } from "@/components/project/ProjectBack";
 import { ProjectClosedBanner } from "@/components/project/ProjectClosedBanner";
 import { FundingSourceGrid } from "@/components/project/ProjectEntryGrids";
 import { ProjectEntryList } from "@/components/project/ProjectEntryList";
-import { PaymentStatusPicker } from "@/components/project/PaymentStatusPicker";
 import { ProjectTextArea } from "@/components/project/ProjectField";
 
 export function ProjectIncomeForm({
@@ -45,7 +44,6 @@ export function ProjectIncomeForm({
   const [label, setLabel] = useState("");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(defaultDate);
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("paid");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,7 +68,6 @@ export function ProjectIncomeForm({
           label: label.trim() || undefined,
           note: note.trim() || undefined,
           entryDate: date,
-          paymentStatus,
         }),
       },
     );
@@ -91,7 +88,7 @@ export function ProjectIncomeForm({
         <ProjectBack href={backHref} />
         <div className="min-w-0 text-center">
           <h1 className="text-base font-medium text-rz-text">บันทึกเงินเข้า</h1>
-          <p className="truncate text-xs text-rz-blue">{activityName}</p>
+          <p className="truncate text-xs text-rz-purple">{activityName}</p>
         </div>
         <span className="w-16" aria-hidden />
       </div>
@@ -152,12 +149,6 @@ export function ProjectIncomeForm({
           disabled={closed}
           onChange={(e) => setDate(clamp(e.target.value || defaultDate))}
           accent="blue"
-        />
-
-        <PaymentStatusPicker
-          value={paymentStatus}
-          onChange={setPaymentStatus}
-          disabled={closed}
         />
 
         <ProjectTextArea

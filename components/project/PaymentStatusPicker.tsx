@@ -29,7 +29,7 @@ export function PaymentStatusPicker({
               onClick={() => onChange(status)}
               className={`tap-target rounded-full border-[0.5px] px-3 py-1.5 text-xs font-medium transition-opacity disabled:opacity-50 ${
                 selected
-                  ? `${cfg.textClass} ${cfg.bgClass} ${cfg.borderClass} ring-1 ring-rz-blue/50`
+                  ? `${cfg.textClass} ${cfg.bgClass} ${cfg.borderClass} ring-1 ring-rz-purple/50`
                   : `${cfg.textClass} ${cfg.bgClass} ${cfg.borderClass} opacity-75`
               }`}
             >

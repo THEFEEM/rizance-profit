@@ -14,6 +14,9 @@
   --rz-green: #4ade9e;
   --rz-red: #f87171;
   --rz-blue: #6bb6ff;
+  --rz-purple: #b69ce8;
+  --rz-purple-bg: #241b38;
+  --rz-purple-border: #3d2f5c;
   --rz-amber: #ef9f27;
   --rz-btn: #1d9e75;
   --rz-logo-bg: #16352a;
@@ -38,6 +41,9 @@
   --color-rz-green: var(--rz-green);
   --color-rz-red: var(--rz-red);
   --color-rz-blue: var(--rz-blue);
+  --color-rz-purple: var(--rz-purple);
+  --color-rz-purple-bg: var(--rz-purple-bg);
+  --color-rz-purple-border: var(--rz-purple-border);
   --color-rz-amber: var(--rz-amber);
   --color-rz-btn: var(--rz-btn);
   --color-rz-logo-bg: var(--rz-logo-bg);
@@ -81,8 +87,8 @@ body {
   background-color: #ba7517;
 }
 
-/* Project-context primary buttons (blue) — set data-context="project" on a parent */
+/* Project-context primary buttons (purple) — set data-context="project" on a parent */
 [data-context="project"] .rz-btn-primary:not(:disabled) {
-  background-color: #15293f;
-  border-color: #1e3a52;
+  background-color: var(--rz-purple-bg);
+  border-color: var(--rz-purple-border);
 }

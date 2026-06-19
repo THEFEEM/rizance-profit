@@ -167,7 +167,7 @@ export function ModeSwitcher({
             onClick={switchToProject}
             className={`${tabBase} ${
               mode === "project"
-                ? "bg-rz-blue text-rz-bg"
+                ? "bg-rz-purple text-rz-bg"
                 : "text-rz-muted active:bg-rz-card"
             }`}
           >
@@ -190,7 +190,7 @@ export function ModeSwitcher({
           </p>
         )}
         {mode === "project" && (
-          <p className="mt-2 flex items-center justify-center gap-1.5 truncate text-center text-[11px] font-medium text-rz-blue">
+          <p className="mt-2 flex items-center justify-center gap-1.5 truncate text-center text-[11px] font-medium text-rz-purple">
             <ClipboardListIcon size={12} />
             <span>โหมดโครงการ</span>
           </p>

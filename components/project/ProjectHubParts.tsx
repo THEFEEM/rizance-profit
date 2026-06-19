@@ -16,7 +16,7 @@ export function ProjectInfoHeader({ project }: { project: Project }) {
           <h1 className="min-w-0 flex-1 text-lg font-medium text-rz-text">{project.name}</h1>
           <ProjectStatusBadge status={project.status} />
         </div>
-        <p className="mt-0.5 text-sm text-rz-blue">
+        <p className="mt-0.5 text-sm text-rz-purple">
           {PROJECT_TYPE_LABELS[project.projectType]}
           {project.orgName && ` · ${project.orgName}`}
         </p>
