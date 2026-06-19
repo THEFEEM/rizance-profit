@@ -5,6 +5,7 @@ import {
 } from "@/types/project";
 
 const ROLE_BADGE: Record<ProjectMemberRole, { textClass: string; bgClass: string; borderClass: string }> = {
+  president: { textClass: "text-rz-purple", bgClass: "bg-rz-purple-bg", borderClass: "border-rz-purple-border" },
   treasurer: { textClass: "text-rz-purple", bgClass: "bg-rz-purple-bg", borderClass: "border-rz-purple-border" },
   member: { textClass: "text-rz-green", bgClass: "bg-rz-logo-bg", borderClass: "border-rz-logo-border" },
   advisor: { textClass: "text-rz-amber", bgClass: "bg-[#2E2310]", borderClass: "border-[#5A3F12]" },

@@ -3,6 +3,7 @@ import { pool } from "@/lib/db";
 import type {
   ProjectActivityInput,
   ProjectActivityPatchInput,
+  CreateProjectActivityInput,
   ProjectExpenseInput,
   ProjectIncomeInput,
   ProjectInput,
@@ -32,6 +33,7 @@ type ProjectRow = {
   org_name: string | null;
   project_code: string | null;
   objective: string | null;
+  chairman_name: string | null;
   budget_target: string;
   start_date: string | null;
   end_date: string | null;
@@ -48,6 +50,7 @@ function mapProject(r: ProjectRow): Project {
     orgName: r.org_name,
     projectCode: r.project_code,
     objective: r.objective,
+    chairmanName: r.chairman_name,
     budgetTarget: r.budget_target,
     startDate: r.start_date,
     endDate: r.end_date,
@@ -57,7 +60,7 @@ function mapProject(r: ProjectRow): Project {
   };
 }
 
-const PROJECT_RETURN = `id, name, project_type, org_name, project_code, objective, budget_target,
+const PROJECT_RETURN = `id, name, project_type, org_name, project_code, objective, chairman_name, budget_target,
   start_date::text AS start_date, end_date::text AS end_date,
   status, note, created_at`;
 
@@ -66,6 +69,7 @@ type ActivityRow = {
   project_id: string;
   name: string;
   budget_target: string;
+  chairman_name: string | null;
   start_date: string | null;
   end_date: string | null;
   status: string;
@@ -81,6 +85,7 @@ function mapActivity(r: ActivityRow): ProjectActivity {
     projectId: r.project_id,
     name: r.name,
     budgetTarget: r.budget_target,
+    chairmanName: r.chairman_name,
     startDate: r.start_date,
     endDate: r.end_date,
     status: r.status as ProjectStatus,
@@ -91,7 +96,7 @@ function mapActivity(r: ActivityRow): ProjectActivity {
   };
 }
 
-const ACTIVITY_RETURN = `id, project_id, name, budget_target,
+const ACTIVITY_RETURN = `id, project_id, name, budget_target, chairman_name,
   start_date::text AS start_date, end_date::text AS end_date,
   status, note, is_general, sort_order, created_at`;
 
@@ -230,23 +235,36 @@ export async function getProject(userId: string, projectId: string): Promise<Pro
   return getOwnedProject(userId, projectId);
 }
 
-/** Option A: short-term projects auto-create exactly one activity (same name/dates/budget). */
+/** User's org (long project) — at most one per user after Round B. */
+export async function getUserLongProject(userId: string): Promise<Project | null> {
+  const { rows } = await pool.query<ProjectRow>(
+    `SELECT ${PROJECT_RETURN} FROM projects
+     WHERE user_id = $1 AND project_type = 'long'
+     ORDER BY created_at ASC
+     LIMIT 1`,
+    [userId],
+  );
+  return rows[0] ? mapProject(rows[0]) : null;
+}
+
+/** Creates a long-term org (1 per user — guard in API). */
 export async function createProject(userId: string, input: ProjectInput): Promise<Project> {
   const budget = (input.budgetTarget ?? 0).toFixed(2);
+  const orgName = input.name.trim();
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     const { rows } = await client.query<{ id: string }>(
-      `INSERT INTO projects (user_id, name, project_type, org_name, project_code, objective, budget_target, start_date, end_date, status, note)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::date, $9::date, $10, $11)
+      `INSERT INTO projects (user_id, name, project_type, org_name, project_code, objective, chairman_name, budget_target, start_date, end_date, status, note)
+       VALUES ($1, $2, 'long', $3, $4, $5, $6, $7, $8::date, $9::date, $10, $11)
        RETURNING id`,
       [
         userId,
-        input.name,
-        input.projectType,
-        input.orgName ?? null,
+        orgName,
+        orgName,
         input.projectCode ?? null,
         input.objective ?? null,
+        input.chairmanName ?? null,
         budget,
         input.startDate ?? null,
         input.endDate ?? null,
@@ -256,30 +274,14 @@ export async function createProject(userId: string, input: ProjectInput): Promis
     );
     const projectId = rows[0].id;
 
-    if (input.projectType === "short") {
-      await client.query(
-        `INSERT INTO project_activities (project_id, user_id, name, budget_target, start_date, end_date, note, sort_order)
-         VALUES ($1, $2, $3, $4, $5::date, $6::date, $7, 0)`,
-        [
-          projectId,
-          userId,
-          input.name,
-          budget,
-          input.startDate ?? null,
-          input.endDate ?? null,
-          input.note ?? null,
-        ],
-      );
-    } else if (input.projectType === "long") {
-      const activityStatus = input.status === "closed" ? "closed" : "active";
-      await client.query(
-        `INSERT INTO project_activities (
-           project_id, user_id, name, budget_target, start_date, end_date, status, note, is_general, sort_order
-         )
-         VALUES ($1, $2, 'กองกลาง', 0, $3::date, $4::date, $5, NULL, true, -1)`,
-        [projectId, userId, input.startDate ?? null, input.endDate ?? null, activityStatus],
-      );
-    }
+    const activityStatus = input.status === "closed" ? "closed" : "active";
+    await client.query(
+      `INSERT INTO project_activities (
+         project_id, user_id, name, budget_target, start_date, end_date, status, note, is_general, sort_order
+       )
+       VALUES ($1, $2, 'กองกลาง', 0, $3::date, $4::date, $5, NULL, true, -1)`,
+      [projectId, userId, input.startDate ?? null, input.endDate ?? null, activityStatus],
+    );
 
     await client.query("COMMIT");
     const project = await getProject(userId, projectId);
@@ -311,11 +313,12 @@ export async function updateProject(
        org_name = $4,
        project_code = $5,
        objective = $6,
-       status = $7,
-       budget_target = $8,
-       start_date = $9::date,
-       end_date = $10::date,
-       note = $11
+       chairman_name = $7,
+       status = $8,
+       budget_target = $9,
+       start_date = $10::date,
+       end_date = $11::date,
+       note = $12
      WHERE user_id = $1 AND id = $2
      RETURNING ${PROJECT_RETURN}`,
     [
@@ -325,6 +328,7 @@ export async function updateProject(
       input.orgName !== undefined ? input.orgName : existing.orgName,
       input.projectCode !== undefined ? input.projectCode : existing.projectCode,
       input.objective !== undefined ? input.objective : existing.objective,
+      input.chairmanName !== undefined ? input.chairmanName : existing.chairmanName,
       input.status ?? existing.status,
       (input.budgetTarget ?? Number(existing.budgetTarget)).toFixed(2),
       startDate,
@@ -376,7 +380,7 @@ export async function getProjectActivity(
 export async function createActivity(
   userId: string,
   projectId: string,
-  input: ProjectActivityInput,
+  input: ProjectActivityInput | CreateProjectActivityInput,
 ): Promise<ProjectActivity | null> {
   const project = await getOwnedProject(userId, projectId);
   if (!project || project.projectType !== "long") return null;
@@ -389,14 +393,15 @@ export async function createActivity(
   const sortOrder = input.sortOrder ?? orderRows[0]?.next_order ?? 0;
 
   const { rows } = await pool.query<ActivityRow>(
-    `INSERT INTO project_activities (project_id, user_id, name, budget_target, start_date, end_date, note, sort_order)
-     VALUES ($1, $2, $3, $4, $5::date, $6::date, $7, $8)
+    `INSERT INTO project_activities (project_id, user_id, name, budget_target, chairman_name, start_date, end_date, note, sort_order)
+     VALUES ($1, $2, $3, $4, $5, $6::date, $7::date, $8, $9)
      RETURNING ${ACTIVITY_RETURN}`,
     [
       projectId,
       userId,
       input.name,
       (input.budgetTarget ?? 0).toFixed(2),
+      input.chairmanName ?? null,
       input.startDate ?? null,
       input.endDate ?? null,
       input.note ?? null,
@@ -423,11 +428,12 @@ export async function updateActivity(
     `UPDATE project_activities SET
        name = $4,
        budget_target = $5,
-       start_date = $6::date,
-       end_date = $7::date,
-       note = $8,
-       status = $9,
-       sort_order = $10
+       chairman_name = $6,
+       start_date = $7::date,
+       end_date = $8::date,
+       note = $9,
+       status = $10,
+       sort_order = $11
      WHERE user_id = $1 AND project_id = $2 AND id = $3
      RETURNING ${ACTIVITY_RETURN}`,
     [
@@ -436,6 +442,7 @@ export async function updateActivity(
       activityId,
       input.name ?? existing.name,
       (input.budgetTarget ?? Number(existing.budgetTarget)).toFixed(2),
+      input.chairmanName !== undefined ? input.chairmanName : existing.chairmanName,
       startDate,
       endDate,
       input.note !== undefined ? input.note : existing.note,

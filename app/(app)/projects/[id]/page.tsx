@@ -5,7 +5,6 @@ import {
   getShortProjectActivity,
   listProjectExpense,
   listProjectIncome,
-  listProjectMembers,
 } from "@/lib/project-queries";
 import { summarizeProject } from "@/lib/project-summary";
 import { getCurrentUser } from "@/lib/session";
@@ -15,7 +14,6 @@ import { ProjectBack } from "@/components/project/ProjectBack";
 import { ProjectBudgetCard } from "@/components/project/ProjectBudgetCard";
 import { ProjectEntryList } from "@/components/project/ProjectEntryList";
 import { ProjectInfoHeader } from "@/components/project/ProjectHubParts";
-import { ProjectMembersPanel } from "@/components/project/ProjectMembersPanel";
 import { ProjectSettingsPanel } from "@/components/project/ProjectSettingsPanel";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +27,6 @@ export default async function ProjectHubPage({ params }: { params: Promise<{ id:
   if (!project) notFound();
 
   const closed = project.status === "closed";
-  const members = await listProjectMembers(user.id, id);
 
   if (project.projectType === "long") {
     const summary = await summarizeProject(user.id, id);
@@ -72,7 +69,6 @@ export default async function ProjectHubPage({ params }: { params: Promise<{ id:
             />
 
             <ProjectSettingsPanel project={project} />
-            <ProjectMembersPanel projectId={id} members={members} />
 
             {!closed && (
               <Link
@@ -120,7 +116,6 @@ export default async function ProjectHubPage({ params }: { params: Promise<{ id:
 
         <div className="space-y-6 px-4">
           <ProjectSettingsPanel project={project} />
-          <ProjectMembersPanel projectId={id} members={members} />
 
           <Link
             href={`/projects/${id}/summary`}

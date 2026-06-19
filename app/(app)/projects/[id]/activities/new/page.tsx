@@ -25,7 +25,7 @@ export default async function NewActivityPage({
       <ProjectBack href={`/projects/${id}`} />
       <ProjectModeSwitcher userId={user.id} project={project} />
       <div className="px-4 pt-1">
-        <h1 className="text-lg font-medium text-rz-text">เพิ่มกิจกรรมย่อย</h1>
+        <h1 className="text-lg font-medium text-rz-text">เพิ่มโครงการ</h1>
         <p className="text-xs text-rz-hint">{project.name}</p>
       </div>
       <div className="mt-4">

@@ -54,7 +54,7 @@ export function ModeSwitcher({
   projectEndDate?: string | null;
 }) {
   const router = useRouter();
-  const [picker, setPicker] = useState<"booth" | "project" | null>(null);
+  const [picker, setPicker] = useState<"booth" | null>(null);
   const [booths, setBooths] = useState<Booth[] | null>(null);
   const [projects, setProjects] = useState<ProjectListItem[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -151,12 +151,6 @@ export function ModeSwitcher({
 
   async function switchToProject() {
     if (switching) return;
-    if (mode === "project") {
-      setPicker("project");
-      setError(null);
-      await loadProjects();
-      return;
-    }
 
     const list = await loadProjects();
     const orgs = activeOrgProjects(list);
@@ -164,16 +158,17 @@ export function ModeSwitcher({
       router.push("/projects/new");
       return;
     }
-    if (orgs.length === 1) {
-      await patchContext({ mode: "project", projectId: orgs[0].id });
+
+    if (mode === "project") {
+      router.push("/");
       return;
     }
-    setPicker("project");
+
+    await patchContext({ mode: "project", projectId: orgs[0].id });
   }
 
   const openBooths = booths?.filter((b) => b.status === "open") ?? [];
   const closedBoothCount = booths?.filter((b) => b.status === "closed").length ?? 0;
-  const openOrgs = projects ? activeOrgProjects(projects) : [];
 
   const tabBase =
     "tap-target flex flex-1 items-center justify-center gap-1 rounded-full py-2 text-xs font-medium transition-colors disabled:opacity-50 sm:text-sm";
@@ -344,101 +339,6 @@ export function ModeSwitcher({
                   ดูบูธที่ปิดแล้ว ({closedBoothCount}) →
                 </Link>
               )}
-
-              <button
-                type="button"
-                onClick={() => setPicker(null)}
-                disabled={switching}
-                className="tap-target min-h-11 w-full py-2 text-sm font-medium text-rz-hint"
-              >
-                ปิด
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {picker === "project" && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="project-picker-title"
-          onClick={() => !switching && setPicker(null)}
-        >
-          <div
-            className="flex max-h-[80dvh] w-full max-w-sm flex-col rounded-2xl border-[0.5px] border-rz-border bg-rz-card shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="shrink-0 p-4 pb-3">
-              <h2 id="project-picker-title" className="text-lg font-medium text-rz-text">
-                เลือกองค์กร
-              </h2>
-              <p className="mt-1 text-sm text-rz-muted">เลือกองค์กรระยะยาวที่เปิดอยู่</p>
-
-              {error && (
-                <p className="mt-3 text-sm text-rz-red" role="alert">
-                  {error}
-                </p>
-              )}
-
-              <Link
-                href="/projects/new"
-                onClick={() => setPicker(null)}
-                className="tap-target mt-4 flex min-h-11 w-full items-center justify-center rounded-[12px] border-[0.5px] border-rz-purple-border bg-rz-purple-bg text-sm font-medium text-rz-purple active:opacity-90"
-              >
-                ＋ สร้างองค์กรใหม่
-              </Link>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto px-4">
-              <ul className="divide-y divide-rz-border border-t-[0.5px] border-rz-border">
-                {loading && (
-                  <li className="px-2 py-3 text-sm text-rz-hint">กำลังโหลดองค์กร…</li>
-                )}
-
-                {!loading &&
-                  openOrgs.map((p) => {
-                    const label = orgDisplayName(p);
-                    const isActive = mode === "project" && projectId === p.id;
-                    return (
-                      <li key={p.id}>
-                        <button
-                          type="button"
-                          disabled={switching}
-                          onClick={() => patchContext({ mode: "project", projectId: p.id })}
-                          className={`tap-target min-h-11 w-full px-2 py-3 text-left disabled:opacity-40 ${
-                            isActive ? "text-rz-purple" : "text-rz-text"
-                          }`}
-                        >
-                          <span className="block text-sm font-medium">{label}</span>
-                          {p.orgName && p.name !== p.orgName && (
-                            <span className="mt-0.5 block truncate text-xs text-rz-hint">
-                              {p.name}
-                            </span>
-                          )}
-                          {isActive && " ✓"}
-                        </button>
-                      </li>
-                    );
-                  })}
-
-                {!loading && projects !== null && openOrgs.length === 0 && (
-                  <li className="px-2 py-4 text-center text-sm text-rz-hint">
-                    ยังไม่มีองค์กรระยะยาวที่เปิดอยู่
-                  </li>
-                )}
-              </ul>
-            </div>
-
-            <div className="shrink-0 border-t-[0.5px] border-rz-border p-4 pt-3">
-              <Link
-                href="/projects"
-                onClick={() => setPicker(null)}
-                className="tap-target mb-3 flex min-h-11 w-full items-center px-1 text-sm text-rz-hint active:text-rz-muted"
-              >
-                ดูโครงการทั้งหมด →
-              </Link>
 
               <button
                 type="button"

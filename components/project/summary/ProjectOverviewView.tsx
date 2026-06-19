@@ -1,11 +1,10 @@
 import { buildExpenseBreakdown, buildIncomeBreakdown } from "@/lib/project-breakdown";
-import type { Project, ProjectMember, ProjectSummary } from "@/types/project";
+import type { Project, ProjectSummary } from "@/types/project";
 import { ProjectBudgetCard } from "@/components/project/ProjectBudgetCard";
 import {
   ProjectExpenseBreakdown,
   ProjectIncomeBreakdown,
 } from "@/components/project/summary/ProjectBreakdownSections";
-import { ProjectMembersList } from "@/components/project/summary/ProjectMembersList";
 import { ProjectSummaryActivityList } from "@/components/project/summary/ProjectSummaryActivityList";
 import { ProjectSummaryHeader } from "@/components/project/summary/ProjectSummaryHeader";
 
@@ -13,13 +12,11 @@ import { ProjectSummaryHeader } from "@/components/project/summary/ProjectSummar
 export function ProjectOverviewView({
   project,
   summary,
-  members,
   currency = "THB",
   backHref,
 }: {
   project: Project;
   summary: ProjectSummary;
-  members: ProjectMember[];
   currency?: string;
   backHref: string;
 }) {
@@ -58,8 +55,6 @@ export function ProjectOverviewView({
 
         <ProjectIncomeBreakdown rows={incomeRows} currency={currency} title="รวมแหล่งเงินเข้า" />
         <ProjectExpenseBreakdown rows={expenseRows} currency={currency} title="รวมรายจ่ายตามหมวด" />
-
-        <ProjectMembersList members={members} />
       </div>
     </div>
   );
