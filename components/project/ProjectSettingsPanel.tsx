@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { apiFetch } from "@/lib/api-client";
-import { PROJECT_LIST_STATUS_BADGE, projectStatusFullLabel } from "@/lib/project-ui";
+import { PROJECT_LIST_STATUS_BADGE, projectScopeNoun, projectStatusFullLabel } from "@/lib/project-ui";
 import type { Project, ProjectStatus } from "@/types/project";
 import { PROJECT_STATUSES } from "@/types/project";
 import { ProjectField, ProjectTextArea } from "@/components/project/ProjectField";
@@ -48,7 +48,7 @@ export function ProjectSettingsPanel({ project }: { project: Project }) {
   }
 
   async function closeProject() {
-    if (!confirm("ปิดโครงการนี้?")) return;
+    if (!confirm(`ปิด${projectScopeNoun(project.projectType)}นี้?`)) return;
     setSaving(true);
     const res = await apiFetch<Project>(`/api/projects/${project.id}`, {
       method: "PATCH",
@@ -109,7 +109,7 @@ export function ProjectSettingsPanel({ project }: { project: Project }) {
                         : "border-rz-border bg-rz-elevated text-rz-muted"
                     }`}
                   >
-                    {projectStatusFullLabel(s)}
+                    {projectStatusFullLabel(s, project.projectType)}
                   </button>
                 );
               })}
@@ -134,7 +134,7 @@ export function ProjectSettingsPanel({ project }: { project: Project }) {
               onClick={closeProject}
               className="tap-target w-full rounded-[12px] border-[0.5px] border-rz-border py-3 text-sm font-medium text-rz-muted active:bg-rz-elevated"
             >
-              ปิดโครงการ
+              ปิด{projectScopeNoun(project.projectType)}
             </button>
           )}
         </div>

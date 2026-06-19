@@ -3,7 +3,7 @@
  * payment_status is a single-user label — not a multi-user workflow.
  */
 
-import type { PaymentStatus, ProjectStatus } from "@/types/project";
+import type { PaymentStatus, ProjectStatus, ProjectType } from "@/types/project";
 
 export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
   planning: "วางแผน",
@@ -18,7 +18,8 @@ export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
   rejected: "ปฏิเสธ",
 };
 
-export function projectStatusLabel(status: ProjectStatus): string {
+export function projectStatusLabel(status: ProjectStatus, projectType?: ProjectType): string {
+  if (status === "closed" && projectType === "long") return "ปิดองค์กร";
   return PROJECT_STATUS_LABELS[status];
 }
 

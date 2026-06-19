@@ -34,7 +34,7 @@ export function BottomNav({
     mode === "booth"
       ? "text-rz-amber"
       : mode === "project"
-        ? "text-rz-blue"
+        ? "text-rz-purple"
         : "text-rz-green";
   const accentIdle = "text-rz-hint";
 

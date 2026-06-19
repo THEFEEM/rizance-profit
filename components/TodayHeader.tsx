@@ -21,7 +21,7 @@ export function TodayHeader({
     mode === "booth"
       ? "ring-rz-amber"
       : mode === "project"
-        ? "ring-rz-blue"
+        ? "ring-rz-purple"
         : "ring-rz-green";
 
   return (

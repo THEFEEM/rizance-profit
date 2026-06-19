@@ -11,7 +11,6 @@ import type { User } from "@/types";
 import { ActivityListSection } from "@/components/project/ActivityListSection";
 import { OrgProjectEntryList } from "@/components/project/OrgProjectEntryList";
 import { ProjectBudgetCard } from "@/components/project/ProjectBudgetCard";
-import { ProjectHubActions } from "@/components/project/ProjectHubParts";
 
 /** Org-mode Today — budget overview, quick actions, recent entries, activities. */
 export async function OrgToday({ user, project }: { user: User; project: Project }) {
@@ -35,7 +34,7 @@ export async function OrgToday({ user, project }: { user: User; project: Project
       <div className="px-4">
         <h1 className="text-lg font-medium text-rz-text">{displayName}</h1>
         {project.orgName && project.name !== project.orgName && (
-          <p className="mt-0.5 truncate text-xs text-rz-blue">{project.name}</p>
+          <p className="mt-0.5 truncate text-xs text-rz-purple">{project.name}</p>
         )}
       </div>
 
@@ -58,8 +57,6 @@ export async function OrgToday({ user, project }: { user: User; project: Project
           title="ภาพรวมงบทั้งปี"
         />
       </div>
-
-      <ProjectHubActions projectId={projectId} scope="project" closed={closed} />
 
       <div className="px-4">
         <h2 className="mb-2.5 text-sm font-medium text-rz-muted">รายการล่าสุด</h2>
@@ -86,9 +83,9 @@ export async function OrgToday({ user, project }: { user: User; project: Project
         <div className="px-4">
           <Link
             href={`/projects/${projectId}`}
-            className="tap-target block rounded-[14px] border-[0.5px] border-rz-border bg-rz-card px-4 py-3 text-center text-sm font-medium text-rz-blue active:bg-rz-elevated"
+            className="tap-target block rounded-[14px] border-[0.5px] border-rz-border bg-rz-card px-4 py-3 text-center text-sm font-medium text-rz-purple active:bg-rz-elevated"
           >
-            เปิดหน้าโครงการเต็ม →
+            เปิดหน้าองค์กรเต็ม →
           </Link>
         </div>
       )}

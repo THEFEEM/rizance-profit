@@ -39,6 +39,7 @@ export default async function ProjectIncomePage({
       <ProjectIncomeForm
         projectId={id}
         activityId={activity.id}
+        projectType={project.projectType}
         activityName={activity.name}
         startDate={startDate}
         endDate={endDate}

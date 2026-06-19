@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AmountInput } from "@/components/ui/AmountInput";
-import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
+import { AmountPadSection } from "@/components/entry/AmountPadSection";
+import { EntryFormLayout } from "@/components/entry/EntryFormLayout";
 import { EntryField } from "@/components/entry/EntryField";
 import { EntryOptionButton } from "@/components/entry/EntryOptionButton";
 import { apiFetch } from "@/lib/api-client";
@@ -112,7 +112,23 @@ export function OrgProjectExpenseForm({
   }
 
   return (
-    <div className="flex min-h-[calc(100dvh-57px-61px)] flex-col" data-context="project">
+    <EntryFormLayout
+      dataContext="project"
+      pad={
+        <AmountPadSection
+          raw={raw}
+          onChange={setRaw}
+          onSave={save}
+          saving={saving}
+          closed={closed}
+          saveLabel="บันทึกรายจ่าย"
+          tone="expense"
+          accent="green"
+          saveTone="red"
+          currency={currency}
+        />
+      }
+    >
       <div className="flex items-center justify-between px-4 py-3">
         <ProjectBack href={backHref} />
         <div className="min-w-0 text-center">
@@ -124,13 +140,11 @@ export function OrgProjectExpenseForm({
 
       {closed && (
         <div className="mb-3">
-          <ProjectClosedBanner />
+          <ProjectClosedBanner projectType="long" />
         </div>
       )}
 
-      <AmountInput value={formatTyped(raw)} tone="expense" currency={currency} />
-
-      <div className="flex flex-col gap-3 px-4">
+      <div className="flex flex-col gap-3 px-4 pb-4">
         <div>
           <p className="mb-1.5 text-xs text-rz-muted">แหล่งเงินทุน (ไม่บังคับ)</p>
           <FundSourceBalanceGrid
@@ -143,7 +157,7 @@ export function OrgProjectExpenseForm({
         </div>
 
         <div>
-          <p className="mb-1.5 text-xs text-rz-muted">เลือกโครงการ</p>
+          <p className="mb-1.5 text-xs text-rz-muted">เลือกกิจกรรม</p>
           <ProjectActivityPicker
             activities={activityOptions}
             generalActivityId={generalActivityId}
@@ -231,22 +245,6 @@ export function OrgProjectExpenseForm({
         )}
       </div>
 
-      <div className="mt-auto px-2 pb-3">
-        {closed ? (
-          <p className="px-2 py-4 text-center text-sm text-rz-hint">ฟอร์มถูกปิดใช้งาน</p>
-        ) : (
-          <QuickAmountPad
-            value={raw}
-            onChange={setRaw}
-            onSave={save}
-            saving={saving}
-            saveLabel="บันทึกรายจ่าย"
-            accent="green"
-            saveTone="red"
-          />
-        )}
-      </div>
-
       <div className="border-t-[0.5px] border-rz-border">
         <h2 className="px-4 pt-4 text-xs font-medium text-rz-muted">รายการรายจ่ายทั้งองค์กร</h2>
         <div className="p-4">
@@ -260,6 +258,6 @@ export function OrgProjectExpenseForm({
           />
         </div>
       </div>
-    </div>
+    </EntryFormLayout>
   );
 }

@@ -4,7 +4,7 @@
  */
 
 import type { PaymentStatus, ProjectStatus, ProjectType } from "@/types/project";
-import { PAYMENT_STATUS_LABELS, PROJECT_STATUS_LABELS } from "@/lib/project-status";
+import { PAYMENT_STATUS_LABELS, PROJECT_STATUS_LABELS, projectStatusLabel } from "@/lib/project-status";
 
 /** §1 Design tokens — purple accent */
 export const PROJECT_UI = {
@@ -27,6 +27,11 @@ export const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {
 /** Display label for org mode — org_name when set, else project name. */
 export function orgDisplayName(project: { orgName: string | null; name: string }): string {
   return project.orgName?.trim() || project.name;
+}
+
+/** "องค์กร" for long-term org projects, "โครงการ" for short-term. */
+export function projectScopeNoun(projectType: import("@/types/project").ProjectType): string {
+  return projectType === "long" ? "องค์กร" : "โครงการ";
 }
 
 /** List-card status badges (GROUP 1) */
@@ -139,6 +144,6 @@ export const PROJECT_TYPE_ICON: Record<ProjectType, { icon: "calendar-event" | "
   long: { icon: "calendar-stats", color: PROJECT_UI.accent, bg: PROJECT_UI.accentBg },
 };
 
-export function projectStatusFullLabel(status: ProjectStatus): string {
-  return PROJECT_STATUS_LABELS[status];
+export function projectStatusFullLabel(status: ProjectStatus, projectType?: ProjectType): string {
+  return projectStatusLabel(status, projectType);
 }

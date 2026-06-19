@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AmountInput } from "@/components/ui/AmountInput";
-import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
+import { AmountPadSection } from "@/components/entry/AmountPadSection";
+import { EntryFormLayout } from "@/components/entry/EntryFormLayout";
 import { EntryField } from "@/components/entry/EntryField";
 import { apiFetch } from "@/lib/api-client";
 import { clampDateToRange } from "@/lib/date";
 import type { ProjectExpenseKey } from "@/lib/project-categories";
-import type { ProjectExpense } from "@/types/project";
+import type { ProjectExpense, ProjectType } from "@/types/project";
 import { ProjectBack } from "@/components/project/ProjectBack";
 import { ProjectClosedBanner } from "@/components/project/ProjectClosedBanner";
 import { ExpenseCategoryGrid } from "@/components/project/ProjectEntryGrids";
@@ -19,6 +19,7 @@ export function ProjectExpenseForm({
   projectId,
   activityId,
   activityName,
+  projectType = "short",
   startDate,
   endDate,
   closed,
@@ -30,6 +31,7 @@ export function ProjectExpenseForm({
   projectId: string;
   activityId: string;
   activityName: string;
+  projectType?: ProjectType;
   startDate: string | null;
   endDate: string | null;
   closed: boolean;
@@ -86,7 +88,23 @@ export function ProjectExpenseForm({
   }
 
   return (
-    <div className="flex min-h-[calc(100dvh-57px-61px)] flex-col" data-context="project">
+    <EntryFormLayout
+      dataContext="project"
+      pad={
+        <AmountPadSection
+          raw={raw}
+          onChange={setRaw}
+          onSave={save}
+          saving={saving}
+          closed={closed}
+          saveLabel="บันทึกรายจ่าย"
+          tone="expense"
+          accent="green"
+          saveTone="red"
+          currency={currency}
+        />
+      }
+    >
       <div className="flex items-center justify-between px-4 py-3">
         <ProjectBack href={backHref} />
         <div className="min-w-0 text-center">
@@ -98,20 +116,16 @@ export function ProjectExpenseForm({
 
       {closed && (
         <div className="mb-3">
-          <ProjectClosedBanner />
+          <ProjectClosedBanner projectType={projectType} />
         </div>
       )}
 
-      <div className="flex flex-col gap-3 px-4">
+      <div className="flex flex-col gap-3 px-4 pb-4">
         <div>
           <p className="mb-1.5 text-xs text-rz-muted">หมวดรายจ่าย</p>
           <ExpenseCategoryGrid value={category} onChange={setCategory} disabled={closed} />
         </div>
-      </div>
 
-      <AmountInput value={formatTyped(raw)} tone="expense" currency={currency} />
-
-      <div className="flex flex-col gap-3 px-4">
         <EntryField
           label="ผู้จ่าย (ไม่บังคับ)"
           placeholder="เช่น เหรัญญิก / สมาชิก"
@@ -158,28 +172,12 @@ export function ProjectExpenseForm({
         )}
       </div>
 
-      <div className="mt-auto px-2 pb-3">
-        {closed ? (
-          <p className="px-2 py-4 text-center text-sm text-rz-hint">ฟอร์มถูกปิดใช้งาน</p>
-        ) : (
-          <QuickAmountPad
-            value={raw}
-            onChange={setRaw}
-            onSave={save}
-            saving={saving}
-            saveLabel="บันทึกรายจ่าย"
-            accent="green"
-            saveTone="red"
-          />
-        )}
-      </div>
-
       <div className="border-t-[0.5px] border-rz-border">
         <h2 className="px-4 pt-4 text-xs font-medium text-rz-muted">รายการที่บันทึกแล้ว</h2>
         <div className="p-4">
           <ProjectEntryList incomes={[]} expenses={entries} kind="expense" currency={currency} />
         </div>
       </div>
-    </div>
+    </EntryFormLayout>
   );
 }
