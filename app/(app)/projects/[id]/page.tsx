@@ -8,7 +8,6 @@ import {
 } from "@/lib/project-queries";
 import { summarizeProject } from "@/lib/project-summary";
 import { getCurrentUser } from "@/lib/session";
-import { ProjectModeSwitcher } from "@/components/project/ProjectModeSwitcher";
 import { ActivityListSection } from "@/components/project/ActivityListSection";
 import { ProjectBack } from "@/components/project/ProjectBack";
 import { ProjectBudgetCard } from "@/components/project/ProjectBudgetCard";
@@ -35,7 +34,6 @@ export default async function ProjectHubPage({ params }: { params: Promise<{ id:
     return (
       <div className="pb-8" data-context="project">
         <ProjectBack href="/projects" />
-        <ProjectModeSwitcher userId={user.id} project={project} />
         <div className="mt-1">
           <ProjectInfoHeader project={project} />
         </div>
@@ -99,7 +97,6 @@ export default async function ProjectHubPage({ params }: { params: Promise<{ id:
   return (
     <div className="pb-8" data-context="project">
       <ProjectBack href="/projects" />
-      <ProjectModeSwitcher userId={user.id} project={project} />
       <div className="mt-1">
         <ProjectInfoHeader project={project} />
       </div>

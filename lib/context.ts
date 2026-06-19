@@ -160,9 +160,9 @@ export type SetContextResult =
 
 export type EntryNavRoutes = {
   today: string;
-  income: string;
-  expense: string;
+  entry: string;
   stats: string;
+  profile: string;
 };
 
 /** Bottom-nav targets from resolved context (stale/invalid → regular routes). */
@@ -170,24 +170,24 @@ export function entryNavRoutes(resolved: ResolvedTodayContext): EntryNavRoutes {
   if (resolved.mode === "booth") {
     return {
       today: "/",
-      income: `/booth/${resolved.boothId}/income`,
-      expense: `/booth/${resolved.boothId}/expense`,
+      entry: `/booth/${resolved.boothId}/entry`,
       stats: "/summary",
+      profile: "/profile",
     };
   }
   if (resolved.mode === "project") {
     const base = `/projects/${resolved.projectId}`;
     return {
       today: "/",
-      income: `${base}/income`,
-      expense: `${base}/expense`,
+      entry: `${base}/entry`,
       stats: `${base}/summary`,
+      profile: "/profile",
     };
   }
   return {
     today: "/",
-    income: "/income",
-    expense: "/expense",
+    entry: "/entry",
     stats: "/summary",
+    profile: "/profile",
   };
 }

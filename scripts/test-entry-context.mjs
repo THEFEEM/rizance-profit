@@ -144,7 +144,7 @@ try {
   );
   const boothId = booths[0].id;
 
-  console.log("1) Regular context → nav routes to /income and /expense");
+  console.log("1) Regular context → nav routes to /entry");
   let res = await apiJson(base, "/api/context", {
     method: "PATCH",
     body: JSON.stringify({ mode: "regular" }),
@@ -153,12 +153,13 @@ try {
 
   let page = await fetchHtml(base, "/");
   assertEq("home status", String(page.status), "200");
-  assertTrue("nav income href /income", hrefPresent(page.html, "/income"));
-  assertTrue("nav expense href /expense", hrefPresent(page.html, "/expense"));
-  assertTrue("no booth income nav", !hrefPresent(page.html, `/booth/${boothId}/income`));
+  assertTrue("nav entry href /entry", hrefPresent(page.html, "/entry"));
+  assertTrue("nav profile href /profile", hrefPresent(page.html, "/profile"));
+  assertTrue("no booth entry nav", !hrefPresent(page.html, `/booth/${boothId}/entry`));
+  assertTrue("no legacy income nav", !hrefPresent(page.html, 'href="/income"'));
   console.log("");
 
-  console.log("2) Regular entry forms show ร้านประจำ banner");
+  console.log("2) Regular entry forms show ร้านประจำ banner (via /income redirect)");
   page = await fetchHtml(base, "/income");
   assertEq("/income status", String(page.status), "200");
   assertTrue("income banner ร้านประจำ", page.html.includes("บันทึกเข้า:") && page.html.includes("ร้านประจำ"));
@@ -169,7 +170,7 @@ try {
   assertTrue("expense banner ร้านประจำ", page.html.includes("บันทึกเข้า:") && page.html.includes("ร้านประจำ"));
   console.log("");
 
-  console.log("3) Open booth context → nav routes to booth entry forms");
+  console.log("3) Open booth context → nav routes to booth entry form");
   res = await apiJson(base, "/api/context", {
     method: "PATCH",
     body: JSON.stringify({ mode: "booth", boothId }),
@@ -177,24 +178,23 @@ try {
   assertEq("PATCH booth", String(res.status), "200");
 
   page = await fetchHtml(base, "/");
-  assertTrue("nav booth income href", hrefPresent(page.html, `/booth/${boothId}/income`));
-  assertTrue("nav booth expense href", hrefPresent(page.html, `/booth/${boothId}/expense`));
-  assertTrue("no regular income nav", !hrefPresent(page.html, "/income"));
+  assertTrue("nav booth entry href", hrefPresent(page.html, `/booth/${boothId}/entry`));
+  assertTrue("no regular entry nav", !hrefPresent(page.html, 'href="/entry"'));
   console.log("");
 
   console.log("4) Booth entry forms show amber booth banner");
-  page = await fetchHtml(base, `/booth/${boothId}/income`);
-  assertEq("booth income status", String(page.status), "200");
+  page = await fetchHtml(base, `/booth/${boothId}/entry?tab=income`);
+  assertEq("booth entry income status", String(page.status), "200");
   assertTrue("booth income banner text", page.html.includes("บันทึกเข้า:") && page.html.includes(boothName));
   assertTrue("booth income amber style", page.html.includes('data-entry-context="booth"'));
 
-  page = await fetchHtml(base, `/booth/${boothId}/expense`);
+  page = await fetchHtml(base, `/booth/${boothId}/entry?tab=expense`);
   assertEq("booth expense status", String(page.status), "200");
   assertTrue("booth expense banner text", page.html.includes("บันทึกเข้า:") && page.html.includes(boothName));
   assertTrue("booth expense amber style", page.html.includes('data-entry-context="booth"'));
   console.log("");
 
-  console.log("7) Open project context → nav routes to org entry forms");
+  console.log("7) Open project context → nav routes to org entry form");
   const { rows: projects } = await client.query(
     `INSERT INTO projects (user_id, name, project_type, org_name, budget_target, start_date, end_date, status)
      VALUES ($1, 'Org Nav Test', 'long', 'ชมรมนำทาง', 50000.00, '2026-01-01'::date, '2026-12-31'::date, 'active')
@@ -211,10 +211,9 @@ try {
   assertEq("PATCH project mode", res.body?.data?.mode, "project");
 
   page = await fetchHtml(base, "/");
-  assertTrue("nav project income href", hrefPresent(page.html, `/projects/${projectId}/income`));
-  assertTrue("nav project expense href", hrefPresent(page.html, `/projects/${projectId}/expense`));
+  assertTrue("nav project entry href", hrefPresent(page.html, `/projects/${projectId}/entry`));
   assertTrue("nav project stats href", hrefPresent(page.html, `/projects/${projectId}/summary`));
-  assertTrue("no regular income nav", !hrefPresent(page.html, 'href="/income"'));
+  assertTrue("no regular entry nav", !hrefPresent(page.html, 'href="/entry"'));
   assertTrue("nav purple accent", page.html.includes("text-rz-purple"));
   assertTrue("OrgToday budget card", page.html.includes("ภาพรวมงบทั้งปี"));
   assertTrue("OrgToday org name", page.html.includes("ชมรมนำทาง"));
@@ -223,9 +222,8 @@ try {
   console.log("8) Closed project cookie → nav falls back to regular routes");
   await client.query(`UPDATE projects SET status = 'closed' WHERE id = $1`, [projectId]);
   page = await fetchHtml(base, "/");
-  assertTrue("closed project: nav /income", hrefPresent(page.html, "/income"));
-  assertTrue("closed project: nav /expense", hrefPresent(page.html, "/expense"));
-  assertTrue("closed project: no project nav", !hrefPresent(page.html, `/projects/${projectId}/income`));
+  assertTrue("closed project: nav /entry", hrefPresent(page.html, "/entry"));
+  assertTrue("closed project: no project nav", !hrefPresent(page.html, `/projects/${projectId}/entry`));
   console.log("");
 
   console.log("5) Closed booth cookie → nav falls back to regular routes");
@@ -234,17 +232,15 @@ try {
     [boothId],
   );
   page = await fetchHtml(base, "/");
-  assertTrue("closed: nav /income", hrefPresent(page.html, "/income"));
-  assertTrue("closed: nav /expense", hrefPresent(page.html, "/expense"));
-  assertTrue("closed: no booth nav", !hrefPresent(page.html, `/booth/${boothId}/income`));
+  assertTrue("closed: nav /entry", hrefPresent(page.html, "/entry"));
+  assertTrue("closed: no booth nav", !hrefPresent(page.html, `/booth/${boothId}/entry`));
   console.log("");
 
   console.log("6) Invalid booth cookie → nav falls back to regular routes");
   const fakeId = "00000000-0000-4000-8000-000000000088";
   cookie = `${cookie}; rizance_context=booth:${fakeId}`;
   page = await fetchHtml(base, "/");
-  assertTrue("invalid: nav /income", hrefPresent(page.html, "/income"));
-  assertTrue("invalid: nav /expense", hrefPresent(page.html, "/expense"));
+  assertTrue("invalid: nav /entry", hrefPresent(page.html, "/entry"));
   console.log("");
 
   if (failed === 0) {

@@ -8,6 +8,32 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      { source: "/income", destination: "/entry?tab=income", permanent: false },
+      { source: "/expense", destination: "/entry?tab=expense", permanent: false },
+      {
+        source: "/booth/:id/income",
+        destination: "/booth/:id/entry?tab=income",
+        permanent: false,
+      },
+      {
+        source: "/booth/:id/expense",
+        destination: "/booth/:id/entry?tab=expense",
+        permanent: false,
+      },
+      {
+        source: "/projects/:id/income",
+        destination: "/projects/:id/entry?tab=income",
+        permanent: false,
+      },
+      {
+        source: "/projects/:id/expense",
+        destination: "/projects/:id/entry?tab=expense",
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     // HSTS and hardening headers only in production (not local dev).
     // Vercel serves HTTPS only; skip HSTS on local dev / `next start` over HTTP.

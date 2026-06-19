@@ -115,6 +115,15 @@ export async function findUserById(id: string): Promise<User | null> {
   return rows[0] ? mapUser(rows[0]) : null;
 }
 
+export async function updateUserShopName(userId: string, shopName: string): Promise<User | null> {
+  const { rows } = await query<UserRow>(
+    `UPDATE users SET shop_name = $2 WHERE id = $1
+     RETURNING id, email, shop_name, currency, created_at`,
+    [userId, shopName],
+  );
+  return rows[0] ? mapUser(rows[0]) : null;
+}
+
 export async function emailExists(email: string): Promise<boolean> {
   const { rows } = await query<{ exists: boolean }>(
     `SELECT EXISTS(SELECT 1 FROM users WHERE email = $1) AS exists`,

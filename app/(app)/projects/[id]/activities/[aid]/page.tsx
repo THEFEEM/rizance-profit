@@ -8,7 +8,6 @@ import {
 } from "@/lib/project-queries";
 import { summarizeActivity } from "@/lib/project-summary";
 import { getCurrentUser } from "@/lib/session";
-import { ProjectModeSwitcher } from "@/components/project/ProjectModeSwitcher";
 import { ActivitySettingsPanel } from "@/components/project/ActivitySettingsPanel";
 import { ProjectBack } from "@/components/project/ProjectBack";
 import { ProjectBudgetCard } from "@/components/project/ProjectBudgetCard";
@@ -45,8 +44,7 @@ export default async function ActivityHubPage({
   return (
     <div className="pb-8" data-context="project">
       <ProjectBack href={`/projects/${id}`} />
-      <ProjectModeSwitcher userId={user.id} project={project} />
-      <div className="px-4 pt-1">
+      <div className="px-4 pt-3">
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
             <h1 className="text-lg font-medium text-rz-text">{activity.name}</h1>

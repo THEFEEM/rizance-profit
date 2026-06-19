@@ -1,7 +1,4 @@
-"use client";
-
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 function GearIcon() {
   return (
@@ -22,55 +19,13 @@ function GearIcon() {
 }
 
 export function HeaderSettings() {
-  const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function onPointerDown(e: PointerEvent) {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [open]);
-
-  async function logout() {
-    setBusy(true);
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/login");
-    router.refresh();
-  }
-
   return (
-    <div ref={rootRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-label="ตั้งค่าและบัญชี"
-        aria-expanded={open}
-        className="tap-target flex h-11 w-11 items-center justify-center rounded-full text-rz-hint active:bg-rz-elevated"
-      >
-        <GearIcon />
-      </button>
-
-      {open && (
-        <div
-          role="menu"
-          className="absolute right-0 top-full z-20 mt-1 min-w-[10rem] overflow-hidden rounded-xl border-[0.5px] border-rz-border bg-rz-card py-1 shadow-lg"
-        >
-          <button
-            type="button"
-            role="menuitem"
-            disabled={busy}
-            onClick={logout}
-            className="tap-target w-full px-4 py-2.5 text-left text-sm font-medium text-rz-muted active:bg-rz-elevated disabled:opacity-50"
-          >
-            {busy ? "กำลังออก…" : "ออกจากระบบ"}
-          </button>
-        </div>
-      )}
-    </div>
+    <Link
+      href="/profile"
+      aria-label="โปรไฟล์และตั้งค่า"
+      className="tap-target flex h-11 w-11 items-center justify-center rounded-full text-rz-hint active:bg-rz-elevated"
+    >
+      <GearIcon />
+    </Link>
   );
 }

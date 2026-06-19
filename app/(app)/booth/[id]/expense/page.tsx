@@ -1,37 +1,6 @@
-import { redirect, notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/session";
-import { boothSummary, getBooth, listBoothExpense, listBoothMembers } from "@/lib/booth-queries";
-import { defaultBoothEntryDate } from "@/lib/date";
-import { BoothExpenseForm } from "@/components/booth/BoothExpenseForm";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default async function BoothExpensePage({ params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+export default async function BoothExpenseRedirect({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const booth = await getBooth(user.id, id);
-  if (!booth) notFound();
-
-  const [entries, members, summary] = await Promise.all([
-    listBoothExpense(user.id, id),
-    listBoothMembers(user.id, id),
-    boothSummary(user.id, id),
-  ]);
-
-  return (
-    <BoothExpenseForm
-      boothId={booth.id}
-      boothName={booth.name}
-      startDate={booth.startDate}
-      endDate={booth.endDate}
-      closed={booth.status === "closed"}
-      defaultDate={defaultBoothEntryDate(booth.startDate, booth.endDate)}
-      entries={entries}
-      members={members}
-      totalBudget={booth.totalBudget}
-      totalExpense={summary?.totalExpense ?? "0.00"}
-      currency={user.currency}
-    />
-  );
+  redirect(`/booth/${id}/entry?tab=expense`);
 }

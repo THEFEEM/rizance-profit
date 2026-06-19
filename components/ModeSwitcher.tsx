@@ -15,6 +15,7 @@ import {
 } from "@/components/project/icons";
 
 import { formatDayShort } from "@/lib/date";
+import { activeOrgProjects } from "@/lib/mode-switch";
 
 function formatDateRange(start: string, end: string): string {
   if (start === end) return formatDayShort(start);
@@ -22,10 +23,6 @@ function formatDateRange(start: string, end: string): string {
 }
 
 type SwitcherMode = "regular" | "booth" | "project";
-
-function activeOrgProjects(projects: ProjectListItem[]): ProjectListItem[] {
-  return projects.filter((p) => p.projectType === "long" && p.status !== "closed");
-}
 
 export function ModeSwitcher({
   mode,

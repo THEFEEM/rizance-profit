@@ -21,13 +21,17 @@ export function BoothEntryList({
   kind,
   boothId,
   entries,
+  incomes,
+  expenses,
   currency = "THB",
   readOnly = false,
   appearance = "default",
 }: {
-  kind: "income" | "expense";
+  kind: "income" | "expense" | "all";
   boothId: string;
-  entries: BoothIncome[] | BoothExpense[];
+  entries?: BoothIncome[] | BoothExpense[];
+  incomes?: BoothIncome[];
+  expenses?: BoothExpense[];
   currency?: string;
   readOnly?: boolean;
   appearance?: "default" | "entry";
@@ -39,12 +43,27 @@ export function BoothEntryList({
   const [error, setError] = useState<string | null>(null);
 
   const isToday = appearance === "entry";
-  const isIncome = kind === "income";
 
   const rows: Row[] =
-    kind === "income"
-      ? (entries as BoothIncome[]).map((entry) => ({ kind: "income", entry }))
-      : (entries as BoothExpense[]).map((entry) => ({ kind: "expense", entry }));
+    kind === "all"
+      ? [
+          ...(incomes ?? []).map((entry) => ({ kind: "income" as const, entry })),
+          ...(expenses ?? []).map((entry) => ({ kind: "expense" as const, entry })),
+        ].sort((a, b) => {
+          const da = a.entry.entryDate;
+          const db = b.entry.entryDate;
+          if (da !== db) return db.localeCompare(da);
+          return b.entry.createdAt.localeCompare(a.entry.createdAt);
+        })
+      : kind === "income"
+        ? ((entries ?? incomes ?? []) as BoothIncome[]).map((entry) => ({
+            kind: "income" as const,
+            entry,
+          }))
+        : ((entries ?? expenses ?? []) as BoothExpense[]).map((entry) => ({
+            kind: "expense" as const,
+            entry,
+          }));
 
   const visible = readOnly ? rows : rows.filter((r) => !removed.has(r.entry.id));
 
@@ -111,18 +130,19 @@ export function BoothEntryList({
       <ul className={`divide-y ${dividerClass}`}>
         {visible.map((row) => {
           const e = row.entry;
+          const rowIncome = row.kind === "income";
           const t = title(row);
-          const displayAmount = `${isIncome ? "+ " : "− "}${formatMoney(e.amount, currency)}`;
+          const displayAmount = `${rowIncome ? "+ " : "− "}${formatMoney(e.amount, currency)}`;
 
           if (isToday) {
             return (
               <li key={e.id} className="flex items-center gap-3 px-4 py-3">
                 <div
                   className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                    isIncome ? "bg-rz-green/15 text-rz-green" : "bg-rz-red/15 text-rz-red"
+                    rowIncome ? "bg-rz-green/15 text-rz-green" : "bg-rz-red/15 text-rz-red"
                   }`}
                 >
-                  {isIncome ? <IncomeArrowIcon /> : <ExpenseArrowIcon />}
+                  {rowIncome ? <IncomeArrowIcon /> : <ExpenseArrowIcon />}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] text-rz-text">{t}</p>
@@ -130,7 +150,7 @@ export function BoothEntryList({
                 </div>
                 <span
                   className={`rz-tabular shrink-0 text-[13px] font-medium ${
-                    isIncome ? "text-rz-green" : "text-rz-red"
+                    rowIncome ? "text-rz-green" : "text-rz-red"
                   }`}
                 >
                   {displayAmount}
@@ -152,7 +172,7 @@ export function BoothEntryList({
           return (
             <li key={e.id} className="flex items-center gap-3 px-4 py-3">
               <span className="text-xl" aria-hidden>
-                {isIncome ? "💰" : "🧾"}
+                {rowIncome ? "💰" : "🧾"}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm text-slate-700">{t}</p>
@@ -160,7 +180,7 @@ export function BoothEntryList({
               </div>
               <span
                 className={`text-sm font-semibold tabular-nums ${
-                  isIncome ? "text-emerald-600" : "text-red-600"
+                  rowIncome ? "text-emerald-600" : "text-red-600"
                 }`}
               >
                 {displayAmount}
