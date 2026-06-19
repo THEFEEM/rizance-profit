@@ -29,6 +29,13 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required").max(200),
 });
 
+export const userPatchSchema = z.object({
+  shopName: z.preprocess(
+    (v) => (typeof v === "string" ? v.trim() : v),
+    z.string().min(1, "กรุณาระบุชื่อ").max(120),
+  ),
+});
+
 // Amount: a positive money value with at most 2 decimals. Sent as a number,
 // re-validated server-side as > 0 so empty/zero entries are blocked.
 const amount = z

@@ -1,0 +1,189 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { ProfileModeSection } from "@/components/profile/ProfileModeSection";
+import { apiFetch } from "@/lib/api-client";
+import { displayInitials } from "@/lib/user-display";
+import type { User } from "@/types";
+
+const APP_VERSION = "v1.0";
+
+export function ProfilePageContent({
+  user,
+  mode,
+  boothId,
+  boothName,
+  projectId,
+}: {
+  user: User;
+  mode: "regular" | "booth" | "project";
+  boothId?: string;
+  boothName?: string;
+  projectId?: string;
+}) {
+  const router = useRouter();
+  const [name, setName] = useState(user.shopName);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(user.shopName);
+  const [saving, setSaving] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [logoutBusy, setLogoutBusy] = useState(false);
+
+  async function saveName() {
+    const trimmed = draft.trim();
+    if (!trimmed) {
+      setNameError("กรุณาระบุชื่อ");
+      return;
+    }
+    if (trimmed === name) {
+      setEditing(false);
+      return;
+    }
+
+    setSaving(true);
+    setNameError(null);
+    const res = await apiFetch<{ user: User }>("/api/user", {
+      method: "PATCH",
+      body: JSON.stringify({ shopName: trimmed }),
+    });
+    setSaving(false);
+
+    if (res.ok) {
+      setName(res.data.user.shopName);
+      setDraft(res.data.user.shopName);
+      setEditing(false);
+      router.refresh();
+    } else {
+      setNameError(res.fields?.shopName?.[0] ?? res.message);
+    }
+  }
+
+  function cancelEdit() {
+    setDraft(name);
+    setNameError(null);
+    setEditing(false);
+  }
+
+  async function logout() {
+    setLogoutBusy(true);
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.replace("/login");
+    router.refresh();
+  }
+
+  return (
+    <div className="px-4 pb-8 pt-4" data-context="profile">
+      <div className="flex flex-col items-center text-center">
+        <div
+          className="flex h-20 w-20 items-center justify-center rounded-full bg-rz-elevated text-2xl font-medium text-rz-text ring-2 ring-rz-border"
+          aria-hidden
+        >
+          {displayInitials(name)}
+        </div>
+
+        <div className="mt-4 w-full max-w-xs">
+          {editing ? (
+            <div className="space-y-2">
+              <label className="sr-only" htmlFor="profile-name">
+                ชื่อ
+              </label>
+              <input
+                id="profile-name"
+                type="text"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                maxLength={120}
+                disabled={saving}
+                className="w-full rounded-[12px] border-[0.5px] border-rz-border bg-rz-elevated px-3 py-2.5 text-center text-base font-medium text-rz-text outline-none focus:border-rz-green"
+                autoFocus
+              />
+              {nameError && (
+                <p className="text-sm text-rz-red" role="alert">
+                  {nameError}
+                </p>
+              )}
+              <div className="flex justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  disabled={saving}
+                  className="tap-target rounded-full px-4 py-2 text-sm text-rz-hint"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={saveName}
+                  disabled={saving}
+                  className="tap-target rounded-full bg-rz-green px-4 py-2 text-sm font-medium text-rz-bg disabled:opacity-50"
+                >
+                  {saving ? "กำลังบันทึก…" : "บันทึก"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-2">
+              <h1 className="text-lg font-medium text-rz-text">{name}</h1>
+              <button
+                type="button"
+                onClick={() => {
+                  setDraft(name);
+                  setEditing(true);
+                }}
+                className="tap-target rounded-full px-2 py-1 text-sm text-rz-hint active:text-rz-muted"
+                aria-label="แก้ไขชื่อ"
+              >
+                ✏️
+              </button>
+            </div>
+          )}
+        </div>
+
+        <p className="mt-1 text-sm text-rz-muted">{user.email}</p>
+      </div>
+
+      <div className="mt-8 space-y-4">
+        <section className="rounded-[14px] border-[0.5px] border-rz-border bg-rz-card">
+          <h2 className="border-b-[0.5px] border-rz-border px-4 py-3 text-sm font-medium text-rz-text">
+            บัญชีผู้ใช้
+          </h2>
+          <dl className="divide-y divide-rz-border text-sm">
+            <div className="flex items-center justify-between gap-3 px-4 py-3">
+              <dt className="text-rz-muted">ชื่อ</dt>
+              <dd className="truncate font-medium text-rz-text">{name}</dd>
+            </div>
+            <div className="flex items-center justify-between gap-3 px-4 py-3">
+              <dt className="text-rz-muted">อีเมล</dt>
+              <dd className="truncate text-rz-text">{user.email}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <ProfileModeSection
+          mode={mode}
+          shopName={name}
+          boothId={boothId}
+          boothName={boothName}
+          projectId={projectId}
+        />
+
+        <section className="rounded-[14px] border-[0.5px] border-rz-border bg-rz-card">
+          <h2 className="border-b-[0.5px] border-rz-border px-4 py-3 text-sm font-medium text-rz-text">
+            อื่นๆ
+          </h2>
+          <p className="px-4 py-3 text-sm text-rz-muted">📋 เกี่ยวกับแอป {APP_VERSION}</p>
+        </section>
+
+        <button
+          type="button"
+          onClick={logout}
+          disabled={logoutBusy}
+          className="tap-target flex min-h-12 w-full items-center justify-center rounded-[14px] border-[0.5px] border-rz-border bg-rz-card text-sm font-medium text-rz-red active:bg-rz-elevated disabled:opacity-50"
+        >
+          {logoutBusy ? "กำลังออก…" : "🚪 ออกจากระบบ"}
+        </button>
+      </div>
+    </div>
+  );
+}

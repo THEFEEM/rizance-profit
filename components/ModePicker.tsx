@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ModeRow } from "@/components/ModeRow";
 import { apiFetch } from "@/lib/api-client";
 import { activeOrgProjects } from "@/lib/mode-switch";
 import { orgDisplayName } from "@/lib/project-ui";
@@ -12,44 +13,6 @@ import type { ProjectListItem } from "@/types/project";
 
 type SwitcherMode = "regular" | "booth" | "project";
 type PickerView = "main" | "booth";
-
-function ModeRow({
-  icon,
-  label,
-  sublabel,
-  selected,
-  disabled,
-  onClick,
-}: {
-  icon: string;
-  label: string;
-  sublabel?: string;
-  selected?: boolean;
-  disabled?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <li>
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={onClick}
-        className={`tap-target flex min-h-12 w-full items-center gap-3 px-2 py-3 text-left text-sm font-medium disabled:opacity-40 ${
-          selected ? "text-rz-text" : "text-rz-text active:bg-rz-elevated"
-        }`}
-      >
-        <span className="text-xl leading-none" aria-hidden>
-          {icon}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate">{label}</span>
-          {sublabel && <span className="block truncate text-xs font-normal text-rz-hint">{sublabel}</span>}
-        </span>
-        {selected && <span className="shrink-0 text-rz-muted">✓</span>}
-      </button>
-    </li>
-  );
-}
 
 export function ModePicker({
   open,
