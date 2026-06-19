@@ -8,7 +8,6 @@ import {
   PROJECT_INCOME_PAYMENT_METHODS,
   PROJECT_MEMBER_ROLES,
   PROJECT_STATUSES,
-  PROJECT_TYPES,
   PAYMENT_STATUSES,
 } from "@/types/project";
 
@@ -48,14 +47,15 @@ const fundSource = z.preprocess(
   z.union([z.enum(PROJECT_FUNDING_KEYS), z.null()]).optional(),
 );
 
+const chairmanName = z.preprocess(
+  (v) => (typeof v === "string" && v.trim() !== "" ? v.trim() : undefined),
+  z.string().max(160).optional(),
+);
+
 export const projectSchema = z
   .object({
     name: z.string().trim().min(1).max(160),
-    projectType: z.enum(PROJECT_TYPES),
-    orgName: z.preprocess(
-      (v) => (typeof v === "string" && v.trim() !== "" ? v.trim() : undefined),
-      z.string().max(160).optional(),
-    ),
+    chairmanName: chairmanName,
     projectCode: z.preprocess(
       (v) => (typeof v === "string" && v.trim() !== "" ? v.trim() : undefined),
       z.string().max(40).optional(),
@@ -80,6 +80,7 @@ export const projectSchema = z
 export const projectActivitySchema = z
   .object({
     name: z.string().trim().min(1).max(160),
+    chairmanName: chairmanName,
     budgetTarget: moneyNonNegative.optional(),
     startDate: projectDate,
     endDate: projectDate,
@@ -88,6 +89,27 @@ export const projectActivitySchema = z
   })
   .superRefine((d, ctx) => {
     if (d.startDate && d.endDate && d.endDate < d.startDate) {
+      ctx.addIssue({
+        code: "custom",
+        message: "วันสิ้นสุดต้องไม่ก่อนวันเริ่ม",
+        path: ["endDate"],
+      });
+    }
+  });
+
+/** Create activity inside org — dates required (UI-level; DB stays nullable). */
+export const createProjectActivitySchema = z
+  .object({
+    name: z.string().trim().min(1).max(160),
+    chairmanName: chairmanName,
+    budgetTarget: moneyNonNegative.optional(),
+    startDate: z.string().refine(isValidDate, "วันที่ต้องเป็น YYYY-MM-DD"),
+    endDate: z.string().refine(isValidDate, "วันที่ต้องเป็น YYYY-MM-DD"),
+    note: noteText,
+    sortOrder: z.number().int().min(0).max(9999).optional(),
+  })
+  .superRefine((d, ctx) => {
+    if (d.endDate < d.startDate) {
       ctx.addIssue({
         code: "custom",
         message: "วันสิ้นสุดต้องไม่ก่อนวันเริ่ม",
@@ -142,6 +164,7 @@ export const projectMemberSchema = z.object({
 
 export type ProjectInput = z.infer<typeof projectSchema>;
 export type ProjectActivityInput = z.infer<typeof projectActivitySchema>;
+export type CreateProjectActivityInput = z.infer<typeof createProjectActivitySchema>;
 export type ProjectIncomeInput = z.infer<typeof projectIncomeSchema>;
 export type ProjectExpenseInput = z.infer<typeof projectExpenseSchema>;
 export type ProjectMemberInput = z.infer<typeof projectMemberSchema>;
@@ -162,6 +185,10 @@ export const projectPatchSchema = z
     objective: z.preprocess(
       (v) => (typeof v === "string" && v.trim() !== "" ? v.trim() : v === "" ? null : undefined),
       z.union([z.string().max(2000), z.null()]).optional(),
+    ),
+    chairmanName: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() !== "" ? v.trim() : v === "" ? null : undefined),
+      z.union([z.string().max(160), z.null()]).optional(),
     ),
     status: z.enum(PROJECT_STATUSES).optional(),
     budgetTarget: moneyNonNegative.optional(),
@@ -185,6 +212,10 @@ export const projectPatchSchema = z
 export const projectActivityPatchSchema = z
   .object({
     name: z.string().trim().min(1).max(160).optional(),
+    chairmanName: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() !== "" ? v.trim() : v === "" ? null : undefined),
+      z.union([z.string().max(160), z.null()]).optional(),
+    ),
     budgetTarget: moneyNonNegative.optional(),
     startDate: z.union([projectDate, z.null()]).optional(),
     endDate: z.union([projectDate, z.null()]).optional(),

@@ -3,14 +3,16 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { apiFetch } from "@/lib/api-client";
-import { ProjectField } from "@/components/project/ProjectField";
+import { ProjectField, ProjectTextArea } from "@/components/project/ProjectField";
 
 export function CreateActivityForm({ projectId }: { projectId: string }) {
   const router = useRouter();
   const [name, setName] = useState("");
+  const [chairmanName, setChairmanName] = useState("");
   const [budgetTarget, setBudgetTarget] = useState("0");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -25,9 +27,11 @@ export function CreateActivityForm({ projectId }: { projectId: string }) {
       method: "POST",
       body: JSON.stringify({
         name,
+        chairmanName: chairmanName || undefined,
         budgetTarget: Number(budgetTarget) || 0,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
+        startDate,
+        endDate,
+        note: note || undefined,
       }),
     });
 
@@ -51,7 +55,7 @@ export function CreateActivityForm({ projectId }: { projectId: string }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-5 px-4 pb-8">
       <ProjectField
-        label="ชื่อกิจกรรม *"
+        label="ชื่อโครงการ *"
         value={name}
         onChange={(e) => setName(e.target.value)}
         maxLength={160}
@@ -60,7 +64,16 @@ export function CreateActivityForm({ projectId }: { projectId: string }) {
       />
 
       <ProjectField
-        label="งบกิจกรรม (฿)"
+        label="ชื่อประธานโครงการ"
+        value={chairmanName}
+        onChange={(e) => setChairmanName(e.target.value)}
+        maxLength={160}
+        placeholder="ไม่บังคับ"
+        error={fieldErrors.chairmanName}
+      />
+
+      <ProjectField
+        label="งบ (฿)"
         type="number"
         inputMode="decimal"
         min={0}
@@ -72,22 +85,33 @@ export function CreateActivityForm({ projectId }: { projectId: string }) {
 
       <div className="grid grid-cols-2 gap-3">
         <ProjectField
-          label="วันเริ่มต้น"
+          label="วันเริ่มต้น *"
           type="date"
           value={startDate}
           onChange={(e) => setStartDate(e.target.value)}
           max={endDate || undefined}
+          required
           error={fieldErrors.startDate}
         />
         <ProjectField
-          label="วันสิ้นสุด"
+          label="วันสิ้นสุด *"
           type="date"
           value={endDate}
           onChange={(e) => setEndDate(e.target.value)}
           min={startDate || undefined}
+          required
           error={fieldErrors.endDate}
         />
       </div>
+
+      <ProjectTextArea
+        label="หมายเหตุ"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="ไม่บังคับ"
+        rows={2}
+        error={fieldErrors.note}
+      />
 
       {error && (
         <p className="text-sm text-rz-red" role="alert">
@@ -97,10 +121,10 @@ export function CreateActivityForm({ projectId }: { projectId: string }) {
 
       <button
         type="submit"
-        disabled={submitting || !name.trim()}
+        disabled={submitting || !name.trim() || !startDate || !endDate}
         className="tap-target rz-btn-primary w-full rounded-[14px] border-[0.5px] border-rz-purple-border bg-rz-purple-bg py-3.5 text-base font-medium text-rz-purple disabled:opacity-50"
       >
-        {submitting ? "กำลังสร้าง…" : "สร้างกิจกรรม"}
+        {submitting ? "กำลังสร้าง…" : "เพิ่มโครงการ"}
       </button>
     </form>
   );

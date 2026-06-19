@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createProject } from "@/lib/project-queries";
+import { createProject, getUserLongProject } from "@/lib/project-queries";
 import { listProjectSummaries } from "@/lib/project-summary";
 import { projectSchema } from "@/lib/project-validation";
 import { getUserId } from "@/lib/session";
@@ -15,6 +15,19 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const userId = await getUserId(req);
   if (!userId) return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
+
+  const existingOrg = await getUserLongProject(userId);
+  if (existingOrg) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "already_has_org",
+          message: "คุณมีองค์กร/ชมรมแล้ว — สร้างได้เพียงหนึ่งองค์กรต่อบัญชี",
+        },
+      },
+      { status: 409 },
+    );
+  }
 
   let body: unknown;
   try {

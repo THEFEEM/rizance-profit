@@ -217,6 +217,7 @@ CREATE TABLE IF NOT EXISTS projects (
   org_name      VARCHAR(160),
   project_code  VARCHAR(40),
   objective     TEXT,
+  chairman_name VARCHAR(160),
   budget_target NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (budget_target >= 0),
   start_date    DATE,
   end_date      DATE,
@@ -235,6 +236,7 @@ CREATE TABLE IF NOT EXISTS project_activities (
   user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name          VARCHAR(160) NOT NULL,
   budget_target NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (budget_target >= 0),
+  chairman_name VARCHAR(160),
   start_date    DATE,
   end_date      DATE,
   status        VARCHAR(12) NOT NULL DEFAULT 'active'
@@ -313,7 +315,7 @@ CREATE TABLE IF NOT EXISTS project_members (
   user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name       VARCHAR(120) NOT NULL,
   role       VARCHAR(20) NOT NULL DEFAULT 'member'
-    CHECK (role IN ('treasurer', 'member', 'advisor')),
+    CHECK (role IN ('president', 'treasurer', 'member', 'advisor')),
   note       TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

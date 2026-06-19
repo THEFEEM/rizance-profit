@@ -5,7 +5,6 @@ import type {
   ProjectActivity,
   ProjectExpense,
   ProjectIncome,
-  ProjectMember,
 } from "@/types/project";
 import { ProjectBudgetCard } from "@/components/project/ProjectBudgetCard";
 import { ProjectEntryList } from "@/components/project/ProjectEntryList";
@@ -13,7 +12,6 @@ import {
   ProjectExpenseBreakdown,
   ProjectIncomeBreakdown,
 } from "@/components/project/summary/ProjectBreakdownSections";
-import { ProjectMembersList } from "@/components/project/summary/ProjectMembersList";
 import { ActivitySummaryHeader } from "@/components/project/summary/ProjectSummaryHeader";
 
 /** Activity-level summary — used for /activities/[aid]/summary and short-term /projects/[id]/summary. */
@@ -23,7 +21,6 @@ export function ProjectActivitySummaryView({
   summary,
   incomes,
   expenses,
-  members,
   currency = "THB",
   backHref,
 }: {
@@ -32,7 +29,6 @@ export function ProjectActivitySummaryView({
   summary: ActivitySummary;
   incomes: ProjectIncome[];
   expenses: ProjectExpense[];
-  members: ProjectMember[];
   currency?: string;
   backHref: string;
 }) {
@@ -73,8 +69,6 @@ export function ProjectActivitySummaryView({
             limit={0}
           />
         </section>
-
-        <ProjectMembersList members={members} />
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createActivity, getProject } from "@/lib/project-queries";
-import { projectActivitySchema } from "@/lib/project-validation";
+import { createProjectActivitySchema } from "@/lib/project-validation";
 import { getUserId } from "@/lib/session";
 import { fieldErrorsFrom } from "@/lib/validation";
 
@@ -31,7 +31,7 @@ export async function POST(
     return NextResponse.json({ error: { message: "Invalid JSON body" } }, { status: 400 });
   }
 
-  const parsed = projectActivitySchema.safeParse(body);
+  const parsed = createProjectActivitySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: { message: "Invalid input", fields: fieldErrorsFrom(parsed.error) } },

@@ -4,7 +4,6 @@ import {
   getShortProjectActivity,
   listProjectExpense,
   listProjectIncome,
-  listProjectMembers,
 } from "@/lib/project-queries";
 import { summarizeActivity, summarizeProject } from "@/lib/project-summary";
 import { getCurrentUser } from "@/lib/session";
@@ -20,8 +19,6 @@ export default async function ProjectSummaryPage({ params }: { params: Promise<{
 
   const project = await getProject(user.id, id);
   if (!project) notFound();
-
-  const members = await listProjectMembers(user.id, id);
 
   if (project.projectType === "short") {
     const activity = await getShortProjectActivity(user.id, id);
@@ -41,7 +38,6 @@ export default async function ProjectSummaryPage({ params }: { params: Promise<{
         summary={summary}
         incomes={incomes}
         expenses={expenses}
-        members={members}
         currency={user.currency}
         backHref={`/projects/${id}`}
       />
@@ -55,7 +51,6 @@ export default async function ProjectSummaryPage({ params }: { params: Promise<{
     <ProjectOverviewView
       project={project}
       summary={summary}
-      members={members}
       currency={user.currency}
       backHref={`/projects/${id}`}
     />

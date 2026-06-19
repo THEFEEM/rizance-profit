@@ -10,10 +10,11 @@ export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 export const PAYMENT_STATUSES = ["pending", "approved", "paid", "rejected"] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
-export const PROJECT_MEMBER_ROLES = ["treasurer", "member", "advisor"] as const;
+export const PROJECT_MEMBER_ROLES = ["president", "treasurer", "member", "advisor"] as const;
 export type ProjectMemberRole = (typeof PROJECT_MEMBER_ROLES)[number];
 
 export const PROJECT_MEMBER_ROLE_LABELS: Record<ProjectMemberRole, string> = {
+  president: "ประธาน",
   treasurer: "เหรัญญิก",
   member: "สมาชิก",
   advisor: "อาจารย์ที่ปรึกษา",
@@ -26,6 +27,7 @@ export type Project = {
   orgName: string | null;
   projectCode: string | null;
   objective: string | null;
+  chairmanName: string | null;
   budgetTarget: string;
   startDate: string | null;
   endDate: string | null;
@@ -39,6 +41,7 @@ export type ProjectActivity = {
   projectId: string;
   name: string;
   budgetTarget: string;
+  chairmanName: string | null;
   startDate: string | null;
   endDate: string | null;
   status: ProjectStatus;
