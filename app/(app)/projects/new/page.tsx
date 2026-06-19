@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getUserLongProject } from "@/lib/project-queries";
 import { getCurrentUser } from "@/lib/session";
-import { ProjectModeSwitcher } from "@/components/project/ProjectModeSwitcher";
 import { ProjectBack } from "@/components/project/ProjectBack";
 import { CreateProjectForm } from "@/components/project/CreateProjectForm";
 
@@ -19,8 +18,7 @@ export default async function NewProjectPage() {
   return (
     <div className="pb-6" data-context="project">
       <ProjectBack href="/projects" />
-      <ProjectModeSwitcher userId={user.id} />
-      <div className="px-4 pt-1">
+      <div className="px-4 pt-3">
         <h1 className="text-lg font-medium text-rz-text">สร้างองค์กร/ชมรม</h1>
       </div>
       <div className="mt-4">

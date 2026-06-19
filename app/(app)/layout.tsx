@@ -31,6 +31,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       <BottomNav
         mode={resolved.mode}
+        shopName={user.shopName}
+        boothId={resolved.mode === "booth" ? resolved.boothId : undefined}
+        boothName={resolved.mode === "booth" ? resolved.booth.name : undefined}
+        projectId={resolved.mode === "project" ? resolved.projectId : undefined}
+        projectName={resolved.mode === "project" ? resolved.project.name : undefined}
+        orgName={resolved.mode === "project" ? resolved.project.orgName : undefined}
         todayHref={navRoutes.today}
         entryHref={navRoutes.entry}
         statsHref={navRoutes.stats}

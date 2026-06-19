@@ -3,7 +3,6 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import { CONTEXT_COOKIE, resolveTodayContext } from "@/lib/context";
-import { ModeSwitcher } from "@/components/ModeSwitcher";
 import {
   RegularStatsSummary,
   parseRegularStatsParams,
@@ -47,14 +46,6 @@ export default async function StatsSummaryPage({
           </Link>
         )}
       </div>
-
-      <ModeSwitcher
-        mode={ctx.mode}
-        boothId={ctx.mode === "booth" ? ctx.boothId : undefined}
-        boothName={ctx.mode === "booth" ? ctx.booth.name : undefined}
-        boothStartDate={ctx.mode === "booth" ? ctx.booth.startDate : undefined}
-        boothEndDate={ctx.mode === "booth" ? ctx.booth.endDate : undefined}
-      />
 
       {ctx.mode === "regular" ? (
         <RegularStatsSummary user={user} period={period} closeDate={closeDate} />

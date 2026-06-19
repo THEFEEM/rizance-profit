@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ModePicker } from "@/components/ModePicker";
 
 const NAV_ITEMS = [
   { key: "today", label: "หน้าหลัก", icon: "🏠", kind: "link" as const },
@@ -46,18 +48,31 @@ function entryFabClasses(mode: "regular" | "booth" | "project") {
 
 export function BottomNav({
   mode,
+  shopName,
+  boothId,
+  boothName,
+  projectId,
+  projectName,
+  orgName,
   todayHref,
   entryHref,
   statsHref,
   profileHref,
 }: {
   mode: "regular" | "booth" | "project";
+  shopName: string;
+  boothId?: string;
+  boothName?: string;
+  projectId?: string;
+  projectName?: string;
+  orgName?: string | null;
   todayHref: string;
   entryHref: string;
   statsHref: string;
   profileHref: string;
 }) {
   const pathname = usePathname();
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const hrefByKey: Record<string, string> = {
     today: todayHref,
@@ -67,62 +82,80 @@ export function BottomNav({
   };
 
   return (
-    <nav className="sticky bottom-0 z-10 border-t-[0.5px] border-rz-border bg-rz-nav">
-      <div className="mx-auto flex max-w-md items-end justify-around px-1 pb-[env(safe-area-inset-bottom)] pt-1">
-        {NAV_ITEMS.map((item) => {
-          if (item.kind === "action") {
+    <>
+      <nav className="sticky bottom-0 z-10 border-t-[0.5px] border-rz-border bg-rz-nav">
+        <div className="mx-auto flex max-w-md items-end justify-around px-1 pb-[env(safe-area-inset-bottom)] pt-1">
+          {NAV_ITEMS.map((item) => {
+            if (item.kind === "action") {
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  aria-label="เลือกโหมด"
+                  aria-expanded={pickerOpen}
+                  onClick={() => setPickerOpen(true)}
+                  className={`tap-target no-select flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium ${
+                    pickerOpen ? accentClasses(mode, true) : "text-rz-hint"
+                  }`}
+                >
+                  <span className="text-xl leading-none" aria-hidden>
+                    {item.icon}
+                  </span>
+                  {item.label}
+                </button>
+              );
+            }
+
+            const href = hrefByKey[item.key];
+            const active = isNavActive(pathname, item.key, href, statsHref);
+            const accent = accentClasses(mode, active);
+
+            if (item.key === "entry") {
+              return (
+                <Link
+                  key={item.key}
+                  href={href}
+                  aria-label="บันทึกรายการ"
+                  className={`tap-target no-select -mt-3 flex flex-1 flex-col items-center justify-end gap-0.5 pb-2 text-[10px] font-medium ${accent}`}
+                >
+                  <span
+                    className={`flex h-12 w-12 items-center justify-center rounded-full text-2xl leading-none shadow-md ring-2 ${entryFabClasses(mode)}`}
+                    aria-hidden
+                  >
+                    {item.icon}
+                  </span>
+                  <span className="sr-only">{item.label}</span>
+                </Link>
+              );
+            }
+
             return (
-              <button
+              <Link
                 key={item.key}
-                type="button"
-                aria-label="โหมด (เร็วๆ นี้)"
-                className="tap-target no-select flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium text-rz-hint"
+                href={href}
+                className={`tap-target no-select flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium ${accent}`}
               >
                 <span className="text-xl leading-none" aria-hidden>
                   {item.icon}
                 </span>
                 {item.label}
-              </button>
-            );
-          }
-
-          const href = hrefByKey[item.key];
-          const active = isNavActive(pathname, item.key, href, statsHref);
-          const accent = accentClasses(mode, active);
-
-          if (item.key === "entry") {
-            return (
-              <Link
-                key={item.key}
-                href={href}
-                aria-label="บันทึกรายการ"
-                className={`tap-target no-select -mt-3 flex flex-1 flex-col items-center justify-end gap-0.5 pb-2 text-[10px] font-medium ${accent}`}
-              >
-                <span
-                  className={`flex h-12 w-12 items-center justify-center rounded-full text-2xl leading-none shadow-md ring-2 ${entryFabClasses(mode)}`}
-                  aria-hidden
-                >
-                  {item.icon}
-                </span>
-                <span className="sr-only">{item.label}</span>
               </Link>
             );
-          }
+          })}
+        </div>
+      </nav>
 
-          return (
-            <Link
-              key={item.key}
-              href={href}
-              className={`tap-target no-select flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium ${accent}`}
-            >
-              <span className="text-xl leading-none" aria-hidden>
-                {item.icon}
-              </span>
-              {item.label}
-            </Link>
-          );
-        })}
-      </div>
-    </nav>
+      <ModePicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        mode={mode}
+        shopName={shopName}
+        boothId={boothId}
+        boothName={boothName}
+        projectId={projectId}
+        projectName={projectName}
+        orgName={orgName}
+      />
+    </>
   );
 }
