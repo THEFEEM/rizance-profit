@@ -22,7 +22,7 @@ function formatDateRange(start: string, end: string): string {
   return `${formatDayShort(start)} – ${formatDayShort(end)}`;
 }
 
-type SwitcherMode = "regular" | "booth" | "project";
+type SwitcherMode = "regular" | "booth" | "project" | "personal";
 
 export function ModeSwitcher({
   mode,

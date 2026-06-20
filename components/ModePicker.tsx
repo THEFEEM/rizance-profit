@@ -11,7 +11,7 @@ import type { Booth } from "@/types/booth";
 import type { AppContext } from "@/types/context";
 import type { ProjectListItem } from "@/types/project";
 
-type SwitcherMode = "regular" | "booth" | "project";
+type SwitcherMode = "regular" | "booth" | "project" | "personal";
 type PickerView = "main" | "booth";
 
 export function ModePicker({
@@ -107,6 +107,7 @@ export function ModePicker({
   async function patchContext(
     body:
       | { mode: "regular" }
+      | { mode: "personal" }
       | { mode: "booth"; boothId: string }
       | { mode: "project"; projectId: string },
   ) {
@@ -129,6 +130,11 @@ export function ModePicker({
   async function selectShop() {
     if (mode === "regular" || switching) return;
     await patchContext({ mode: "regular" });
+  }
+
+  async function selectPersonal() {
+    if (mode === "personal" || switching) return;
+    await patchContext({ mode: "personal" });
   }
 
   async function selectBooth() {
@@ -285,8 +291,9 @@ export function ModePicker({
             <ModeRow
               icon="❤️"
               label="บุคคล"
-              sublabel="เร็วๆ นี้"
-              disabled
+              selected={mode === "personal"}
+              disabled={switching}
+              onClick={selectPersonal}
             />
             <ModeRow
               icon="💚"

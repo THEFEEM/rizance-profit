@@ -33,6 +33,10 @@ export default async function StatsSummaryPage({
     redirect(`/projects/${ctx.projectId}/summary`);
   }
 
+  if (ctx.mode === "personal") {
+    redirect("/personal/summary");
+  }
+
   const { period } = parseRegularStatsParams(params);
 
   return (
@@ -48,9 +52,9 @@ export default async function StatsSummaryPage({
 
       {ctx.mode === "regular" ? (
         <RegularStatsSummary user={user} period={period} />
-      ) : (
+      ) : ctx.mode === "booth" ? (
         <BoothStatsSummary user={user} booth={ctx.booth} />
-      )}
+      ) : null}
     </div>
   );
 }
