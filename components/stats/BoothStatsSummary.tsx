@@ -17,7 +17,7 @@ import {
   type CategoryProgressRow,
 } from "@/components/stats/CategoryProgressList";
 import type { CategoryBreakdownEntry } from "@/components/stats/CategoryBreakdownPanel";
-import { BoothSummarySplitCard } from "@/components/booth/summary/BoothSummarySplitCard";
+import { SplitProfitCard } from "@/components/shared/SplitProfitCard";
 import {
   expenseCategoryIcon,
   expenseCategoryLabel,
@@ -213,7 +213,9 @@ export async function BoothStatsSummary({
         )}
       </div>
 
-      {split && <BoothSummarySplitCard split={split} currency={user.currency} />}
+      {split && (
+        <SplitProfitCard split={split} currency={user.currency} accent="amber" />
+      )}
     </>
   );
 }

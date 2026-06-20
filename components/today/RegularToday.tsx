@@ -1,26 +1,34 @@
 import {
   allTimeSummary,
+  allTimeCashIncome,
   dailySummary,
   listIncomeByDate,
   listExpenseByDate,
 } from "@/lib/queries";
 import { today } from "@/lib/date";
+import { computeProfit } from "@/lib/money";
+import { shopSplitProfit } from "@/lib/shop-split";
 import { TodayBalanceCard } from "@/components/TodayBalanceCard";
 import { TodayStatCards } from "@/components/TodayStatCards";
 import { TodayCategoryMiniList } from "@/components/today/TodayCategoryMiniList";
 import { EntryList, type EntryRow } from "@/components/EntryList";
+import { SplitProfitCard } from "@/components/shared/SplitProfitCard";
 import { buildTodayCategoryGroups } from "@/lib/today-category-groups";
 import type { User } from "@/types";
 
-/** Regular-shop Today — total sales hero + today's breakdown. */
+/** Regular-shop Today — total sales hero + today's breakdown + partner split. */
 export async function RegularToday({ user }: { user: User }) {
   const date = today();
-  const [allTime, summary, incomes, expenses] = await Promise.all([
+  const [allTime, summary, incomes, expenses, cashIncome, split] = await Promise.all([
     allTimeSummary(user.id),
     dailySummary(user.id, date),
     listIncomeByDate(user.id, date),
     listExpenseByDate(user.id, date),
+    allTimeCashIncome(user.id),
+    shopSplitProfit(user.id, date, date),
   ]);
+
+  const cashInHand = computeProfit(cashIncome, allTime.expense);
 
   const entries: EntryRow[] = [
     ...incomes.map((i) => ({
@@ -50,6 +58,7 @@ export async function RegularToday({ user }: { user: User }) {
         totalSales={allTime.income}
         cumulativeProfit={allTime.profit}
         todayProfit={summary.profit}
+        cashInHand={cashInHand}
         currency={user.currency}
       />
 
@@ -58,6 +67,16 @@ export async function RegularToday({ user }: { user: User }) {
         expense={summary.expense}
         currency={user.currency}
       />
+
+      {split && (
+        <SplitProfitCard
+          split={split}
+          currency={user.currency}
+          accent="green"
+          periodLabel="วันนี้"
+          variant="compact"
+        />
+      )}
 
       {hasEntries && (
         <TodayCategoryMiniList groups={categoryGroups} currency={user.currency} />

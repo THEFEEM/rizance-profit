@@ -13,13 +13,16 @@ import {
   formatDayShort,
   formatPeriodRangeLabel,
   formatWeekdayShortThai,
+  PERIOD_LABELS,
   periodRange,
 } from "@/lib/date";
 import { formatMoney, toCents } from "@/lib/money";
+import { shopSplitProfit } from "@/lib/shop-split";
 import { StatsPeriodSelector, type StatsPeriodKey } from "@/components/stats/StatsPeriodSelector";
 import { StatsSummaryCards } from "@/components/stats/StatsSummaryCards";
 import { DailyProfitChart } from "@/components/stats/DailyProfitChart";
 import { BreakdownSection, ProgressBarRow } from "@/components/stats/BreakdownSection";
+import { SplitProfitCard } from "@/components/shared/SplitProfitCard";
 import {
   CategoryProgressList,
   type CategoryProgressRow,
@@ -90,6 +93,7 @@ export async function RegularStatsSummary({
     periodIncomes,
     periodExpenses,
     dailySeries,
+    shopSplit,
   ] = await Promise.all([
     periodSummary(user.id, period),
     periodIncomeByCashTransfer(user.id, start, end),
@@ -98,6 +102,7 @@ export async function RegularStatsSummary({
     listIncomeInPeriod(user.id, start, end),
     listExpenseInPeriod(user.id, start, end),
     dailyProfitSeries(user.id, start, end),
+    shopSplitProfit(user.id, start, end),
   ]);
 
   const totalIncome = periodData.income;
@@ -206,6 +211,15 @@ export async function RegularStatsSummary({
           </BreakdownSection>
         )}
       </div>
+
+      {shopSplit && (
+        <SplitProfitCard
+          split={shopSplit}
+          currency={user.currency}
+          accent="green"
+          periodLabel={PERIOD_LABELS[period]}
+        />
+      )}
     </>
   );
 }
