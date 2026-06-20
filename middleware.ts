@@ -4,6 +4,16 @@ import { isVercel } from "@/lib/env";
 
 const PUBLIC_PATHS = ["/login", "/register"];
 
+function isPublicStaticFile(pathname: string): boolean {
+  const PUBLIC_FILES = ["/sw.js", "/manifest.json", "/favicon.ico"];
+  return (
+    PUBLIC_FILES.includes(pathname) ||
+    pathname.startsWith("/icons/") ||
+    pathname.startsWith("/_next/") ||
+    /\.(png|jpg|jpeg|gif|svg|ico|json|webmanifest|txt|xml|webp)$/i.test(pathname)
+  );
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -11,6 +21,11 @@ export async function middleware(req: NextRequest) {
   if (isVercel() && req.headers.get("x-forwarded-proto") === "http") {
     const host = req.headers.get("host") ?? req.nextUrl.host;
     return NextResponse.redirect(`https://${host}${pathname}${req.nextUrl.search}`, 301);
+  }
+
+  // PWA / static passthrough — must run before auth (sw.js, manifest, icons).
+  if (isPublicStaticFile(pathname)) {
+    return NextResponse.next();
   }
 
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -34,6 +49,8 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Run on everything except API routes, Next internals, and static assets.
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest|icons|.*\\.(?:svg|png|jpg|jpeg|webp|ico)$).*)"],
+  // Run on everything except API routes, Next internals, PWA files, and static assets.
+  matcher: [
+    "/((?!api|_next/static|_next/image|favicon\\.ico|sw\\.js|manifest\\.json|icons/|.*\\.(?:png|jpg|jpeg|gif|svg|ico|json|webmanifest|txt|xml|webp)$).*)",
+  ],
 };
