@@ -31,9 +31,10 @@ export function clearContextCookieOptions() {
 }
 
 export function encodeContextCookie(
-  mode: "regular" | { boothId: string } | { projectId: string },
+  mode: "regular" | "personal" | { boothId: string } | { projectId: string },
 ): string {
   if (mode === "regular") return "regular";
+  if (mode === "personal") return "personal";
   if ("boothId" in mode) return `booth:${mode.boothId}`;
   return `project:${mode.projectId}`;
 }
@@ -42,10 +43,12 @@ export function parseContextCookie(
   raw: string | undefined,
 ):
   | { type: "regular" }
+  | { type: "personal" }
   | { type: "booth"; boothId: string }
   | { type: "project"; projectId: string }
   | { type: "invalid" } {
   if (!raw || raw === "regular") return { type: "regular" };
+  if (raw === "personal") return { type: "personal" };
   if (raw.startsWith("booth:")) {
     const boothId = raw.slice(6);
     if (UUID_RE.test(boothId)) return { type: "booth", boothId };
@@ -68,6 +71,7 @@ function isActiveOrgProject(project: Project): boolean {
 /** Resolved context for Today — read-only; never mutates cookies (safe in Server Components). */
 export type ResolvedTodayContext =
   | { mode: "regular" }
+  | { mode: "personal" }
   | { mode: "booth"; booth: Booth; boothId: string; date: string }
   | { mode: "project"; project: Project; projectId: string };
 
@@ -86,6 +90,10 @@ export async function resolveTodayContext(
 
   if (parsed.type === "regular") {
     return { mode: "regular" };
+  }
+
+  if (parsed.type === "personal") {
+    return { mode: "personal" };
   }
 
   if (parsed.type === "invalid") {
@@ -118,9 +126,10 @@ export function shouldClearContextCookie(
   raw: string | undefined,
   resolved: ResolvedTodayContext,
 ): boolean {
-  if (!raw || raw === "regular") return false;
+  if (!raw || raw === "regular" || raw === "personal") return false;
   const parsed = parseContextCookie(raw);
   if (parsed.type === "invalid") return true;
+  if (parsed.type === "personal" && resolved.mode !== "personal") return true;
   if (parsed.type === "booth" && resolved.mode !== "booth") return true;
   if (parsed.type === "project" && resolved.mode !== "project") return true;
   return false;
@@ -130,6 +139,7 @@ export function shouldClearContextCookie(
 export async function getAppContext(userId: string, req?: NextRequest): Promise<AppContext> {
   const resolved = await resolveTodayContext(userId, req);
   if (resolved.mode === "regular") return { mode: "regular" };
+  if (resolved.mode === "personal") return { mode: "personal" };
   if (resolved.mode === "project") {
     return {
       mode: "project",
@@ -138,11 +148,14 @@ export async function getAppContext(userId: string, req?: NextRequest): Promise<
       orgName: resolved.project.orgName,
     };
   }
-  return {
-    mode: "booth",
-    boothId: resolved.boothId,
-    boothName: resolved.booth.name,
-  };
+  if (resolved.mode === "booth") {
+    return {
+      mode: "booth",
+      boothId: resolved.boothId,
+      boothName: resolved.booth.name,
+    };
+  }
+  return { mode: "regular" };
 }
 
 export type SetContextResult =
@@ -167,6 +180,14 @@ export type EntryNavRoutes = {
 
 /** Bottom-nav targets from resolved context (stale/invalid → regular routes). */
 export function entryNavRoutes(resolved: ResolvedTodayContext): EntryNavRoutes {
+  if (resolved.mode === "personal") {
+    return {
+      today: "/",
+      entry: "/personal/entry",
+      stats: "/personal/summary",
+      profile: "/profile",
+    };
+  }
   if (resolved.mode === "booth") {
     return {
       today: "/",

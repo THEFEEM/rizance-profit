@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash VARCHAR(255) NOT NULL,
   shop_name     VARCHAR(120) NOT NULL,
   currency      CHAR(3)      NOT NULL DEFAULT 'THB',
+  monthly_budget NUMERIC(12,2),
   created_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
   updated_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
@@ -320,3 +321,45 @@ CREATE TABLE IF NOT EXISTS project_members (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_project_members_project ON project_members (project_id);
+
+-- =========================================================
+-- Personal mode (0016)
+-- =========================================================
+CREATE TABLE IF NOT EXISTS personal_income_entries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id),
+  amount NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  category VARCHAR(30) NOT NULL
+    CHECK (category IN ('salary','business','freelance','scholarship',
+           'family','bonus','loan_return','other_income')),
+  note TEXT,
+  entry_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_personal_income_user
+  ON personal_income_entries(user_id, entry_date);
+
+CREATE TABLE IF NOT EXISTS personal_expense_entries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id),
+  amount NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  category VARCHAR(30) NOT NULL
+    CHECK (category IN ('food','transport','education','rent','water',
+           'electricity','internet','phone','health','clothing',
+           'donation','installment','social','other_expense')),
+  note TEXT,
+  entry_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_personal_expense_user
+  ON personal_expense_entries(user_id, entry_date);
+
+CREATE TABLE IF NOT EXISTS savings_goals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id),
+  name VARCHAR(160) NOT NULL,
+  target_amount NUMERIC(12,2) NOT NULL CHECK (target_amount > 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_savings_goals_user
+  ON savings_goals(user_id);

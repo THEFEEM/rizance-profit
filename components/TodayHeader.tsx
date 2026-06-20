@@ -8,14 +8,16 @@ export function TodayHeader({
 }: {
   displayName: string;
   dateLabel: string;
-  mode: "regular" | "booth" | "project";
+  mode: "regular" | "booth" | "project" | "personal";
 }) {
   const ringColor =
-    mode === "booth"
-      ? "ring-rz-amber"
-      : mode === "project"
-        ? "ring-rz-purple"
-        : "ring-rz-green";
+    mode === "personal"
+      ? "ring-rz-rose"
+      : mode === "booth"
+        ? "ring-rz-amber"
+        : mode === "project"
+          ? "ring-rz-purple"
+          : "ring-rz-green";
 
   return (
     <header className="flex items-center justify-between px-4 py-3">

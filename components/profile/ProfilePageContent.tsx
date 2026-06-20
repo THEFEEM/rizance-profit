@@ -17,7 +17,7 @@ export function ProfilePageContent({
   projectId,
 }: {
   user: User;
-  mode: "regular" | "booth" | "project";
+  mode: "regular" | "booth" | "project" | "personal";
   boothId?: string;
   boothName?: string;
   projectId?: string;

@@ -10,6 +10,10 @@ import {
   type ExpenseCategoryKey,
   type IncomeCategoryKey,
 } from "@/lib/expense-categories";
+import {
+  personalExpenseLabel,
+  personalIncomeLabel,
+} from "@/lib/personal-categories";
 import { DeleteConfirm } from "@/components/DeleteConfirm";
 import { ExpenseArrowIcon, IncomeArrowIcon } from "@/components/today/today-icons";
 
@@ -28,27 +32,34 @@ function entryCategoryKey(e: EntryRow): string {
   return `${e.kind}:${category}`;
 }
 
-function entryTitle(e: EntryRow): string {
+function entryTitle(e: EntryRow, ledger: "shop" | "personal"): string {
   const label =
-    e.kind === "income"
-      ? incomeCategoryLabel(e.category ?? "storefront")
-      : expenseCategoryLabel(e.category ?? "expense_misc");
+    ledger === "personal"
+      ? e.kind === "income"
+        ? personalIncomeLabel(e.category ?? "other_income")
+        : personalExpenseLabel(e.category ?? "other_expense")
+      : e.kind === "income"
+        ? incomeCategoryLabel(e.category ?? "storefront")
+        : expenseCategoryLabel(e.category ?? "expense_misc");
   return e.note ? `${label} · ${e.note}` : label;
 }
 
-function entryCategoryLabel(e: EntryRow): string {
+function entryCategoryLabel(e: EntryRow, ledger: "shop" | "personal"): string {
+  if (ledger === "personal") {
+    return e.kind === "income"
+      ? personalIncomeLabel(e.category ?? "other_income")
+      : personalExpenseLabel(e.category ?? "other_expense");
+  }
   return e.kind === "income"
     ? incomeCategoryLabel(e.category ?? "storefront")
     : expenseCategoryLabel(e.category ?? "expense_misc");
 }
 
-function entryMeta(e: EntryRow): string {
-  const label = entryCategoryLabel(e);
-  if (e.kind === "expense") {
-    const typeLabel = expenseCostTypeLabel(e.category ?? "expense_misc");
-    return typeLabel ? `${label} · ${typeLabel}` : label;
-  }
-  return label;
+function entryMeta(e: EntryRow, ledger: "shop" | "personal"): string {
+  const label = entryCategoryLabel(e, ledger);
+  if (ledger === "personal" || e.kind === "income") return label;
+  const typeLabel = expenseCostTypeLabel(e.category ?? "expense_misc");
+  return typeLabel ? `${label} · ${typeLabel}` : label;
 }
 
 export function EntryList({
@@ -57,6 +68,7 @@ export function EntryList({
   emptyHint = "No entries yet.",
   readOnly = false,
   appearance = "default",
+  ledger = "shop",
 }: {
   entries: EntryRow[];
   currency?: string;
@@ -65,6 +77,8 @@ export function EntryList({
   readOnly?: boolean;
   /** Dark Today list styling — does not affect Stats. */
   appearance?: "default" | "today";
+  /** Shop vs personal API paths and category labels. */
+  ledger?: "shop" | "personal";
 }) {
   const router = useRouter();
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -79,7 +93,8 @@ export function EntryList({
     if (!pending || deleting) return;
     setDeleting(pending.id);
     setError(null);
-    const res = await fetch(`/api/${pending.kind}/${pending.id}`, { method: "DELETE" });
+    const base = ledger === "personal" ? "/api/personal" : "/api";
+    const res = await fetch(`${base}/${pending.kind}/${pending.id}`, { method: "DELETE" });
     if (res.ok) {
       setRemoved((prev) => new Set(prev).add(pending.id));
       setPending(null);
@@ -112,8 +127,8 @@ export function EntryList({
       <ul className={`divide-y ${dividerClass}`}>
         {visible.map((e) => {
           const isIncome = e.kind === "income";
-          const title = entryTitle(e);
-          const categoryLabel = entryMeta(e);
+          const title = entryTitle(e, ledger);
+          const categoryLabel = entryMeta(e, ledger);
           const displayAmount = `${isIncome ? "+ " : "− "}${formatMoney(e.amount, currency)}`;
 
           if (isToday) {
@@ -189,7 +204,7 @@ export function EntryList({
 
       {pending && (
         <DeleteConfirm
-          title={entryTitle(pending)}
+          title={entryTitle(pending, ledger)}
           amount={formatMoney(pending.amount, currency)}
           onConfirm={confirmDelete}
           onCancel={() => setPending(null)}

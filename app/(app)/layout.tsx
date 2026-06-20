@@ -19,9 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-rz-bg">
       <TodayHeader
         displayName={
-          resolved.mode === "project"
-            ? orgDisplayName(resolved.project)
-            : user.shopName
+          resolved.mode === "project" ? orgDisplayName(resolved.project) : user.shopName
         }
         dateLabel={formatDateLabel(today())}
         mode={resolved.mode}

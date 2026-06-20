@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import { CONTEXT_COOKIE, resolveTodayContext } from "@/lib/context";
 import { RegularToday } from "@/components/today/RegularToday";
+import { PersonalToday } from "@/components/today/PersonalToday";
 import { BoothToday } from "@/components/today/BoothToday";
 import { OrgToday } from "@/components/today/OrgToday";
 
@@ -23,6 +24,8 @@ export default async function TodayPage() {
     <div className="pb-3">
       {ctx.mode === "regular" ? (
         <RegularToday user={user} />
+      ) : ctx.mode === "personal" ? (
+        <PersonalToday user={user} />
       ) : ctx.mode === "booth" ? (
         <BoothToday user={user} booth={ctx.booth} date={ctx.date} />
       ) : (

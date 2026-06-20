@@ -43,8 +43,8 @@ export function QuickAmountPad({
   onSave: () => void;
   saving?: boolean;
   saveLabel?: string;
-  accent?: "green" | "amber";
-  saveTone?: "green" | "amber" | "red";
+  accent?: "green" | "amber" | "rose";
+  saveTone?: "green" | "amber" | "red" | "rose";
 }) {
   const press = (k: Key) => onChange(applyKey(value, k));
   const canSave = !!value && Number(value) > 0 && !saving;
@@ -52,6 +52,8 @@ export function QuickAmountPad({
   const saveActive =
     tone === "red"
       ? "bg-rz-red text-rz-bg active:opacity-90 disabled:opacity-40"
+      : tone === "rose"
+        ? "bg-rz-rose text-rz-bg active:opacity-90 disabled:opacity-40"
       : tone === "amber"
         ? "bg-rz-amber text-rz-bg active:opacity-90 disabled:opacity-40"
         : "bg-rz-green text-rz-bg active:opacity-90 disabled:opacity-40";

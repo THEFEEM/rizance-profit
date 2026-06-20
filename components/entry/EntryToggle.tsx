@@ -10,11 +10,16 @@ export function EntryToggle({
   value,
   onChange,
   disabled = false,
+  accent = "green",
 }: {
   value: EntryTab;
   onChange: (tab: EntryTab) => void;
   disabled?: boolean;
+  accent?: "green" | "rose";
 }) {
+  const incomeActive =
+    accent === "rose" ? "bg-rz-rose text-rz-bg" : "bg-rz-green text-rz-bg";
+
   return (
     <div
       className="mx-4 mb-3 flex rounded-full bg-rz-elevated p-[3px]"
@@ -29,7 +34,7 @@ export function EntryToggle({
         onClick={() => onChange("income")}
         className={`tap-target flex flex-1 items-center justify-center rounded-full py-2.5 text-sm font-medium transition-colors disabled:opacity-50 ${
           value === "income"
-            ? "bg-rz-green text-rz-bg"
+            ? incomeActive
             : "text-rz-muted active:bg-rz-card"
         }`}
       >

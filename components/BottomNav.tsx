@@ -33,14 +33,16 @@ function isNavActive(
   return false;
 }
 
-function accentClasses(mode: "regular" | "booth" | "project", active: boolean) {
+function accentClasses(mode: "regular" | "booth" | "project" | "personal", active: boolean) {
   if (!active) return "text-rz-hint";
+  if (mode === "personal") return "text-rz-rose";
   if (mode === "booth") return "text-rz-amber";
   if (mode === "project") return "text-rz-purple";
   return "text-rz-green";
 }
 
-function entryFabClasses(mode: "regular" | "booth" | "project") {
+function entryFabClasses(mode: "regular" | "booth" | "project" | "personal") {
+  if (mode === "personal") return "bg-rz-rose text-rz-bg ring-rz-rose/40";
   if (mode === "booth") return "bg-rz-amber text-rz-bg ring-rz-amber/40";
   if (mode === "project") return "bg-rz-purple text-rz-bg ring-rz-purple/40";
   return "bg-rz-green text-rz-bg ring-rz-green/40";
@@ -59,7 +61,7 @@ export function BottomNav({
   statsHref,
   profileHref,
 }: {
-  mode: "regular" | "booth" | "project";
+  mode: "regular" | "booth" | "project" | "personal";
   shopName: string;
   boothId?: string;
   boothName?: string;

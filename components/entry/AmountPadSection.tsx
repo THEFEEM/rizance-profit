@@ -22,8 +22,8 @@ export function AmountPadSection({
   saving?: boolean;
   closed?: boolean;
   saveLabel?: string;
-  accent?: "green" | "amber";
-  saveTone?: "green" | "amber" | "red";
+  accent?: "green" | "amber" | "rose";
+  saveTone?: "green" | "amber" | "red" | "rose";
   currency?: string;
   tone?: "income" | "expense";
   closedMessage?: string;

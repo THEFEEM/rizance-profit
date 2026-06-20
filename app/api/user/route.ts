@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserId } from "@/lib/session";
-import { findUserById, updateUserShopName } from "@/lib/queries";
+import { findUserById, updateUserProfile } from "@/lib/queries";
 import { fieldErrorsFrom, userPatchSchema } from "@/lib/validation";
 
 export async function PATCH(req: NextRequest) {
@@ -24,7 +24,16 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  const user = await updateUserShopName(userId, parsed.data.shopName);
+  const patch: { shopName?: string; monthlyBudget?: string | null } = {};
+  if (parsed.data.shopName !== undefined) {
+    patch.shopName = parsed.data.shopName;
+  }
+  if (parsed.data.monthlyBudget !== undefined) {
+    patch.monthlyBudget =
+      parsed.data.monthlyBudget === null ? null : parsed.data.monthlyBudget.toFixed(2);
+  }
+
+  const user = await updateUserProfile(userId, patch);
   if (!user) {
     return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
   }

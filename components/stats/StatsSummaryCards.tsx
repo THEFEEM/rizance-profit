@@ -14,8 +14,8 @@ function SummaryCard({
 }: {
   label: string;
   value: string;
-  tone: "green" | "red" | "muted" | "amber" | "purple";
-  accent?: "green" | "amber" | "purple";
+  tone: "green" | "red" | "muted" | "amber" | "purple" | "rose";
+  accent?: "green" | "amber" | "purple" | "rose";
 }) {
   const valueClass =
     tone === "green"
@@ -24,16 +24,20 @@ function SummaryCard({
         ? "text-rz-amber"
         : tone === "purple"
           ? "text-rz-purple"
-          : tone === "red"
-            ? "text-rz-red"
-            : "text-rz-hint";
+          : tone === "rose"
+            ? "text-rz-rose"
+            : tone === "red"
+              ? "text-rz-red"
+              : "text-rz-hint";
 
   const borderClass =
-    accent === "amber" && (tone === "green" || tone === "amber")
-      ? "border-rz-amber/30"
-      : accent === "purple" && tone === "purple"
-        ? "border-rz-purple/30"
-        : "border-rz-border";
+    accent === "rose" && tone === "rose"
+      ? "border-rz-rose/30"
+      : accent === "amber" && (tone === "green" || tone === "amber")
+        ? "border-rz-amber/30"
+        : accent === "purple" && tone === "purple"
+          ? "border-rz-purple/30"
+          : "border-rz-border";
 
   return (
     <div
@@ -45,7 +49,7 @@ function SummaryCard({
   );
 }
 
-/** Shop/booth profit cards (default) or org budget cards (variant="budget"). */
+/** Shop/booth profit cards (default), org budget cards, or personal savings cards. */
 export function StatsSummaryCards({
   income,
   expense,
@@ -55,16 +59,46 @@ export function StatsSummaryCards({
   variant = "profit",
   remaining,
   budgetUsedPct = 0,
+  balance,
 }: {
   income: string;
   expense: string;
   profit?: string;
   currency?: string;
-  accent?: "green" | "amber" | "purple";
-  variant?: "profit" | "budget";
+  accent?: "green" | "amber" | "purple" | "rose";
+  variant?: "profit" | "budget" | "personal";
   remaining?: string;
   budgetUsedPct?: number;
+  balance?: string;
 }) {
+  if (variant === "personal") {
+    const balanceValue = balance ?? profit ?? "0.00";
+    const balanceSign = moneySign(balanceValue);
+    const balanceTone = balanceSign > 0 ? "green" : balanceSign < 0 ? "red" : "muted";
+
+    return (
+      <div className="grid grid-cols-2 gap-3 px-4">
+        <SummaryCard
+          label="รายรับรวม"
+          value={formatMoney(income, currency)}
+          tone="rose"
+          accent="rose"
+        />
+        <SummaryCard label="รายจ่ายรวม" value={formatMoney(expense, currency)} tone="red" />
+        <SummaryCard
+          label="คงเหลือ"
+          value={formatMoney(balanceValue, currency)}
+          tone={balanceTone}
+        />
+        <SummaryCard
+          label="อัตราออม"
+          value={`${profitRatePercent(income, balanceValue)}%`}
+          tone="muted"
+        />
+      </div>
+    );
+  }
+
   if (variant === "budget") {
     const remain = remaining ?? "0.00";
     const remainSign = moneySign(remain);

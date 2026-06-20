@@ -17,6 +17,7 @@ function contextResponse(
   resolved: Awaited<ReturnType<typeof resolveTodayContext>>,
 ) {
   if (resolved.mode === "regular") return { mode: "regular" as const };
+  if (resolved.mode === "personal") return { mode: "personal" as const };
   if (resolved.mode === "project") {
     return {
       mode: "project" as const,
@@ -69,6 +70,12 @@ export async function PATCH(req: NextRequest) {
   if (parsed.data.mode === "regular") {
     const res = NextResponse.json({ data: { mode: "regular" as const } });
     res.cookies.set(CONTEXT_COOKIE, "regular", contextCookieOptions());
+    return res;
+  }
+
+  if (parsed.data.mode === "personal") {
+    const res = NextResponse.json({ data: { mode: "personal" as const } });
+    res.cookies.set(CONTEXT_COOKIE, "personal", contextCookieOptions());
     return res;
   }
 
