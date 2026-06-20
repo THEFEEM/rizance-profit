@@ -72,8 +72,9 @@ async function req(path, init = {}) {
   const headers = { "Content-Type": "application/json", ...(init.headers ?? {}) };
   if (cookie) headers.Cookie = cookie;
   const res = await fetch(`${BASE}${path}`, { ...init, headers });
-  for (const c of res.headers.getSetCookie?.() ?? []) {
-    cookie = c.split(";")[0];
+  const setCookie = res.headers.getSetCookie?.() ?? [];
+  if (setCookie.length) {
+    cookie = setCookie.map((c) => c.split(";")[0]).join("; ");
   }
   return { res, body: await res.json().catch(() => null) };
 }

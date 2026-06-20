@@ -15,6 +15,8 @@ const email = z.preprocess(
   z.email("Enter a valid email").max(255),
 );
 
+export const registerModeSchema = z.enum(["personal", "regular", "booth", "org"]);
+
 export const registerSchema = z.object({
   email,
   password: z.string().min(8, "Password must be at least 8 characters").max(200),
@@ -22,6 +24,7 @@ export const registerSchema = z.object({
     (v) => (typeof v === "string" ? v.trim() : v),
     z.string().min(1, "Shop name is required").max(120),
   ),
+  mode: registerModeSchema.default("personal"),
 });
 
 export const loginSchema = z.object({

@@ -71,7 +71,8 @@ function LoginFormInner({ googleEnabled }: { googleEnabled: boolean }) {
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col" noValidate>
-      <p className="mb-4 text-center text-xs font-medium text-rz-muted">Sign in</p>
+      <p className="mb-1 text-center text-sm font-medium text-rz-text">Welcome to Rizance</p>
+      <p className="mb-4 text-center text-xs text-rz-muted">เข้าสู่ระบบ</p>
 
       {googleEnabled && (
         <>
@@ -140,9 +141,9 @@ function LoginFormInner({ googleEnabled }: { googleEnabled: boolean }) {
       </div>
 
       <p className="mt-6 text-center text-sm text-rz-hint">
-        New here?{" "}
+        ยังไม่มีบัญชี?{" "}
         <Link href="/register" className="font-medium text-rz-green">
-          Create shop →
+          สร้างบัญชี →
         </Link>
       </p>
     </form>

@@ -7,19 +7,24 @@ import { AuthButton } from "@/components/auth/AuthButton";
 import { AuthDivider } from "@/components/auth/AuthDivider";
 import { AuthField } from "@/components/auth/AuthField";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
+import { RegisterModeTiles } from "@/components/auth/RegisterModeTiles";
 import {
   EyeIcon,
   EyeOffIcon,
   LockIcon,
   MailIcon,
   StoreIcon,
+  UserIcon,
 } from "@/components/auth/auth-icons";
 import { apiFetch } from "@/lib/api-client";
+import type { RegisterMode } from "@/lib/register-mode";
+import { registerNameField, registerSubmitButtonClass } from "@/lib/register-mode";
 import type { User } from "@/types";
 
 export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
   const router = useRouter();
 
+  const [mode, setMode] = useState<RegisterMode>("personal");
   const [shopName, setShopName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,18 +34,21 @@ export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
   const [fields, setFields] = useState<Record<string, string[] | undefined>>({});
   const [submitting, setSubmitting] = useState(false);
 
+  const nameField = registerNameField(mode);
+  const NameIcon = mode === "personal" ? UserIcon : StoreIcon;
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setErrorCode(null);
     setFields({});
     setSubmitting(true);
-    const res = await apiFetch<{ user: User }>("/api/auth/register", {
+    const res = await apiFetch<{ user: User; redirect: string }>("/api/auth/register", {
       method: "POST",
-      body: JSON.stringify({ shopName, email, password }),
+      body: JSON.stringify({ shopName, email, password, mode }),
     });
     if (res.ok) {
-      router.replace("/");
+      router.replace(res.data.redirect || "/");
       router.refresh();
     } else {
       setError(res.message);
@@ -57,34 +65,37 @@ export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col" noValidate>
-      <p className="mb-4 text-center text-xs font-medium text-rz-muted">Create shop</p>
+      <p className="mb-4 text-center text-xs font-medium text-rz-muted">สร้างบัญชี Rizance</p>
 
       {googleEnabled && (
         <>
-          <GoogleSignInButton />
+          <GoogleSignInButton label="สมัครด้วย Google" />
           <AuthDivider />
         </>
       )}
 
-      <div className="flex flex-col gap-3.5">
+      <p className="mb-2.5 text-sm font-medium text-rz-text">เลือกโหมดการใช้งาน</p>
+      <RegisterModeTiles value={mode} onChange={setMode} />
+
+      <div className="mt-5 flex flex-col gap-3.5">
         <AuthField
-          label="Shop name"
-          autoComplete="organization"
-          placeholder="Bean & Brew"
+          label={nameField.label}
+          autoComplete={mode === "personal" ? "name" : "organization"}
+          placeholder={nameField.placeholder}
           value={shopName}
           onChange={(e) => setShopName(e.target.value)}
           error={fields.shopName?.[0]}
-          leadingIcon={<StoreIcon />}
+          leadingIcon={<NameIcon />}
           required
         />
 
         <AuthField
-          label="Email"
+          label="อีเมล"
           type="email"
           inputMode="email"
           autoComplete="email"
           autoCapitalize="none"
-          placeholder="Email"
+          placeholder="email@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           error={fields.email?.[0]}
@@ -93,10 +104,10 @@ export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
         />
 
         <AuthField
-          label="Password"
+          label="รหัสผ่าน"
           type={showPw ? "text" : "password"}
           autoComplete="new-password"
-          placeholder="At least 8 characters"
+          placeholder="8 ตัวขึ้นไป"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           error={fields.password?.[0]}
@@ -127,22 +138,26 @@ export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
           {error}
           {isGoogleAccountExists && googleEnabled && (
             <span className="mt-2 block text-rz-hint">
-              ใช้ปุ่ม &quot;เข้าสู่ระบบด้วย Google&quot; ด้านบนแทน
+              ใช้ปุ่ม &quot;สมัครด้วย Google&quot; ด้านบนแทน
             </span>
           )}
         </p>
       )}
 
       <div className="mt-[22px]">
-        <AuthButton type="submit" disabled={submitting}>
-          {submitting ? "Creating…" : "Create shop"}
+        <AuthButton
+          type="submit"
+          disabled={submitting}
+          className={registerSubmitButtonClass(mode)}
+        >
+          {submitting ? "กำลังสร้าง…" : "สร้างบัญชี"}
         </AuthButton>
       </div>
 
       <p className="mt-6 text-center text-sm text-rz-hint">
-        Already have a shop?{" "}
+        มีบัญชีแล้ว?{" "}
         <Link href="/login" className="font-medium text-rz-green">
-          Log in →
+          เข้าสู่ระบบ →
         </Link>
       </p>
     </form>

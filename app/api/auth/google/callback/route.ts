@@ -6,6 +6,7 @@ import {
   linkGoogleAccount,
 } from "@/lib/queries";
 import { signSession, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth";
+import { CONTEXT_COOKIE, contextCookieOptions } from "@/lib/context";
 import { createGoogleOAuthClient, isGoogleAuthEnabled } from "@/lib/google-oauth";
 
 function loginRedirect(req: NextRequest, error?: string) {
@@ -47,6 +48,7 @@ export async function GET(req: NextRequest) {
     const picture = payload.picture ?? null;
 
     let user = await findUserByGoogleId(googleId);
+    let isNewUser = false;
 
     if (!user) {
       const byEmail = await findUserByEmail(email);
@@ -56,8 +58,9 @@ export async function GET(req: NextRequest) {
     }
 
     if (!user) {
-      const shopName = name || "ร้านของฉัน";
       const displayName = name || email.split("@")[0];
+      const shopName = name || displayName;
+      isNewUser = true;
       user = await createGoogleUser({
         email,
         googleId,
@@ -74,6 +77,9 @@ export async function GET(req: NextRequest) {
     const token = await signSession(user.id);
     const res = NextResponse.redirect(new URL("/", req.url));
     res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
+    if (isNewUser) {
+      res.cookies.set(CONTEXT_COOKIE, "personal", contextCookieOptions());
+    }
     return res;
   } catch {
     return loginRedirect(req, "google_failed");

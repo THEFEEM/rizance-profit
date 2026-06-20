@@ -6,3 +6,12 @@ export function displayInitials(name: string): string {
   }
   return (name.trim().slice(0, 2) || "?").toUpperCase();
 }
+
+/** Preferred display label for a user (personal name vs shop name). */
+export function getUserDisplayName(user: {
+  displayName: string | null;
+  shopName: string;
+  email: string;
+}): string {
+  return user.displayName || user.shopName || user.email.split("@")[0];
+}
