@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkAuthRateLimit } from "@/lib/auth-rate-limit";
 import { registerSchema, fieldErrorsFrom } from "@/lib/validation";
-import { createUser, emailExists } from "@/lib/queries";
+import { createUser, findUserByEmail } from "@/lib/queries";
 import { hashPassword, signSession, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
@@ -25,7 +25,19 @@ export async function POST(req: NextRequest) {
 
   const { email, password, shopName } = parsed.data;
 
-  if (await emailExists(email)) {
+  const existing = await findUserByEmail(email);
+  if (existing) {
+    if (existing.authProvider === "google") {
+      return NextResponse.json(
+        {
+          error: {
+            message: "อีเมลนี้ใช้ Google เข้าสู่ระบบอยู่แล้ว",
+            code: "google_account_exists",
+          },
+        },
+        { status: 409 },
+      );
+    }
     return NextResponse.json(
       { error: { message: "That email is already registered", fields: { email: ["Email already in use"] } } },
       { status: 409 },

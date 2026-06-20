@@ -21,6 +21,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         displayName={
           resolved.mode === "project" ? orgDisplayName(resolved.project) : user.shopName
         }
+        avatarUrl={user.avatarUrl}
         dateLabel={formatDateLabel(today())}
         mode={resolved.mode}
       />

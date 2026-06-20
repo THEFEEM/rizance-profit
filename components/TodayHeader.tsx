@@ -1,12 +1,14 @@
 import { HeaderSettings } from "@/components/HeaderSettings";
-import { displayInitials } from "@/lib/user-display";
+import { UserAvatar } from "@/components/UserAvatar";
 
 export function TodayHeader({
   displayName,
+  avatarUrl,
   dateLabel,
   mode,
 }: {
   displayName: string;
+  avatarUrl?: string | null;
   dateLabel: string;
   mode: "regular" | "booth" | "project" | "personal";
 }) {
@@ -22,12 +24,7 @@ export function TodayHeader({
   return (
     <header className="flex items-center justify-between px-4 py-3">
       <div className="flex min-w-0 items-center gap-3">
-        <div
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rz-elevated text-sm font-medium text-rz-text ring-2 ${ringColor}`}
-          aria-hidden
-        >
-          {displayInitials(displayName)}
-        </div>
+        <UserAvatar name={displayName} avatarUrl={avatarUrl} size="sm" ringClassName={ringColor} />
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-rz-text">{displayName}</p>
           <p className="text-[11px] text-rz-hint">{dateLabel}</p>

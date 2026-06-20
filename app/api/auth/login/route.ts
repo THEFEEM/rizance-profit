@@ -26,8 +26,18 @@ export async function POST(req: NextRequest) {
   const { email, password } = parsed.data;
   const found = await findUserByEmail(email);
 
-  // Same response for unknown email or wrong password (don't leak which).
-  if (!found || !(await verifyPassword(password, found.passwordHash))) {
+  if (!found) {
+    return NextResponse.json({ error: { message: "Invalid email or password" } }, { status: 401 });
+  }
+
+  if (!found.passwordHash) {
+    return NextResponse.json(
+      { error: { message: "ใช้ Google เข้าสู่ระบบ", code: "google_only" } },
+      { status: 400 },
+    );
+  }
+
+  if (!(await verifyPassword(password, found.passwordHash))) {
     return NextResponse.json({ error: { message: "Invalid email or password" } }, { status: 401 });
   }
 

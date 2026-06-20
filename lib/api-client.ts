@@ -1,7 +1,7 @@
 // Browser-side fetch helper that understands our { data } / { error } envelope.
 export type ApiResult<T> =
   | { ok: true; data: T }
-  | { ok: false; status: number; message: string; fields?: Record<string, string[] | undefined> };
+  | { ok: false; status: number; message: string; code?: string; fields?: Record<string, string[] | undefined> };
 
 export async function apiFetch<T>(input: string, init?: RequestInit): Promise<ApiResult<T>> {
   let res: Response;
@@ -25,11 +25,12 @@ export async function apiFetch<T>(input: string, init?: RequestInit): Promise<Ap
     return { ok: true, data: (body as { data: T })?.data };
   }
 
-  const err = (body as { error?: { message?: string; fields?: Record<string, string[] | undefined> } })?.error;
+  const err = (body as { error?: { message?: string; code?: string; fields?: Record<string, string[] | undefined> } })?.error;
   return {
     ok: false,
     status: res.status,
     message: err?.message ?? "Something went wrong. Please try again.",
+    code: err?.code,
     fields: err?.fields,
   };
 }
