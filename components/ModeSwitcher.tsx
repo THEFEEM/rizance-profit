@@ -4,16 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-client";
+import { Building2, Store, Tent } from "lucide-react";
+import { modeAccentTextClass } from "@/components/mode-icons";
 import { orgDisplayName } from "@/lib/project-ui";
 import type { Booth } from "@/types/booth";
 import type { AppContext } from "@/types/context";
 import type { ProjectListItem } from "@/types/project";
-import {
-  BuildingStoreIcon,
-  ClipboardListIcon,
-  TentIcon,
-} from "@/components/project/icons";
-
 import { formatDayShort } from "@/lib/date";
 import { activeOrgProjects } from "@/lib/mode-switch";
 
@@ -195,7 +191,7 @@ export function ModeSwitcher({
                 : "text-rz-muted active:bg-rz-card"
             }`}
           >
-            <BuildingStoreIcon size={14} />
+            <Store size={14} className={mode === "regular" ? "" : modeAccentTextClass("regular")} />
             ร้านค้า
           </button>
           <button
@@ -210,7 +206,7 @@ export function ModeSwitcher({
                 : "text-rz-muted active:bg-rz-card"
             }`}
           >
-            <TentIcon size={14} />
+            <Tent size={14} className={mode === "booth" ? "" : modeAccentTextClass("booth")} />
             บูธ
           </button>
           <button
@@ -225,13 +221,16 @@ export function ModeSwitcher({
                 : "text-rz-muted active:bg-rz-card"
             }`}
           >
-            <ClipboardListIcon size={14} className="shrink-0" />
+            <Building2
+              size={14}
+              className={`shrink-0 ${projectTabSelected ? "" : modeAccentTextClass("org")}`}
+            />
             <span className="truncate">{orgLabel}</span>
           </button>
         </div>
         {mode === "booth" && boothName && (
           <p className="mt-2 flex items-center justify-center gap-1.5 truncate text-center text-[11px] font-medium text-rz-amber">
-            <TentIcon size={12} />
+            <Tent size={12} />
             <span className="truncate">
               {boothName}
               {boothStartDate && boothEndDate && (
@@ -245,7 +244,7 @@ export function ModeSwitcher({
         )}
         {projectSubtitle && (
           <p className="mt-2 flex items-center justify-center gap-1.5 truncate text-center text-[11px] font-medium text-rz-purple">
-            <ClipboardListIcon size={12} />
+            <Building2 size={12} />
             <span className="truncate">
               {projectSubtitle}
               {projectStartDate && projectEndDate && (

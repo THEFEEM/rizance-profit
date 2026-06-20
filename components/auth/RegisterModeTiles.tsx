@@ -1,8 +1,8 @@
+import { renderModeIcon } from "@/components/mode-icons";
 import type { RegisterMode } from "@/lib/register-mode";
 
 const TILES: {
   mode: RegisterMode;
-  emoji: string;
   label: string;
   hint?: string;
   selectedRing: string;
@@ -10,7 +10,6 @@ const TILES: {
 }[] = [
   {
     mode: "personal",
-    emoji: "❤️",
     label: "บุคคล",
     hint: "(เริ่มต้น)",
     selectedRing: "ring-rz-rose",
@@ -18,21 +17,18 @@ const TILES: {
   },
   {
     mode: "regular",
-    emoji: "💚",
     label: "ร้านค้า",
     selectedRing: "ring-rz-green",
     selectedBg: "bg-rz-green/10 border-rz-green/50",
   },
   {
     mode: "booth",
-    emoji: "🧡",
     label: "บูธ",
     selectedRing: "ring-rz-amber",
     selectedBg: "bg-rz-amber/10 border-rz-amber/50",
   },
   {
     mode: "org",
-    emoji: "💜",
     label: "องค์กร",
     selectedRing: "ring-rz-purple",
     selectedBg: "bg-rz-purple/10 border-rz-purple-border",
@@ -62,8 +58,8 @@ export function RegisterModeTiles({
             }`}
             aria-pressed={selected}
           >
-            <span className="text-xl leading-none" aria-hidden>
-              {tile.emoji}
+            <span className="flex h-8 w-8 items-center justify-center">
+              {renderModeIcon(tile.mode === "org" ? "org" : tile.mode, 28)}
             </span>
             <span className="mt-1.5 text-sm font-medium text-rz-text">{tile.label}</span>
             {tile.hint && <span className="mt-0.5 text-[10px] text-rz-hint">{tile.hint}</span>}

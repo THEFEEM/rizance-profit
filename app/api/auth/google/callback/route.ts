@@ -20,17 +20,26 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: { message: "Google login is not configured" } }, { status: 404 });
   }
 
+  const googleError = req.nextUrl.searchParams.get("error");
+  if (googleError) {
+    console.error("[google-callback] provider error:", googleError);
+    return loginRedirect(req, "google_denied");
+  }
+
   const code = req.nextUrl.searchParams.get("code");
   if (!code) {
-    return loginRedirect(req, "google_failed");
+    console.error("[google-callback] missing code");
+    return loginRedirect(req, "no_code");
   }
 
   try {
     const client = createGoogleOAuthClient();
+    console.log("[google] redirect_uri used:", process.env.GOOGLE_REDIRECT_URI);
     const { tokens } = await client.getToken(code);
     const idToken = tokens.id_token;
     if (!idToken) {
-      return loginRedirect(req, "google_failed");
+      console.error("[google-callback] missing id_token");
+      return loginRedirect(req, "google_callback");
     }
 
     const ticket = await client.verifyIdToken({
@@ -39,7 +48,8 @@ export async function GET(req: NextRequest) {
     });
     const payload = ticket.getPayload();
     if (!payload?.sub || !payload.email) {
-      return loginRedirect(req, "google_failed");
+      console.error("[google-callback] invalid token payload");
+      return loginRedirect(req, "google_callback");
     }
 
     const googleId = payload.sub;
@@ -71,7 +81,8 @@ export async function GET(req: NextRequest) {
     }
 
     if (!user) {
-      return loginRedirect(req, "google_failed");
+      console.error("[google-callback] user resolution failed");
+      return loginRedirect(req, "google_callback");
     }
 
     const token = await signSession(user.id);
@@ -81,7 +92,8 @@ export async function GET(req: NextRequest) {
       res.cookies.set(CONTEXT_COOKIE, "personal", contextCookieOptions());
     }
     return res;
-  } catch {
-    return loginRedirect(req, "google_failed");
+  } catch (err) {
+    console.error("[google-callback]", err);
+    return loginRedirect(req, "google_callback");
   }
 }

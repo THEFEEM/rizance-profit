@@ -8,12 +8,20 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Rizance Profit",
-  description: "Know your real profit — today's profit in under 30 seconds.",
-  manifest: "/manifest.webmanifest",
+  title: "Rizance",
+  description: "Know your real profit",
+  manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icons/icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/icons/icon-512.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+  },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "Rizance",
   },
 };

@@ -9,7 +9,7 @@ export function ModeRow({
   onClick,
   action,
 }: {
-  icon: string;
+  icon: ReactNode;
   label: string;
   sublabel?: string;
   selected?: boolean;
@@ -27,7 +27,7 @@ export function ModeRow({
           selected ? "text-rz-text" : "text-rz-text active:bg-rz-elevated"
         }`}
       >
-        <span className="text-xl leading-none" aria-hidden>
+        <span className="flex h-7 w-7 items-center justify-center" aria-hidden>
           {icon}
         </span>
         <span className="min-w-0 flex-1">
