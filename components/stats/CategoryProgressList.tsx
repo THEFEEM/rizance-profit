@@ -19,15 +19,19 @@ export function CategoryProgressList({
   entriesByCategory,
   currency = "THB",
   tone = "income",
+  accent = "green",
 }: {
   rows: CategoryProgressRow[];
   entriesByCategory: Record<string, CategoryBreakdownEntry[]>;
   currency?: string;
   tone?: "income" | "expense";
+  accent?: "green" | "amber";
 }) {
   const [open, setOpen] = useState<string | null>(null);
-  const barClass = tone === "income" ? "bg-rz-green" : "bg-rz-red";
-  const amountClass = tone === "income" ? "text-rz-green" : "text-rz-red";
+  const barClass =
+    tone === "expense" ? "bg-rz-red" : accent === "amber" ? "bg-rz-amber" : "bg-rz-green";
+  const amountClass =
+    tone === "expense" ? "text-rz-red" : accent === "amber" ? "text-rz-amber" : "text-rz-green";
 
   if (rows.length === 0) return null;
 

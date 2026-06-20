@@ -45,7 +45,9 @@ export function ProgressBarRow({
       ? "text-rz-green"
       : tone === "red"
         ? "text-rz-red"
-        : "text-rz-text";
+        : tone === "amber"
+          ? "text-rz-amber"
+          : "text-rz-text";
 
   const pct = Math.min(100, Math.max(0, percentage));
 

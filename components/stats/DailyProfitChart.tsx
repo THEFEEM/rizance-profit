@@ -12,7 +12,8 @@ import {
 } from "recharts";
 import { formatMoney } from "@/lib/money";
 
-const COLOR_POSITIVE = "#4ADE9E";
+const COLOR_POSITIVE_GREEN = "#4ADE9E";
+const COLOR_POSITIVE_AMBER = "#EF9F27";
 const COLOR_NEGATIVE = "#F87171";
 const COLOR_GRID = "#243049";
 const COLOR_AXIS = "#9AA6B8";
@@ -27,10 +28,15 @@ export type DailyProfitChartPoint = {
 export function DailyProfitChart({
   data,
   currency = "THB",
+  accent = "green",
 }: {
   data: DailyProfitChartPoint[];
   currency?: string;
+  accent?: "green" | "amber";
 }) {
+  const positiveColor = accent === "amber" ? COLOR_POSITIVE_AMBER : COLOR_POSITIVE_GREEN;
+  const positiveTextClass = accent === "amber" ? "text-rz-amber" : "text-rz-green";
+
   if (data.length === 0) {
     return (
       <div className="flex h-[200px] items-center justify-center text-sm text-rz-hint">
@@ -70,7 +76,7 @@ export function DailyProfitChart({
                   <p className="text-rz-muted">{row.date}</p>
                   <p
                     className={`mt-0.5 font-medium rz-tabular ${
-                      row.profit >= 0 ? "text-rz-green" : "text-rz-red"
+                      row.profit >= 0 ? positiveTextClass : "text-rz-red"
                     }`}
                   >
                     {formatMoney(row.profitDisplay, currency)}
@@ -83,7 +89,7 @@ export function DailyProfitChart({
             {data.map((entry) => (
               <Cell
                 key={entry.date}
-                fill={entry.profit >= 0 ? COLOR_POSITIVE : COLOR_NEGATIVE}
+                fill={entry.profit >= 0 ? positiveColor : COLOR_NEGATIVE}
               />
             ))}
           </Bar>
