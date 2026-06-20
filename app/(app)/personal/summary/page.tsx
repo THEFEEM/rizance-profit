@@ -1,11 +1,29 @@
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/session";
+import {
+  PersonalStatsSummary,
+  parsePersonalStatsParams,
+} from "@/components/stats/PersonalStatsSummary";
+
 export const dynamic = "force-dynamic";
 
-/** Placeholder — GROUP 3 will add PersonalStats. */
-export default function PersonalSummaryPage() {
+export default async function PersonalSummaryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string }>;
+}) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  const params = await searchParams;
+  const { period } = parsePersonalStatsParams(params);
+
   return (
-    <div className="px-4 py-10 text-center">
-      <h1 className="text-lg font-medium text-rz-text">สถิติ</h1>
-      <p className="mt-2 text-sm text-rz-hint">สถิติบุคคล — GROUP 3</p>
+    <div className="pb-6">
+      <div className="px-4 pt-3">
+        <h1 className="text-lg font-medium text-rz-text">สถิติ</h1>
+      </div>
+      <PersonalStatsSummary user={user} period={period} />
     </div>
   );
 }

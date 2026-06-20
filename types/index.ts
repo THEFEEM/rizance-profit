@@ -48,6 +48,7 @@ export type User = {
   email: string;
   shopName: string;
   currency: string;
+  monthlyBudget: string | null;
   createdAt: string;
 };
 

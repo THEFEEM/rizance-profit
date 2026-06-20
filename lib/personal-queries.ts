@@ -9,6 +9,7 @@ import type {
   PersonalExpense,
   PersonalIncome,
   PersonalSummary,
+  SavingsGoal,
 } from "@/types/personal";
 
 type IncomeRow = {
@@ -311,6 +312,86 @@ export async function deletePersonalIncome(userId: string, id: string): Promise<
 export async function deletePersonalExpense(userId: string, id: string): Promise<boolean> {
   const { rowCount } = await query(
     `DELETE FROM personal_expense_entries WHERE id = $1 AND user_id = $2`,
+    [id, userId],
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+type SavingsGoalRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  target_amount: string;
+  created_at: Date | string;
+};
+
+function mapSavingsGoal(r: SavingsGoalRow): SavingsGoal {
+  return {
+    id: r.id,
+    userId: r.user_id,
+    name: r.name,
+    targetAmount: r.target_amount,
+    createdAt: toIso(r.created_at),
+  };
+}
+
+export async function listPersonalIncomesInPeriod(
+  userId: string,
+  start: string,
+  end: string,
+): Promise<PersonalIncome[]> {
+  const { rows } = await query<IncomeRow>(
+    `SELECT ${INCOME_RETURN}
+     FROM personal_income_entries
+     WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date
+     ORDER BY entry_date DESC, created_at DESC`,
+    [userId, start, end],
+  );
+  return rows.map(mapIncome);
+}
+
+export async function listPersonalExpensesInPeriod(
+  userId: string,
+  start: string,
+  end: string,
+): Promise<PersonalExpense[]> {
+  const { rows } = await query<ExpenseRow>(
+    `SELECT ${EXPENSE_RETURN}
+     FROM personal_expense_entries
+     WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date
+     ORDER BY entry_date DESC, created_at DESC`,
+    [userId, start, end],
+  );
+  return rows.map(mapExpense);
+}
+
+export async function listSavingsGoals(userId: string): Promise<SavingsGoal[]> {
+  const { rows } = await query<SavingsGoalRow>(
+    `SELECT id, user_id, name, target_amount::text AS target_amount, created_at
+     FROM savings_goals
+     WHERE user_id = $1
+     ORDER BY created_at ASC`,
+    [userId],
+  );
+  return rows.map(mapSavingsGoal);
+}
+
+export async function createSavingsGoal(
+  userId: string,
+  input: { name: string; targetAmount: number },
+): Promise<SavingsGoal> {
+  const { rows } = await query<SavingsGoalRow>(
+    `INSERT INTO savings_goals (user_id, name, target_amount)
+     VALUES ($1, $2, $3)
+     RETURNING id, user_id, name, target_amount::text AS target_amount, created_at`,
+    [userId, input.name, input.targetAmount.toFixed(2)],
+  );
+  return mapSavingsGoal(rows[0]);
+}
+
+export async function deleteSavingsGoal(userId: string, id: string): Promise<boolean> {
+  const { rowCount } = await query(
+    `DELETE FROM savings_goals WHERE id = $1 AND user_id = $2`,
     [id, userId],
   );
   return (rowCount ?? 0) > 0;

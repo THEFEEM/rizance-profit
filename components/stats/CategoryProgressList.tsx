@@ -25,25 +25,29 @@ export function CategoryProgressList({
   entriesByCategory: Record<string, CategoryBreakdownEntry[]>;
   currency?: string;
   tone?: "income" | "expense";
-  accent?: "green" | "amber" | "purple";
+  accent?: "green" | "amber" | "purple" | "rose";
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const barClass =
     tone === "expense"
       ? "bg-rz-red"
-      : accent === "amber"
-        ? "bg-rz-amber"
-        : accent === "purple"
-          ? "bg-rz-purple"
-          : "bg-rz-green";
+      : accent === "rose"
+        ? "bg-rz-rose"
+        : accent === "amber"
+          ? "bg-rz-amber"
+          : accent === "purple"
+            ? "bg-rz-purple"
+            : "bg-rz-green";
   const amountClass =
     tone === "expense"
       ? "text-rz-red"
-      : accent === "amber"
-        ? "text-rz-amber"
-        : accent === "purple"
-          ? "text-rz-purple"
-          : "text-rz-green";
+      : accent === "rose"
+        ? "text-rz-rose"
+        : accent === "amber"
+          ? "text-rz-amber"
+          : accent === "purple"
+            ? "text-rz-purple"
+            : "text-rz-green";
 
   if (rows.length === 0) return null;
 

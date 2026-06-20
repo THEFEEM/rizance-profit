@@ -28,6 +28,7 @@ type UserRow = {
   email: string;
   shop_name: string;
   currency: string;
+  monthly_budget: string | null;
   created_at: Date | string;
 };
 
@@ -41,9 +42,12 @@ function mapUser(r: UserRow): User {
     email: r.email,
     shopName: r.shop_name,
     currency: r.currency,
+    monthlyBudget: r.monthly_budget,
     createdAt: toIso(r.created_at),
   };
 }
+
+const USER_RETURN = `id, email, shop_name, currency, monthly_budget::text AS monthly_budget, created_at`;
 
 type IncomeRow = {
   id: string;
@@ -92,7 +96,7 @@ export async function createUser(params: {
   const { rows } = await query<UserRow>(
     `INSERT INTO users (email, password_hash, shop_name)
      VALUES ($1, $2, $3)
-     RETURNING id, email, shop_name, currency, created_at`,
+     RETURNING ${USER_RETURN}`,
     [params.email, params.passwordHash, params.shopName],
   );
   return mapUser(rows[0]);
@@ -100,7 +104,7 @@ export async function createUser(params: {
 
 export async function findUserByEmail(email: string): Promise<UserWithHash | null> {
   const { rows } = await query<UserRow & { password_hash: string }>(
-    `SELECT id, email, password_hash, shop_name, currency, created_at
+    `SELECT id, email, password_hash, shop_name, currency, monthly_budget::text AS monthly_budget, created_at
      FROM users WHERE email = $1`,
     [email],
   );
@@ -110,17 +114,40 @@ export async function findUserByEmail(email: string): Promise<UserWithHash | nul
 
 export async function findUserById(id: string): Promise<User | null> {
   const { rows } = await query<UserRow>(
-    `SELECT id, email, shop_name, currency, created_at FROM users WHERE id = $1`,
+    `SELECT ${USER_RETURN} FROM users WHERE id = $1`,
     [id],
   );
   return rows[0] ? mapUser(rows[0]) : null;
 }
 
 export async function updateUserShopName(userId: string, shopName: string): Promise<User | null> {
+  return updateUserProfile(userId, { shopName });
+}
+
+export async function updateUserProfile(
+  userId: string,
+  patch: { shopName?: string; monthlyBudget?: string | null },
+): Promise<User | null> {
+  const sets: string[] = [];
+  const params: (string | null)[] = [userId];
+  let idx = 2;
+
+  if (patch.shopName !== undefined) {
+    sets.push(`shop_name = $${idx}`);
+    params.push(patch.shopName);
+    idx += 1;
+  }
+  if (patch.monthlyBudget !== undefined) {
+    sets.push(`monthly_budget = $${idx}`);
+    params.push(patch.monthlyBudget);
+    idx += 1;
+  }
+  if (sets.length === 0) return findUserById(userId);
+
   const { rows } = await query<UserRow>(
-    `UPDATE users SET shop_name = $2 WHERE id = $1
-     RETURNING id, email, shop_name, currency, created_at`,
-    [userId, shopName],
+    `UPDATE users SET ${sets.join(", ")}, updated_at = now() WHERE id = $1
+     RETURNING ${USER_RETURN}`,
+    params,
   );
   return rows[0] ? mapUser(rows[0]) : null;
 }

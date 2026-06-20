@@ -37,3 +37,15 @@ export const personalExpenseSchema = z.object({
 
 export type PersonalIncomeInput = z.infer<typeof personalIncomeSchema>;
 export type PersonalExpenseInput = z.infer<typeof personalExpenseSchema>;
+
+const goalName = z.preprocess(
+  (v) => (typeof v === "string" ? v.trim() : v),
+  z.string().min(1, "กรุณาระบุชื่อ").max(160),
+);
+
+export const savingsGoalSchema = z.object({
+  name: goalName,
+  targetAmount: amount,
+});
+
+export type SavingsGoalInput = z.infer<typeof savingsGoalSchema>;
