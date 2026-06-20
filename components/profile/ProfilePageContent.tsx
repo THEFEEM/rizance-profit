@@ -4,12 +4,19 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ProfileModeSection } from "@/components/profile/ProfileModeSection";
 import { ShopMemberEditor } from "@/components/shop/ShopMemberEditor";
+import { UserAvatar } from "@/components/UserAvatar";
 import { apiFetch } from "@/lib/api-client";
-import { displayInitials } from "@/lib/user-display";
+import type { AuthProvider } from "@/types";
 import type { ShopMember } from "@/types/shop";
 import type { User } from "@/types";
 
 const APP_VERSION = "v1.0";
+
+function authProviderBadge(provider: AuthProvider): string | null {
+  if (provider === "google") return "เข้าสู่ระบบด้วย Google";
+  if (provider === "both") return "อีเมล + Google";
+  return null;
+}
 
 export function ProfilePageContent({
   user,
@@ -28,6 +35,8 @@ export function ProfilePageContent({
 }) {
   const router = useRouter();
   const [name, setName] = useState(user.shopName);
+  const profileLabel = user.displayName || name;
+  const providerBadge = authProviderBadge(user.authProvider);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(user.shopName);
   const [saving, setSaving] = useState(false);
@@ -79,12 +88,7 @@ export function ProfilePageContent({
   return (
     <div className="px-4 pb-8 pt-4" data-context="profile">
       <div className="flex flex-col items-center text-center">
-        <div
-          className="flex h-20 w-20 items-center justify-center rounded-full bg-rz-elevated text-2xl font-medium text-rz-text ring-2 ring-rz-border"
-          aria-hidden
-        >
-          {displayInitials(name)}
-        </div>
+        <UserAvatar name={profileLabel} avatarUrl={user.avatarUrl} size="lg" />
 
         <div className="mt-4 w-full max-w-xs">
           {editing ? (
@@ -145,6 +149,14 @@ export function ProfilePageContent({
         </div>
 
         <p className="mt-1 text-sm text-rz-muted">{user.email}</p>
+        {providerBadge && (
+          <span className="mt-2 inline-flex items-center rounded-full border-[0.5px] border-rz-border bg-rz-elevated px-3 py-1 text-xs text-rz-muted">
+            {providerBadge}
+          </span>
+        )}
+        {user.displayName && user.displayName !== name && (
+          <p className="mt-1 text-xs text-rz-hint">{user.displayName}</p>
+        )}
       </div>
 
       <div className="mt-8 space-y-4">
@@ -161,6 +173,18 @@ export function ProfilePageContent({
               <dt className="text-rz-muted">อีเมล</dt>
               <dd className="truncate text-rz-text">{user.email}</dd>
             </div>
+            {providerBadge && (
+              <div className="flex items-center justify-between gap-3 px-4 py-3">
+                <dt className="text-rz-muted">การเข้าสู่ระบบ</dt>
+                <dd className="text-rz-text">{providerBadge}</dd>
+              </div>
+            )}
+            {user.authProvider !== "google" && (
+              <div className="flex items-center justify-between gap-3 px-4 py-3">
+                <dt className="text-rz-muted">รหัสผ่าน</dt>
+                <dd className="text-rz-hint">••••••••</dd>
+              </div>
+            )}
           </dl>
         </section>
 
