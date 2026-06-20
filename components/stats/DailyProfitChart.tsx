@@ -14,7 +14,9 @@ import { formatMoney } from "@/lib/money";
 
 const COLOR_POSITIVE_GREEN = "#4ADE9E";
 const COLOR_POSITIVE_AMBER = "#EF9F27";
+const COLOR_POSITIVE_PURPLE = "#B69CE8";
 const COLOR_NEGATIVE = "#F87171";
+const COLOR_EXPENSE = "#F87171";
 const COLOR_GRID = "#243049";
 const COLOR_AXIS = "#9AA6B8";
 
@@ -25,17 +27,38 @@ export type DailyProfitChartPoint = {
   date: string;
 };
 
+export type DailyExpenseChartPoint = {
+  label: string;
+  expense: number;
+  expenseDisplay: string;
+  date: string;
+};
+
+type ChartPoint = DailyProfitChartPoint | DailyExpenseChartPoint;
+
 export function DailyProfitChart({
   data,
   currency = "THB",
   accent = "green",
+  mode = "profit",
 }: {
-  data: DailyProfitChartPoint[];
+  data: ChartPoint[];
   currency?: string;
-  accent?: "green" | "amber";
+  accent?: "green" | "amber" | "purple";
+  mode?: "profit" | "expense";
 }) {
-  const positiveColor = accent === "amber" ? COLOR_POSITIVE_AMBER : COLOR_POSITIVE_GREEN;
-  const positiveTextClass = accent === "amber" ? "text-rz-amber" : "text-rz-green";
+  const positiveColor =
+    accent === "amber"
+      ? COLOR_POSITIVE_AMBER
+      : accent === "purple"
+        ? COLOR_POSITIVE_PURPLE
+        : COLOR_POSITIVE_GREEN;
+  const positiveTextClass =
+    accent === "amber"
+      ? "text-rz-amber"
+      : accent === "purple"
+        ? "text-rz-purple"
+        : "text-rz-green";
 
   if (data.length === 0) {
     return (
@@ -44,6 +67,9 @@ export function DailyProfitChart({
       </div>
     );
   }
+
+  const dataKey = mode === "expense" ? "expense" : "profit";
+  const emptyLabel = mode === "expense" ? "รายจ่ายรายวัน" : "กำไรรายวัน";
 
   return (
     <div className="h-[200px] w-full">
@@ -70,31 +96,50 @@ export function DailyProfitChart({
             cursor={{ fill: "rgba(255,255,255,0.04)" }}
             content={({ active, payload }) => {
               if (!active || !payload?.[0]) return null;
-              const row = payload[0].payload as DailyProfitChartPoint;
+              const row = payload[0].payload as ChartPoint;
+              if (mode === "expense") {
+                const expenseRow = row as DailyExpenseChartPoint;
+                return (
+                  <div className="rounded-lg border-[0.5px] border-rz-border bg-rz-card px-3 py-2 text-xs shadow-lg">
+                    <p className="text-rz-muted">{expenseRow.date}</p>
+                    <p className="mt-0.5 font-medium rz-tabular text-rz-red">
+                      {formatMoney(expenseRow.expenseDisplay, currency)}
+                    </p>
+                  </div>
+                );
+              }
+              const profitRow = row as DailyProfitChartPoint;
               return (
                 <div className="rounded-lg border-[0.5px] border-rz-border bg-rz-card px-3 py-2 text-xs shadow-lg">
-                  <p className="text-rz-muted">{row.date}</p>
+                  <p className="text-rz-muted">{profitRow.date}</p>
                   <p
                     className={`mt-0.5 font-medium rz-tabular ${
-                      row.profit >= 0 ? positiveTextClass : "text-rz-red"
+                      profitRow.profit >= 0 ? positiveTextClass : "text-rz-red"
                     }`}
                   >
-                    {formatMoney(row.profitDisplay, currency)}
+                    {formatMoney(profitRow.profitDisplay, currency)}
                   </p>
                 </div>
               );
             }}
           />
-          <Bar dataKey="profit" radius={[4, 4, 0, 0]}>
-            {data.map((entry) => (
-              <Cell
-                key={entry.date}
-                fill={entry.profit >= 0 ? positiveColor : COLOR_NEGATIVE}
-              />
-            ))}
+          <Bar dataKey={dataKey} radius={[4, 4, 0, 0]}>
+            {data.map((entry) => {
+              if (mode === "expense") {
+                return <Cell key={entry.date} fill={COLOR_EXPENSE} />;
+              }
+              const profitRow = entry as DailyProfitChartPoint;
+              return (
+                <Cell
+                  key={entry.date}
+                  fill={profitRow.profit >= 0 ? positiveColor : COLOR_NEGATIVE}
+                />
+              );
+            })}
           </Bar>
         </BarChart>
       </ResponsiveContainer>
+      <span className="sr-only">{emptyLabel}</span>
     </div>
   );
 }

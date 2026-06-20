@@ -3,9 +3,10 @@ import {
   getProject,
   getShortProjectActivity,
   listProjectExpense,
+  listProjectExpensesForProject,
   listProjectIncome,
 } from "@/lib/project-queries";
-import { summarizeActivity, summarizeProject } from "@/lib/project-summary";
+import { orgDailyExpenseSeries, summarizeActivity, summarizeProject } from "@/lib/project-summary";
 import { getCurrentUser } from "@/lib/session";
 import { ProjectActivitySummaryView } from "@/components/project/summary/ProjectActivitySummaryView";
 import { ProjectOverviewView } from "@/components/project/summary/ProjectOverviewView";
@@ -24,10 +25,11 @@ export default async function ProjectSummaryPage({ params }: { params: Promise<{
     const activity = await getShortProjectActivity(user.id, id);
     if (!activity) notFound();
 
-    const [summary, incomes, expenses] = await Promise.all([
+    const [summary, incomes, expenses, dailySeries] = await Promise.all([
       summarizeActivity(user.id, id, activity.id),
       listProjectIncome(user.id, activity.id),
       listProjectExpense(user.id, activity.id),
+      orgDailyExpenseSeries(user.id, id, activity.id),
     ]);
     if (!summary) notFound();
 
@@ -38,19 +40,26 @@ export default async function ProjectSummaryPage({ params }: { params: Promise<{
         summary={summary}
         incomes={incomes}
         expenses={expenses}
+        dailySeries={dailySeries}
         currency={user.currency}
         backHref={`/projects/${id}`}
       />
     );
   }
 
-  const summary = await summarizeProject(user.id, id);
+  const [summary, dailySeries, expenses] = await Promise.all([
+    summarizeProject(user.id, id),
+    orgDailyExpenseSeries(user.id, id),
+    listProjectExpensesForProject(user.id, id),
+  ]);
   if (!summary) notFound();
 
   return (
     <ProjectOverviewView
       project={project}
       summary={summary}
+      dailySeries={dailySeries}
+      expenses={expenses}
       currency={user.currency}
       backHref={`/projects/${id}`}
     />
