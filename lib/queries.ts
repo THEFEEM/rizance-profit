@@ -284,6 +284,17 @@ export async function allTimeSummary(userId: string): Promise<AllTimeSummary> {
   };
 }
 
+/** All-time cash income — regular shop เงินสดในมือ = cash income − all-time expense. */
+export async function allTimeCashIncome(userId: string): Promise<string> {
+  const { rows } = await query<{ cash_income: string }>(
+    `SELECT COALESCE(SUM(amount), 0)::text AS cash_income
+     FROM income_entries
+     WHERE user_id = $1 AND payment_method = 'cash'`,
+    [userId],
+  );
+  return rows[0].cash_income;
+}
+
 export async function periodSummary(userId: string, period: PeriodKey): Promise<PeriodSummary> {
   const { start, end } = periodRange(period);
   const { rows } = await query<{

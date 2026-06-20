@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ProfileModeSection } from "@/components/profile/ProfileModeSection";
+import { ShopMemberEditor } from "@/components/shop/ShopMemberEditor";
 import { apiFetch } from "@/lib/api-client";
 import { displayInitials } from "@/lib/user-display";
+import type { ShopMember } from "@/types/shop";
 import type { User } from "@/types";
 
 const APP_VERSION = "v1.0";
@@ -15,12 +17,14 @@ export function ProfilePageContent({
   boothId,
   boothName,
   projectId,
+  shopMembers = [],
 }: {
   user: User;
   mode: "regular" | "booth" | "project" | "personal";
   boothId?: string;
   boothName?: string;
   projectId?: string;
+  shopMembers?: ShopMember[];
 }) {
   const router = useRouter();
   const [name, setName] = useState(user.shopName);
@@ -167,6 +171,8 @@ export function ProfilePageContent({
           boothName={boothName}
           projectId={projectId}
         />
+
+        <ShopMemberEditor members={shopMembers} currency={user.currency} />
 
         <section className="rounded-[14px] border-[0.5px] border-rz-border bg-rz-card">
           <h2 className="border-b-[0.5px] border-rz-border px-4 py-3 text-sm font-medium text-rz-text">

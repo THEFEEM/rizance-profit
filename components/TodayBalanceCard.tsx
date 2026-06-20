@@ -6,17 +6,19 @@ function profitColor(amount: string): string {
 }
 
 /**
- * Regular-mode Today hero: total sales + cumulative / today profit.
+ * Regular-mode Today hero: total sales + cumulative / today profit + cash in hand.
  */
 export function TodayBalanceCard({
   totalSales,
   cumulativeProfit,
   todayProfit,
+  cashInHand,
   currency = "THB",
 }: {
   totalSales: string;
   cumulativeProfit: string;
   todayProfit: string;
+  cashInHand?: string;
   currency?: string;
 }) {
   return (
@@ -43,6 +45,14 @@ export function TodayBalanceCard({
             <p className={`rz-tabular mt-0.5 text-base font-medium ${profitColor(todayProfit)}`}>
               {formatMoney(todayProfit, currency)}
             </p>
+            {cashInHand !== undefined && (
+              <div className="mt-2 border-t-[0.5px] border-rz-border pt-2">
+                <p className="text-[11px] text-rz-hint">เงินสดในมือ</p>
+                <p className={`rz-tabular mt-0.5 text-sm font-medium ${profitColor(cashInHand)}`}>
+                  {formatMoney(cashInHand, currency)}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -329,7 +329,7 @@ export function ModePicker({
 
           <div className="my-4 border-t-[0.5px] border-rz-border pt-3">
             <Link
-              href="/profile"
+              href="/shop/new"
               onClick={close}
               className="tap-target flex min-h-11 w-full items-center px-2 text-sm font-medium text-rz-muted active:text-rz-text"
             >
