@@ -3,6 +3,7 @@ import { checkAuthRateLimit } from "@/lib/auth-rate-limit";
 import { registerSchema, fieldErrorsFrom } from "@/lib/validation";
 import { createUser, findUserByEmail } from "@/lib/queries";
 import { hashPassword, signSession, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth";
+import { CONTEXT_COOKIE, contextCookieOptions } from "@/lib/context";
 
 export async function POST(req: NextRequest) {
   const limited = checkAuthRateLimit(req, "register");
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { email, password, shopName } = parsed.data;
+  const { email, password, shopName, mode } = parsed.data;
 
   const existing = await findUserByEmail(email);
   if (existing) {
@@ -47,8 +48,19 @@ export async function POST(req: NextRequest) {
   const passwordHash = await hashPassword(password);
   const user = await createUser({ email, passwordHash, shopName });
 
+  let contextValue = "regular";
+  let redirect = "/";
+  if (mode === "personal") {
+    contextValue = "personal";
+    redirect = "/";
+  } else if (mode === "org") {
+    contextValue = "regular";
+    redirect = "/projects/new";
+  }
+
   const token = await signSession(user.id);
-  const res = NextResponse.json({ data: { user } }, { status: 201 });
+  const res = NextResponse.json({ data: { user, redirect } }, { status: 201 });
   res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
+  res.cookies.set(CONTEXT_COOKIE, contextValue, contextCookieOptions());
   return res;
 }

@@ -21,14 +21,14 @@ function GoogleIcon() {
   );
 }
 
-export function GoogleSignInButton() {
+export function GoogleSignInButton({ label = "เข้าสู่ระบบด้วย Google" }: { label?: string }) {
   return (
     <a
       href="/api/auth/google"
       className="tap-target no-select inline-flex w-full items-center justify-center gap-2.5 rounded-[11px] border-[0.5px] border-rz-border bg-rz-card px-5 py-[15px] text-[15px] font-medium text-rz-text transition-opacity active:opacity-90"
     >
       <GoogleIcon />
-      เข้าสู่ระบบด้วย Google
+      {label}
     </a>
   );
 }
