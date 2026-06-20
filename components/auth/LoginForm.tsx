@@ -23,6 +23,21 @@ function AuthBanner({ children, variant = "error" }: { children: React.ReactNode
   );
 }
 
+function googleErrorMessage(error: string | null): string | null {
+  switch (error) {
+    case "google_callback":
+      return "เข้าสู่ระบบด้วย Google ไม่สำเร็จ ลองใหม่อีกครั้ง";
+    case "google_denied":
+      return "คุณยกเลิกการอนุญาต Google Login";
+    case "no_code":
+      return "ไม่พบรหัสยืนยันจาก Google กรุณาลองใหม่";
+    case "google_failed":
+      return "เข้าสู่ระบบด้วย Google ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง";
+    default:
+      return null;
+  }
+}
+
 function LoginFormInner({ googleEnabled }: { googleEnabled: boolean }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -36,12 +51,10 @@ function LoginFormInner({ googleEnabled }: { googleEnabled: boolean }) {
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string[] | undefined>>({});
   const [submitting, setSubmitting] = useState(false);
-  const [googleFailedBanner, setGoogleFailedBanner] = useState(false);
+  const [googleErrorBanner, setGoogleErrorBanner] = useState<string | null>(null);
 
   useEffect(() => {
-    if (oauthError === "google_failed") {
-      setGoogleFailedBanner(true);
-    }
+    setGoogleErrorBanner(googleErrorMessage(oauthError));
   }, [oauthError]);
 
   async function onSubmit(e: React.FormEvent) {
@@ -49,7 +62,7 @@ function LoginFormInner({ googleEnabled }: { googleEnabled: boolean }) {
     setError(null);
     setErrorCode(null);
     setFields({});
-    setGoogleFailedBanner(false);
+    setGoogleErrorBanner(null);
     setSubmitting(true);
     const res = await apiFetch<{ user: User }>("/api/auth/login", {
       method: "POST",
@@ -119,9 +132,7 @@ function LoginFormInner({ googleEnabled }: { googleEnabled: boolean }) {
         />
       </div>
 
-      {googleFailedBanner && (
-        <AuthBanner>เข้าสู่ระบบด้วย Google ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง</AuthBanner>
-      )}
+      {googleErrorBanner && <AuthBanner>{googleErrorBanner}</AuthBanner>}
 
       {showGlobalError && !isGoogleOnly && <AuthBanner>{error}</AuthBanner>}
 

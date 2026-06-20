@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ModeRow } from "@/components/ModeRow";
+import { renderModeIcon } from "@/components/mode-icons";
 import { apiFetch } from "@/lib/api-client";
 import { activeOrgProjects } from "@/lib/mode-switch";
 import { orgDisplayName } from "@/lib/project-ui";
@@ -289,14 +290,14 @@ export function ModePicker({
         <div className="min-h-0 flex-1 overflow-y-auto px-4">
           <ul className="divide-y divide-rz-border border-t-[0.5px] border-rz-border">
             <ModeRow
-              icon="❤️"
+              icon={renderModeIcon("personal")}
               label="บุคคล"
               selected={mode === "personal"}
               disabled={switching}
               onClick={selectPersonal}
             />
             <ModeRow
-              icon="💚"
+              icon={renderModeIcon("regular")}
               label={shopName}
               selected={mode === "regular"}
               disabled={switching}
@@ -304,7 +305,7 @@ export function ModePicker({
             />
             {openBooths.length > 0 && (
               <ModeRow
-                icon="🧡"
+                icon={renderModeIcon("booth")}
                 label={boothRowLabel}
                 sublabel="บูธ"
                 selected={mode === "booth"}
@@ -314,7 +315,7 @@ export function ModePicker({
             )}
             {orgLabel && (
               <ModeRow
-                icon="💜"
+                icon={renderModeIcon("org")}
                 label={orgLabel}
                 sublabel="องค์กร"
                 selected={mode === "project"}

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ModeRow } from "@/components/ModeRow";
+import { renderModeIcon } from "@/components/mode-icons";
 import { apiFetch } from "@/lib/api-client";
 import { activeOrgProjects } from "@/lib/mode-switch";
 import { orgDisplayName } from "@/lib/project-ui";
@@ -140,14 +141,14 @@ export function ProfileModeSection({
         <>
           <ul className="divide-y divide-rz-border">
             <ModeRow
-              icon="❤️"
+              icon={renderModeIcon("personal")}
               label="บุคคล"
               selected={mode === "personal"}
               disabled={switching}
               onClick={selectPersonal}
             />
             <ModeRow
-              icon="💚"
+              icon={renderModeIcon("regular")}
               label={shopName}
               sublabel="ร้านค้า"
               selected={mode === "regular"}
@@ -156,7 +157,7 @@ export function ProfileModeSection({
             />
             {openBooths.length > 0 ? (
               <ModeRow
-                icon="🧡"
+                icon={renderModeIcon("booth")}
                 label={boothRowLabel}
                 sublabel="บูธ"
                 selected={mode === "booth"}
@@ -169,8 +170,8 @@ export function ProfileModeSection({
                   href="/booth/new"
                   className="tap-target flex min-h-12 items-center gap-3 px-3 py-3 text-sm font-medium text-rz-text active:bg-rz-elevated"
                 >
-                  <span className="text-xl leading-none" aria-hidden>
-                    🧡
+                  <span className="flex h-7 w-7 items-center justify-center" aria-hidden>
+                    {renderModeIcon("booth")}
                   </span>
                   <span className="flex-1">บูธ</span>
                   <span className="shrink-0 text-xs text-rz-hint">สร้าง →</span>
@@ -179,7 +180,7 @@ export function ProfileModeSection({
             )}
             {orgLabel ? (
               <ModeRow
-                icon="💜"
+                icon={renderModeIcon("org")}
                 label={orgLabel}
                 sublabel="องค์กร"
                 selected={mode === "project"}
@@ -192,8 +193,8 @@ export function ProfileModeSection({
                   href="/projects/new"
                   className="tap-target flex min-h-12 items-center gap-3 px-3 py-3 text-sm font-medium text-rz-text active:bg-rz-elevated"
                 >
-                  <span className="text-xl leading-none" aria-hidden>
-                    💜
+                  <span className="flex h-7 w-7 items-center justify-center" aria-hidden>
+                    {renderModeIcon("org")}
                   </span>
                   <span className="flex-1">องค์กร</span>
                   <span className="shrink-0 text-xs text-rz-hint">สร้าง →</span>
