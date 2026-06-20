@@ -1,5 +1,6 @@
 // Project mode summary computation — derived totals, never stored.
 // Option B: one batched fetch per project (activities + entries), aggregate in JS.
+import { addDays } from "@/lib/date";
 import { pool } from "@/lib/db";
 import {
   PROJECT_EXPENSE_KEYS,
@@ -7,6 +8,7 @@ import {
   projectFundingLabel,
 } from "@/lib/project-categories";
 import { computeProfit, sumDecimals, toCents } from "@/lib/money";
+import type { DailyExpensePoint } from "@/types";
 import type {
   ActivitySummary,
   FundBalance,
@@ -445,4 +447,65 @@ export async function listProjectSummaries(userId: string): Promise<ProjectListI
     totalSpent: r.total_spent,
     remaining: computeProfit(r.total_funding, r.total_spent),
   }));
+}
+
+/** Per-day org expense totals — optional activity scope; zero-fills when range ≤ 90 days. */
+export async function orgDailyExpenseSeries(
+  userId: string,
+  projectId: string,
+  activityId?: string,
+): Promise<DailyExpensePoint[]> {
+  const bundle = await loadProjectBundle(userId, projectId);
+  if (!bundle) return [];
+
+  const activityFilter = activityId ? "AND e.activity_id = $3" : "";
+  const params: (string | undefined)[] = [projectId, userId];
+  if (activityId) params.push(activityId);
+
+  const { rows } = await pool.query<{ entry_date: string; expense: string }>(
+    `SELECT to_char(e.entry_date, 'YYYY-MM-DD') AS entry_date,
+            COALESCE(SUM(e.amount), 0)::text AS expense
+     FROM project_expense_entries e
+     JOIN project_activities a ON a.id = e.activity_id
+     WHERE a.project_id = $1 AND a.user_id = $2 AND e.user_id = $2
+       AND e.payment_status != 'rejected'
+       ${activityFilter}
+     GROUP BY e.entry_date
+     ORDER BY entry_date ASC`,
+    params,
+  );
+
+  if (rows.length === 0) return [];
+
+  const byDate = new Map(rows.map((r) => [r.entry_date, r.expense]));
+
+  let start: string;
+  let end: string;
+
+  if (activityId) {
+    const act = bundle.activities.find((a) => a.id === activityId);
+    start = act?.start_date ?? rows[0].entry_date;
+    end = act?.end_date ?? rows[rows.length - 1].entry_date;
+  } else {
+    start = bundle.project.start_date ?? rows[0].entry_date;
+    end = bundle.project.end_date ?? rows[rows.length - 1].entry_date;
+  }
+
+  if (start > end) [start, end] = [end, start];
+
+  const dayCount =
+    Math.floor(
+      (new Date(`${end}T12:00:00Z`).getTime() - new Date(`${start}T12:00:00Z`).getTime()) /
+        86_400_000,
+    ) + 1;
+
+  if (dayCount > 90) {
+    return rows.map((r) => ({ date: r.entry_date, expense: r.expense }));
+  }
+
+  const series: DailyExpensePoint[] = [];
+  for (let d = start; d <= end; d = addDays(d, 1)) {
+    series.push({ date: d, expense: byDate.get(d) ?? "0.00" });
+  }
+  return series;
 }

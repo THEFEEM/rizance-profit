@@ -1,209 +1,51 @@
 import Link from "next/link";
 import {
   categoryBreakdown,
-  dailySummary,
-  listIncomeByDate,
-  listExpenseByDate,
-  listIncomeInPeriod,
+  dailyProfitSeries,
   listExpenseInPeriod,
+  listIncomeInPeriod,
   periodExpenseByFixedVariable,
   periodIncomeByCashTransfer,
   periodSummary,
 } from "@/lib/queries";
 import {
-  today,
-  isValidDate,
-  isValidPeriod,
-  formatDateLabel,
-  formatPeriodRangeLabel,
   currentMonth,
+  formatDayShort,
+  formatPeriodRangeLabel,
+  formatWeekdayShortThai,
   periodRange,
-  type PeriodKey,
 } from "@/lib/date";
-import { boothNetForPeriod } from "@/lib/booth-queries";
-import { sumDecimals, toCents } from "@/lib/money";
-import { PeriodSelector } from "@/components/PeriodSelector";
-import { DateNav } from "@/components/DateNav";
-import { SummaryRows } from "@/components/SummaryRows";
-import { CombinedProfitCard } from "@/components/CombinedProfitCard";
+import { formatMoney, toCents } from "@/lib/money";
+import { StatsPeriodSelector, type StatsPeriodKey } from "@/components/stats/StatsPeriodSelector";
+import { StatsSummaryCards } from "@/components/stats/StatsSummaryCards";
+import { DailyProfitChart } from "@/components/stats/DailyProfitChart";
+import { BreakdownSection, ProgressBarRow } from "@/components/stats/BreakdownSection";
 import {
-  CategoryBreakdownPanel,
-  type CategoryBreakdownEntry,
-  type CategoryBreakdownRow,
-} from "@/components/stats/CategoryBreakdownPanel";
-import { RegularStatsRows } from "@/components/stats/RegularStatsRows";
-import { EntryList, type EntryRow } from "@/components/EntryList";
+  CategoryProgressList,
+  type CategoryProgressRow,
+} from "@/components/stats/CategoryProgressList";
+import type { CategoryBreakdownEntry } from "@/components/stats/CategoryBreakdownPanel";
 import {
   expenseCategoryIcon,
   expenseCategoryLabel,
-  expenseCategoryOrder,
   incomeCategoryIcon,
   incomeCategoryLabel,
-  incomeCategoryOrder,
 } from "@/lib/expense-categories";
-import {
-  type CategoryBreakdownItem,
-  type User,
-} from "@/types";
+import type { CategoryBreakdownItem, User } from "@/types";
 
-const CLOSE_OUT_LABELS = {
-  income: "รายรับ",
-  expense: "รายจ่าย",
-  profit: "กำไร",
-};
-
-/** Regular-shop Stats — Block 1 behavior, unchanged. */
-export async function RegularStatsSummary({
-  user,
-  period,
-  closeDate,
-}: {
-  user: User;
-  period: PeriodKey;
-  closeDate: string;
-}) {
-  const { start, end } = periodRange(period);
-  const [
-    periodData,
-    cashTransfer,
-    fixedVariable,
-    closeOut,
-    incomes,
-    expenses,
-    boothProfit,
-    breakdown,
-    periodIncomes,
-    periodExpenses,
-  ] = await Promise.all([
-    periodSummary(user.id, period),
-    periodIncomeByCashTransfer(user.id, start, end),
-    periodExpenseByFixedVariable(user.id, start, end),
-    dailySummary(user.id, closeDate),
-    listIncomeByDate(user.id, closeDate),
-    listExpenseByDate(user.id, closeDate),
-    boothNetForPeriod(user.id, start, end),
-    categoryBreakdown(user.id, start, end),
-    listIncomeInPeriod(user.id, start, end),
-    listExpenseInPeriod(user.id, start, end),
-  ]);
-  const combinedProfit = sumDecimals(periodData.profit, boothProfit);
-
-  const entries: EntryRow[] = [
-    ...incomes.map((i) => ({
-      id: i.id,
-      kind: "income" as const,
-      amount: i.amount,
-      note: i.note,
-      category: i.category,
-      createdAt: i.createdAt,
-    })),
-    ...expenses.map((e) => ({
-      id: e.id,
-      kind: "expense" as const,
-      amount: e.amount,
-      note: e.note,
-      category: e.category,
-      createdAt: e.createdAt,
-    })),
-  ].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-
-  const entryTotal = periodData.incomeCount + periodData.expenseCount;
-
-  const incomeRows = toBreakdownRows(breakdown.income, "income");
-  const expenseRows = toBreakdownRows(breakdown.expense, "expense");
-  const incomeEntries = groupEntriesByCategory(periodIncomes);
-  const expenseEntries = groupEntriesByCategory(periodExpenses);
-
-  return (
-    <>
-      <div className="mt-3">
-        <PeriodSelector period={period} date={closeDate} />
-      </div>
-
-      <div className="mt-4">
-        <RegularStatsRows
-          cashIncome={cashTransfer.cashIncome}
-          transferIncome={cashTransfer.transferIncome}
-          fixedExpense={fixedVariable.fixedExpense}
-          variableExpense={fixedVariable.variableExpense}
-          profit={periodData.profit}
-          currency={user.currency}
-        />
-        <p className="px-4 pt-2 text-center text-xs text-rz-hint">
-          {formatPeriodRangeLabel(periodData.start, periodData.end)}
-          {entryTotal > 0 && ` · ${entryTotal.toLocaleString()} รายการ`}
-        </p>
-        {period === "month" && (
-          <p className="px-4 pt-2 text-center">
-            <Link
-              href={`/summary/monthly?month=${currentMonth()}`}
-              className="text-sm font-medium text-rz-green"
-            >
-              ดูรายวันในเดือน →
-            </Link>
-          </p>
-        )}
-      </div>
-
-      <CategoryBreakdownPanel
-        incomeRows={incomeRows}
-        expenseRows={expenseRows}
-        incomeEntries={incomeEntries}
-        expenseEntries={expenseEntries}
-        currency={user.currency}
-      />
-
-      <div className="mt-8">
-        <h2 className="px-4 text-base font-medium text-rz-text">ปิดร้าน</h2>
-        <DateNav
-          date={closeDate}
-          label={formatDateLabel(closeDate)}
-          period={period}
-          maxDate={today()}
-          accent="green"
-        />
-        <SummaryRows
-          income={closeOut.income}
-          expense={closeOut.expense}
-          profit={closeOut.profit}
-          currency={user.currency}
-          labels={CLOSE_OUT_LABELS}
-        />
-        <p className="px-4 pb-1 text-center text-xs text-rz-hint">
-          {closeOut.incomeCount + closeOut.expenseCount > 0
-            ? `${closeOut.incomeCount} รายรับ · ${closeOut.expenseCount} รายจ่าย`
-            : "ยังไม่มีรายการในวันนี้"}
-        </p>
-      </div>
-
-      <CombinedProfitCard
-        regularProfit={periodData.profit}
-        boothProfit={boothProfit}
-        combinedProfit={combinedProfit}
-        currency={user.currency}
-      />
-
-      <div className="mt-6">
-        <h2 className="px-4 pb-2 text-sm font-medium text-rz-muted">รายการ</h2>
-        <EntryList
-          entries={entries}
-          currency={user.currency}
-          emptyHint="ไม่มีรายการในวันนี้"
-          readOnly
-          appearance="today"
-        />
-      </div>
-    </>
-  );
+function sharePercent(part: string, total: string): number {
+  const totalCents = toCents(total);
+  if (totalCents <= 0) return 0;
+  return (toCents(part) / totalCents) * 100;
 }
 
-function toBreakdownRows(
+function toCategoryProgressRows(
   items: CategoryBreakdownItem[],
   kind: "income" | "expense",
-): CategoryBreakdownRow[] {
+  totalAmount: string,
+): CategoryProgressRow[] {
   const labelFn = kind === "income" ? incomeCategoryLabel : expenseCategoryLabel;
   const iconFn = kind === "income" ? incomeCategoryIcon : expenseCategoryIcon;
-  const orderFn = kind === "income" ? incomeCategoryOrder : expenseCategoryOrder;
   return items
     .map((item) => ({
       category: item.category,
@@ -211,13 +53,9 @@ function toBreakdownRows(
       icon: iconFn(item.category),
       amount: item.amount,
       count: item.count,
+      percentage: sharePercent(item.amount, totalAmount),
     }))
-    .sort((a, b) => {
-      const oa = orderFn(a.category);
-      const ob = orderFn(b.category);
-      if (oa !== ob) return oa - ob;
-      return toCents(b.amount) - toCents(a.amount);
-    });
+    .sort((a, b) => toCents(b.amount) - toCents(a.amount));
 }
 
 function groupEntriesByCategory(
@@ -235,12 +73,147 @@ function groupEntriesByCategory(
   return map;
 }
 
-export function parseRegularStatsParams(params: { period?: string; date?: string }) {
-  const period: PeriodKey =
-    params.period && isValidPeriod(params.period) ? params.period : "today";
-  const bangkokToday = today();
-  let closeDate =
-    params.date && isValidDate(params.date) ? params.date : bangkokToday;
-  if (closeDate > bangkokToday) closeDate = bangkokToday;
-  return { period, closeDate };
+/** Regular-shop Stats — cards, chart, and progress breakdowns. */
+export async function RegularStatsSummary({
+  user,
+  period,
+}: {
+  user: User;
+  period: StatsPeriodKey;
+}) {
+  const { start, end } = periodRange(period);
+  const [
+    periodData,
+    cashTransfer,
+    fixedVariable,
+    breakdown,
+    periodIncomes,
+    periodExpenses,
+    dailySeries,
+  ] = await Promise.all([
+    periodSummary(user.id, period),
+    periodIncomeByCashTransfer(user.id, start, end),
+    periodExpenseByFixedVariable(user.id, start, end),
+    categoryBreakdown(user.id, start, end),
+    listIncomeInPeriod(user.id, start, end),
+    listExpenseInPeriod(user.id, start, end),
+    dailyProfitSeries(user.id, start, end),
+  ]);
+
+  const totalIncome = periodData.income;
+  const totalExpense = periodData.expense;
+  const entryTotal = periodData.incomeCount + periodData.expenseCount;
+
+  const incomeRows = toCategoryProgressRows(breakdown.income, "income", totalIncome);
+  const expenseRows = toCategoryProgressRows(breakdown.expense, "expense", totalExpense);
+  const incomeEntries = groupEntriesByCategory(periodIncomes);
+  const expenseEntries = groupEntriesByCategory(periodExpenses);
+
+  const useWeekdayLabels = period === "last_7";
+  const chartData = dailySeries.map((p) => ({
+    date: p.date,
+    label: useWeekdayLabels ? formatWeekdayShortThai(p.date) : formatDayShort(p.date),
+    profit: Number(p.profit),
+    profitDisplay: p.profit,
+  }));
+
+  return (
+    <>
+      <StatsPeriodSelector period={period} />
+
+      <div className="mt-4">
+        <StatsSummaryCards
+          income={totalIncome}
+          expense={totalExpense}
+          profit={periodData.profit}
+          currency={user.currency}
+        />
+        <p className="px-4 pt-2 text-center text-xs text-rz-hint">
+          {formatPeriodRangeLabel(periodData.start, periodData.end)}
+          {entryTotal > 0 && ` · ${entryTotal.toLocaleString()} รายการ`}
+        </p>
+      </div>
+
+      <section className="mt-6 px-4">
+        <h2 className="mb-2.5 text-sm font-medium text-rz-text">กำไรรายวัน</h2>
+        <div className="rounded-[14px] border-[0.5px] border-rz-border bg-rz-card p-3">
+          <DailyProfitChart data={chartData} currency={user.currency} />
+        </div>
+        <p className="mt-2 text-center">
+          <Link
+            href={`/summary/monthly?month=${currentMonth()}`}
+            className="text-sm font-medium text-rz-green"
+          >
+            ดูรายวันในเดือน →
+          </Link>
+        </p>
+      </section>
+
+      <div className="mt-6 space-y-6">
+        <BreakdownSection title="รายรับ">
+          <div className="divide-y divide-rz-border">
+            <ProgressBarRow
+              label="เงินสด"
+              amount={formatMoney(cashTransfer.cashIncome, user.currency)}
+              percentage={sharePercent(cashTransfer.cashIncome, totalIncome)}
+              tone="green"
+            />
+            <ProgressBarRow
+              label="เงินโอน"
+              amount={formatMoney(cashTransfer.transferIncome, user.currency)}
+              percentage={sharePercent(cashTransfer.transferIncome, totalIncome)}
+              tone="green"
+            />
+          </div>
+        </BreakdownSection>
+
+        <BreakdownSection title="ค่าใช้จ่าย">
+          <div className="divide-y divide-rz-border">
+            <ProgressBarRow
+              label="คงที่"
+              amount={formatMoney(fixedVariable.fixedExpense, user.currency)}
+              percentage={sharePercent(fixedVariable.fixedExpense, totalExpense)}
+              tone="red"
+            />
+            <ProgressBarRow
+              label="ผันแปร"
+              amount={formatMoney(fixedVariable.variableExpense, user.currency)}
+              percentage={sharePercent(fixedVariable.variableExpense, totalExpense)}
+              tone="red"
+            />
+          </div>
+        </BreakdownSection>
+
+        {incomeRows.length > 0 && (
+          <BreakdownSection title="รายรับตามหมวด">
+            <CategoryProgressList
+              rows={incomeRows}
+              entriesByCategory={incomeEntries}
+              currency={user.currency}
+              tone="income"
+            />
+          </BreakdownSection>
+        )}
+
+        {expenseRows.length > 0 && (
+          <BreakdownSection title="รายจ่ายตามหมวด">
+            <CategoryProgressList
+              rows={expenseRows}
+              entriesByCategory={expenseEntries}
+              currency={user.currency}
+              tone="expense"
+            />
+          </BreakdownSection>
+        )}
+      </div>
+    </>
+  );
+}
+
+export function parseRegularStatsParams(params: {
+  period?: string;
+  date?: string;
+}): { period: StatsPeriodKey } {
+  const period: StatsPeriodKey = params.period === "last_30" ? "last_30" : "last_7";
+  return { period };
 }

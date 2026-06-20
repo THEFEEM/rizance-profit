@@ -98,6 +98,18 @@ export type CategoryBreakdown = {
   expense: CategoryBreakdownItem[];
 };
 
+export type DailyProfitPoint = {
+  date: string;
+  income: string;
+  expense: string;
+  profit: string;
+};
+
+export type DailyExpensePoint = {
+  date: string;
+  expense: string;
+};
+
 export type DailySummary = {
   date: string; // YYYY-MM-DD
   income: string;

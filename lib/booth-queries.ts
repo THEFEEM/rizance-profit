@@ -15,7 +15,8 @@ import {
   type SplitProfitResult,
 } from "@/lib/booth-split";
 import { centsToDecimalString, computeProfit, sumDecimals, toCents } from "@/lib/money";
-import { today } from "@/lib/date";
+import { addDays, today } from "@/lib/date";
+import type { DailyProfitPoint } from "@/types";
 import type {
   Booth,
   BoothCostType,
@@ -424,6 +425,49 @@ export async function boothDaySummary(
     expense: r.expense,
     profit: computeProfit(r.income, r.expense),
   };
+}
+
+/** Per-day booth income/expense/profit — all event days filled with zero. */
+export async function boothDailyProfitSeries(
+  userId: string,
+  boothId: string,
+): Promise<DailyProfitPoint[]> {
+  const booth = await getBooth(userId, boothId);
+  if (!booth) return [];
+
+  const start = booth.startDate;
+  const end = booth.endDate;
+
+  const { rows } = await query<{ entry_date: string; income: string; expense: string }>(
+    `WITH combined AS (
+       SELECT entry_date, amount, 'income' AS type FROM booth_income_entries
+       WHERE booth_id = $1 AND user_id = $2 AND entry_date >= $3::date AND entry_date <= $4::date
+       UNION ALL
+       SELECT entry_date, amount, 'expense' AS type FROM booth_expense_entries
+       WHERE booth_id = $1 AND user_id = $2 AND entry_date >= $3::date AND entry_date <= $4::date
+     )
+     SELECT
+       to_char(entry_date, 'YYYY-MM-DD') AS entry_date,
+       COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0)::text AS income,
+       COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0)::text AS expense
+     FROM combined
+     GROUP BY entry_date
+     ORDER BY entry_date ASC`,
+    [boothId, userId, start, end],
+  );
+
+  const byDate = new Map(rows.map((r) => [r.entry_date, { income: r.income, expense: r.expense }]));
+  const series: DailyProfitPoint[] = [];
+  for (let d = start; d <= end; d = addDays(d, 1)) {
+    const row = byDate.get(d) ?? { income: "0.00", expense: "0.00" };
+    series.push({
+      date: d,
+      income: row.income,
+      expense: row.expense,
+      profit: computeProfit(row.income, row.expense),
+    });
+  }
+  return series;
 }
 
 export async function listBoothIncomeByDate(

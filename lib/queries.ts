@@ -4,6 +4,7 @@ import type {
   AllTimeSummary,
   CategoryBreakdown,
   CategoryBreakdownItem,
+  DailyProfitPoint,
   DailySummary,
   Expense,
   ExpenseCategory,
@@ -16,7 +17,7 @@ import type {
   User,
 } from "@/types";
 import type { ExpenseInput, IncomeInput } from "@/lib/validation";
-import { monthRange, periodRange, today } from "@/lib/date";
+import { addDays, monthRange, periodRange, today } from "@/lib/date";
 import { isFixed } from "@/lib/expense-categories";
 import { centsToDecimalString } from "@/lib/money";
 
@@ -376,6 +377,44 @@ export async function periodExpenseByFixedVariable(
     fixedExpense: centsToDecimalString(fixedCents),
     variableExpense: centsToDecimalString(variableCents),
   };
+}
+
+/** Per-day income/expense/profit for a date range — missing days filled with zero. */
+export async function dailyProfitSeries(
+  userId: string,
+  start: string,
+  end: string,
+): Promise<DailyProfitPoint[]> {
+  const { rows } = await query<{ entry_date: string; income: string; expense: string }>(
+    `WITH combined AS (
+       SELECT entry_date, amount, 'income' AS type FROM income_entries
+       WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date
+       UNION ALL
+       SELECT entry_date, amount, 'expense' AS type FROM expense_entries
+       WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date
+     )
+     SELECT
+       to_char(entry_date, 'YYYY-MM-DD') AS entry_date,
+       COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0)::text AS income,
+       COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0)::text AS expense
+     FROM combined
+     GROUP BY entry_date
+     ORDER BY entry_date ASC`,
+    [userId, start, end],
+  );
+
+  const byDate = new Map(rows.map((r) => [r.entry_date, { income: r.income, expense: r.expense }]));
+  const series: DailyProfitPoint[] = [];
+  for (let d = start; d <= end; d = addDays(d, 1)) {
+    const row = byDate.get(d) ?? { income: "0.00", expense: "0.00" };
+    series.push({
+      date: d,
+      income: row.income,
+      expense: row.expense,
+      profit: computeProfit(row.income, row.expense),
+    });
+  }
+  return series;
 }
 
 export async function dailySummary(userId: string, date: string): Promise<DailySummary> {

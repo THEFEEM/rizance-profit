@@ -5,7 +5,7 @@ import {
   listProjectExpense,
   listProjectIncome,
 } from "@/lib/project-queries";
-import { summarizeActivity } from "@/lib/project-summary";
+import { orgDailyExpenseSeries, summarizeActivity } from "@/lib/project-summary";
 import { getCurrentUser } from "@/lib/session";
 import { ProjectActivitySummaryView } from "@/components/project/summary/ProjectActivitySummaryView";
 
@@ -26,10 +26,11 @@ export default async function ActivitySummaryPage({
   ]);
   if (!project || !activity) notFound();
 
-  const [summary, incomes, expenses] = await Promise.all([
+  const [summary, incomes, expenses, dailySeries] = await Promise.all([
     summarizeActivity(user.id, id, aid),
     listProjectIncome(user.id, aid),
     listProjectExpense(user.id, aid),
+    orgDailyExpenseSeries(user.id, id, aid),
   ]);
   if (!summary) notFound();
 
@@ -40,6 +41,7 @@ export default async function ActivitySummaryPage({
       summary={summary}
       incomes={incomes}
       expenses={expenses}
+      dailySeries={dailySeries}
       currency={user.currency}
       backHref={`/projects/${id}/activities/${aid}`}
     />

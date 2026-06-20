@@ -9,7 +9,6 @@ import {
 } from "@/components/stats/RegularStatsSummary";
 import {
   BoothStatsSummary,
-  parseBoothStatsDate,
 } from "@/components/stats/BoothStatsSummary";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +33,7 @@ export default async function StatsSummaryPage({
     redirect(`/projects/${ctx.projectId}/summary`);
   }
 
-  const { period, closeDate } = parseRegularStatsParams(params);
+  const { period } = parseRegularStatsParams(params);
 
   return (
     <div className="pb-6">
@@ -48,13 +47,9 @@ export default async function StatsSummaryPage({
       </div>
 
       {ctx.mode === "regular" ? (
-        <RegularStatsSummary user={user} period={period} closeDate={closeDate} />
+        <RegularStatsSummary user={user} period={period} />
       ) : (
-        <BoothStatsSummary
-          user={user}
-          booth={ctx.booth}
-          closeDate={parseBoothStatsDate(ctx.booth, params)}
-        />
+        <BoothStatsSummary user={user} booth={ctx.booth} />
       )}
     </div>
   );
