@@ -10,12 +10,14 @@ export function CategoryGrid<T extends string>({
   value: T;
   onChange: (value: T) => void;
   columns?: 2 | 3 | 4;
-  accent?: "green" | "amber";
+  accent?: "green" | "amber" | "rose";
 }) {
   const active =
-    accent === "amber"
-      ? "border-rz-amber bg-rz-amber text-rz-bg"
-      : "border-rz-green bg-rz-green text-rz-bg";
+    accent === "rose"
+      ? "border-rz-rose bg-rz-rose text-rz-bg"
+      : accent === "amber"
+        ? "border-rz-amber bg-rz-amber text-rz-bg"
+        : "border-rz-green bg-rz-green text-rz-bg";
   const idle =
     "border-rz-border bg-rz-card text-rz-text active:bg-rz-elevated";
 

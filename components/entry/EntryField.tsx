@@ -3,7 +3,7 @@ import { forwardRef, useId } from "react";
 type Props = React.InputHTMLAttributes<HTMLInputElement> & {
   label?: string;
   error?: string | null;
-  accent?: "green" | "amber" | "blue";
+  accent?: "green" | "amber" | "blue" | "rose";
 };
 
 /** Dark-themed field for +In / −Out entry screens. */
@@ -14,7 +14,9 @@ export const EntryField = forwardRef<HTMLInputElement, Props>(function EntryFiel
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const focusBorder =
-    accent === "amber"
+    accent === "rose"
+      ? "focus:border-rz-rose"
+      : accent === "amber"
       ? "focus:border-rz-amber"
       : accent === "blue"
         ? "focus:border-rz-purple"

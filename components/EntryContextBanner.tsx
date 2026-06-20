@@ -1,6 +1,6 @@
 /** Display-only banner showing which ledger entries will be recorded into. */
 export function EntryContextBanner(
-  props: { target: "regular" } | { target: "booth"; name: string },
+  props: { target: "regular" } | { target: "personal" } | { target: "booth"; name: string },
 ) {
   if (props.target === "regular") {
     return (
@@ -9,6 +9,17 @@ export function EntryContextBanner(
         className="mx-4 mb-2 rounded-[11px] border-[0.5px] border-rz-green/30 bg-rz-green/10 px-3 py-2 text-center text-sm text-rz-muted"
       >
         บันทึกเข้า: <span className="font-medium text-rz-green">ร้านประจำ</span>
+      </div>
+    );
+  }
+
+  if (props.target === "personal") {
+    return (
+      <div
+        data-entry-context="personal"
+        className="mx-4 mb-2 rounded-[11px] border-[0.5px] border-rz-rose/40 bg-rz-rose/10 px-3 py-2 text-center text-sm text-rz-muted"
+      >
+        บันทึกเข้า: <span className="font-medium text-rz-rose">บุคคล</span>
       </div>
     );
   }

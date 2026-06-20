@@ -1,11 +1,26 @@
+import { redirect } from "next/navigation";
+import { PersonalEntryForm } from "@/components/personal/PersonalEntryForm";
+import { listPersonalEntriesAll } from "@/lib/personal-queries";
+import { getCurrentUser } from "@/lib/session";
+
 export const dynamic = "force-dynamic";
 
-/** Placeholder — GROUP 2 will add PersonalEntryForm. */
-export default function PersonalEntryPage() {
+export default async function PersonalEntryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  const { tab } = await searchParams;
+  const entries = await listPersonalEntriesAll(user.id, 20);
+
   return (
-    <div className="px-4 py-10 text-center">
-      <h1 className="text-lg font-medium text-rz-text">บันทึกรายการ</h1>
-      <p className="mt-2 text-sm text-rz-hint">ฟอร์มบุคคล — GROUP 2</p>
-    </div>
+    <PersonalEntryForm
+      initialTab={tab}
+      entries={entries}
+      currency={user.currency}
+    />
   );
 }
