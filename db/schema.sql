@@ -63,6 +63,22 @@ CREATE INDEX IF NOT EXISTS idx_income_user_date  ON income_entries  (user_id, en
 CREATE INDEX IF NOT EXISTS idx_expense_user_date ON expense_entries (user_id, entry_date);
 
 -- =========================================================
+-- shop_members — shop partnership / equity split (E7)
+-- investor + manager only; no wages (salary = expense entry)
+-- =========================================================
+CREATE TABLE IF NOT EXISTS shop_members (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name              VARCHAR(120) NOT NULL,
+  role              VARCHAR(20) NOT NULL DEFAULT 'investor'
+    CHECK (role IN ('investor', 'manager')),
+  investment_amount NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (investment_amount >= 0),
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_shop_members_user ON shop_members (user_id);
+
+
+-- =========================================================
 -- Cost & Pricing (computed costs never stored)
 -- =========================================================
 CREATE TABLE IF NOT EXISTS ingredients (
