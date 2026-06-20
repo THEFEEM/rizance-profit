@@ -43,10 +43,15 @@ import type { ExpenseCategoryKey, IncomeCategoryKey } from "@/lib/expense-catego
 export type IncomeCategory = IncomeCategoryKey;
 export type ExpenseCategory = ExpenseCategoryKey;
 
+export type AuthProvider = "email" | "google" | "both";
+
 export type User = {
   id: string;
   email: string;
   shopName: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  authProvider: AuthProvider;
   currency: string;
   monthlyBudget: string | null;
   createdAt: string;

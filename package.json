@@ -35,6 +35,7 @@
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "google-auth-library": "^10.7.0",
     "jose": "^6.2.3",
     "next": "16.2.7",
     "pg": "^8.21.0",

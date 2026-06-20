@@ -11,10 +11,15 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE TABLE IF NOT EXISTS users (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email         VARCHAR(255) UNIQUE NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
+  password_hash VARCHAR(255),
   shop_name     VARCHAR(120) NOT NULL,
   currency      CHAR(3)      NOT NULL DEFAULT 'THB',
   monthly_budget NUMERIC(12,2),
+  google_id     VARCHAR(255) UNIQUE,
+  display_name  VARCHAR(160),
+  avatar_url    TEXT,
+  auth_provider VARCHAR(20) NOT NULL DEFAULT 'email'
+    CHECK (auth_provider IN ('email', 'google', 'both')),
   created_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
   updated_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
 );

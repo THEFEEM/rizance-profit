@@ -2,6 +2,7 @@ import { query } from "@/lib/db";
 import { computeProfit, sumDecimals, toCents } from "@/lib/money";
 import type {
   AllTimeSummary,
+  AuthProvider,
   CategoryBreakdown,
   CategoryBreakdownItem,
   DailyProfitPoint,
@@ -29,6 +30,10 @@ type UserRow = {
   shop_name: string;
   currency: string;
   monthly_budget: string | null;
+  google_id: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  auth_provider: string;
   created_at: Date | string;
 };
 
@@ -41,13 +46,17 @@ function mapUser(r: UserRow): User {
     id: r.id,
     email: r.email,
     shopName: r.shop_name,
+    displayName: r.display_name,
+    avatarUrl: r.avatar_url,
+    authProvider: r.auth_provider as AuthProvider,
     currency: r.currency,
     monthlyBudget: r.monthly_budget,
     createdAt: toIso(r.created_at),
   };
 }
 
-const USER_RETURN = `id, email, shop_name, currency, monthly_budget::text AS monthly_budget, created_at`;
+const USER_RETURN = `id, email, shop_name, currency, monthly_budget::text AS monthly_budget,
+  google_id, display_name, avatar_url, auth_provider, created_at`;
 
 type IncomeRow = {
   id: string;
@@ -86,7 +95,7 @@ function mapExpense(r: ExpenseRow): Expense {
 
 // ---- auth -----------------------------------------------------------------
 
-export type UserWithHash = User & { passwordHash: string };
+export type UserWithHash = User & { passwordHash: string | null };
 
 export async function createUser(params: {
   email: string;
@@ -94,8 +103,8 @@ export async function createUser(params: {
   shopName: string;
 }): Promise<User> {
   const { rows } = await query<UserRow>(
-    `INSERT INTO users (email, password_hash, shop_name)
-     VALUES ($1, $2, $3)
+    `INSERT INTO users (email, password_hash, shop_name, auth_provider)
+     VALUES ($1, $2, $3, 'email')
      RETURNING ${USER_RETURN}`,
     [params.email, params.passwordHash, params.shopName],
   );
@@ -103,13 +112,62 @@ export async function createUser(params: {
 }
 
 export async function findUserByEmail(email: string): Promise<UserWithHash | null> {
-  const { rows } = await query<UserRow & { password_hash: string }>(
-    `SELECT id, email, password_hash, shop_name, currency, monthly_budget::text AS monthly_budget, created_at
+  const { rows } = await query<UserRow & { password_hash: string | null }>(
+    `SELECT id, email, password_hash, shop_name, currency, monthly_budget::text AS monthly_budget,
+            google_id, display_name, avatar_url, auth_provider, created_at
      FROM users WHERE email = $1`,
     [email],
   );
   if (!rows[0]) return null;
   return { ...mapUser(rows[0]), passwordHash: rows[0].password_hash };
+}
+
+export async function findUserByGoogleId(googleId: string): Promise<User | null> {
+  const { rows } = await query<UserRow>(
+    `SELECT ${USER_RETURN} FROM users WHERE google_id = $1`,
+    [googleId],
+  );
+  return rows[0] ? mapUser(rows[0]) : null;
+}
+
+export async function createGoogleUser(params: {
+  email: string;
+  googleId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  shopName: string;
+}): Promise<User> {
+  const { rows } = await query<UserRow>(
+    `INSERT INTO users (email, google_id, display_name, avatar_url, shop_name, auth_provider, password_hash)
+     VALUES ($1, $2, $3, $4, $5, 'google', NULL)
+     RETURNING ${USER_RETURN}`,
+    [
+      params.email,
+      params.googleId,
+      params.displayName,
+      params.avatarUrl,
+      params.shopName,
+    ],
+  );
+  return mapUser(rows[0]);
+}
+
+export async function linkGoogleAccount(
+  userId: string,
+  googleId: string,
+  avatarUrl?: string | null,
+): Promise<User | null> {
+  const { rows } = await query<UserRow>(
+    `UPDATE users
+     SET google_id = $2,
+         avatar_url = COALESCE($3, avatar_url),
+         auth_provider = 'both',
+         updated_at = now()
+     WHERE id = $1
+     RETURNING ${USER_RETURN}`,
+    [userId, googleId, avatarUrl ?? null],
+  );
+  return rows[0] ? mapUser(rows[0]) : null;
 }
 
 export async function findUserById(id: string): Promise<User | null> {
