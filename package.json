@@ -33,7 +33,8 @@
     "test:project-queries": "node scripts/test-project-queries.mjs",
     "test:project-summary": "node scripts/test-project-summary.mjs",
     "test:fix-pack-h-logic": "node scripts/test-fix-pack-h-logic.mjs",
-    "test:fix-pack-i-logic": "node scripts/test-fix-pack-i-logic.mjs"
+    "test:fix-pack-i-logic": "node scripts/test-fix-pack-i-logic.mjs",
+    "test:subscription": "node scripts/test-subscription.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
