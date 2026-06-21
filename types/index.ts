@@ -78,6 +78,8 @@ export type Expense = {
   note: string | null;
   entryDate: string; // YYYY-MM-DD
   createdAt: string;
+  isAdvance?: boolean;
+  payerName?: string | null;
 };
 
 export const PERIOD_KEYS = ["today", "month", "last_7", "last_14", "last_30"] as const;

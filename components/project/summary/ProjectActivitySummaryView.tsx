@@ -20,6 +20,7 @@ import { BreakdownSection, ProgressBarRow } from "@/components/stats/BreakdownSe
 import { CategoryProgressList } from "@/components/stats/CategoryProgressList";
 import { ProjectEntryList } from "@/components/project/ProjectEntryList";
 import { ActivitySummaryHeader } from "@/components/project/summary/ProjectSummaryHeader";
+import { ProjectAdvanceCreditorsSection } from "@/components/project/summary/ProjectAdvanceCreditorsSection";
 
 function chartDataFromSeries(series: DailyExpensePoint[], useWeekdayLabels: boolean) {
   return series.map((p) => ({
@@ -99,6 +100,11 @@ export function ProjectActivitySummaryView({
           />
         </div>
       </section>
+
+      <ProjectAdvanceCreditorsSection
+        advanceByPayer={summary.advanceByPayer}
+        currency={currency}
+      />
 
       <div className="mt-6 space-y-6">
         {fundRows.length > 0 && (

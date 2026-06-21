@@ -95,12 +95,22 @@ export const incomeSchema = z.object({
   entryDate,
 });
 
-export const expenseSchema = z.object({
-  amount,
-  category: expenseCategory,
-  note,
-  entryDate,
-});
+export const expenseSchema = z
+  .object({
+    amount,
+    category: expenseCategory,
+    note,
+    entryDate,
+    isAdvance: z.boolean().optional(),
+    payerName: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() !== "" ? v.trim() : undefined),
+      z.string().max(120).optional(),
+    ),
+  })
+  .refine((d) => !d.isAdvance || d.payerName, {
+    message: "กรุณาระบุชื่อผู้จ่ายล่วงหน้า",
+    path: ["payerName"],
+  });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

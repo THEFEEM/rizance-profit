@@ -58,6 +58,8 @@ CREATE TABLE IF NOT EXISTS expense_entries (
              )),
   note       VARCHAR(255),
   entry_date DATE NOT NULL,
+  is_advance BOOLEAN NOT NULL DEFAULT false,
+  payer_name VARCHAR(120),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -380,6 +382,7 @@ CREATE TABLE IF NOT EXISTS savings_goals (
   user_id UUID NOT NULL REFERENCES users(id),
   name VARCHAR(160) NOT NULL,
   target_amount NUMERIC(12,2) NOT NULL CHECK (target_amount > 0),
+  current_amount NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (current_amount >= 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_savings_goals_user

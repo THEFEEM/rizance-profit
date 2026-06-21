@@ -14,17 +14,21 @@ export function TodayBalanceCard({
   todayProfit,
   cashInHand,
   currency = "THB",
+  salesLabel = "ยอดขายรวม",
+  profitLabel = "กำไรสะสม",
 }: {
   totalSales: string;
   cumulativeProfit: string;
   todayProfit: string;
   cashInHand?: string;
   currency?: string;
+  salesLabel?: string;
+  profitLabel?: string;
 }) {
   return (
     <section className="px-4 pt-3">
       <div className="rounded-[14px] border-[0.5px] border-rz-border bg-rz-card px-[18px] py-[18px]">
-        <p className="text-[11px] text-rz-hint">ยอดขายรวม</p>
+        <p className="text-[11px] text-rz-hint">{salesLabel}</p>
         <p className="rz-tabular mt-1 break-all text-[32px] font-medium leading-tight tracking-[-0.5px] text-rz-green">
           {formatMoney(totalSales, currency)}
         </p>
@@ -33,7 +37,7 @@ export function TodayBalanceCard({
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <p className="text-[11px] text-rz-hint">กำไรสะสม</p>
+            <p className="text-[11px] text-rz-hint">{profitLabel}</p>
             <p
               className={`rz-tabular mt-0.5 text-base font-medium ${profitColor(cumulativeProfit)}`}
             >

@@ -5,21 +5,26 @@ import { BoothSummaryLegend } from "@/components/booth/summary/BoothSummaryLegen
 import { BoothSummaryNetCard } from "@/components/booth/summary/BoothSummaryNetCard";
 import { BoothSummaryPLCard } from "@/components/booth/summary/BoothSummaryPLCard";
 import { BoothSummarySplitCard } from "@/components/booth/summary/BoothSummarySplitCard";
+import { BoothSummaryCategorySection } from "@/components/booth/summary/BoothSummaryCategorySection";
+import { BoothAdvanceCreditorsSection } from "@/components/booth/summary/BoothAdvanceCreditorsSection";
 import type { BoothSummary, SplitProfitResult } from "@/types/booth";
 
 /** Full booth summary page layout — presentation only, spec §1 order. */
 export function BoothSummaryView({
   boothId,
+  userId,
   summary,
   split,
   currency = "THB",
 }: {
   boothId: string;
+  userId: string;
   summary: BoothSummary;
   split: SplitProfitResult | null;
   currency?: string;
 }) {
   const closed = summary.booth.status === "closed";
+  const entryExpenseTotal = summary.entryExpense;
 
   return (
     <div className="pb-6">
@@ -35,6 +40,12 @@ export function BoothSummaryView({
         <>
           <BoothSummarySplitCard split={split} currency={currency} />
           <BoothSummaryEmployeeCards split={split} currency={currency} />
+          <BoothAdvanceCreditorsSection
+            userId={userId}
+            boothId={boothId}
+            split={split}
+            currency={currency}
+          />
           <BoothSummaryLegend />
           <BoothSummaryNetCard split={split} currency={currency} />
         </>
@@ -42,6 +53,15 @@ export function BoothSummaryView({
         <p className="mt-6 px-4 pb-8 text-center text-sm text-rz-hint">
           ไม่สามารถคำนวณการแบ่งกำไรได้
         </p>
+      )}
+      {closed && (
+        <BoothSummaryCategorySection
+          userId={userId}
+          boothId={boothId}
+          totalIncome={summary.totalIncome}
+          totalExpense={entryExpenseTotal}
+          currency={currency}
+        />
       )}
     </div>
   );

@@ -60,6 +60,8 @@ export function ShopEntryForm({
   const [expenseCategory, setExpenseCategory] = useState<ExpenseCategoryKey>("materials");
   const [expenseNote, setExpenseNote] = useState("");
   const [expenseDate, setExpenseDate] = useState(today());
+  const [expenseAdvance, setExpenseAdvance] = useState(false);
+  const [expensePayerName, setExpensePayerName] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +99,11 @@ export function ShopEntryForm({
         setError(res.fields?.amount?.[0] ?? res.message);
       }
     } else {
+      if (expenseAdvance && !expensePayerName.trim()) {
+        setError("กรุณาระบุชื่อผู้จ่ายล่วงหน้า");
+        setSaving(false);
+        return;
+      }
       const res = await apiFetch<Expense>("/api/expense", {
         method: "POST",
         body: JSON.stringify({
@@ -104,6 +111,8 @@ export function ShopEntryForm({
           category: expenseCategory,
           note: expenseNote.trim() || undefined,
           entryDate: expenseDate,
+          isAdvance: expenseAdvance || undefined,
+          payerName: expenseAdvance ? expensePayerName.trim() : undefined,
         }),
       });
       if (res.ok) {
@@ -163,6 +172,10 @@ export function ShopEntryForm({
             onDateChange={setExpenseDate}
             maxDate={maxDate}
             disabled={saving}
+            isAdvance={expenseAdvance}
+            onAdvanceChange={setExpenseAdvance}
+            payerName={expensePayerName}
+            onPayerNameChange={setExpensePayerName}
           />
         )}
 

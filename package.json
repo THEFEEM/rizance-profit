@@ -31,7 +31,8 @@
     "test:combined-summary": "node scripts/test-combined-summary.mjs",
     "test:project-categories": "node scripts/test-project-categories.mjs",
     "test:project-queries": "node scripts/test-project-queries.mjs",
-    "test:project-summary": "node scripts/test-project-summary.mjs"
+    "test:project-summary": "node scripts/test-project-summary.mjs",
+    "test:fix-pack-h-logic": "node scripts/test-fix-pack-h-logic.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

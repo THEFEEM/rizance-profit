@@ -11,6 +11,10 @@ export function RegularExpenseFields({
   onDateChange,
   maxDate,
   disabled = false,
+  isAdvance = false,
+  onAdvanceChange,
+  payerName = "",
+  onPayerNameChange,
 }: {
   category: ExpenseCategoryKey;
   onCategoryChange: (v: ExpenseCategoryKey) => void;
@@ -20,6 +24,10 @@ export function RegularExpenseFields({
   onDateChange: (v: string) => void;
   maxDate: string;
   disabled?: boolean;
+  isAdvance?: boolean;
+  onAdvanceChange?: (v: boolean) => void;
+  payerName?: string;
+  onPayerNameChange?: (v: string) => void;
 }) {
   return (
     <>
@@ -33,6 +41,31 @@ export function RegularExpenseFields({
           accent="green"
         />
       </div>
+
+      {onAdvanceChange && (
+        <label className="flex items-center gap-2 text-sm text-rz-text">
+          <input
+            type="checkbox"
+            checked={isAdvance}
+            disabled={disabled}
+            onChange={(e) => onAdvanceChange(e.target.checked)}
+            className="h-4 w-4 rounded border-rz-border"
+          />
+          ออกเงินก่อน (เจ้าหนี้)
+        </label>
+      )}
+
+      {isAdvance && onPayerNameChange && (
+        <EntryField
+          label="ชื่อผู้จ่ายล่วงหน้า"
+          placeholder="เช่น ชื่อหุ้นส่วน / ผู้ให้กู้"
+          value={payerName}
+          onChange={(e) => onPayerNameChange(e.target.value)}
+          maxLength={120}
+          disabled={disabled}
+          accent="green"
+        />
+      )}
 
       <EntryField
         label="บันทึกเพิ่มเติม (ไม่บังคับ)"

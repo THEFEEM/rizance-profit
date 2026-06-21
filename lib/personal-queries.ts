@@ -1,4 +1,5 @@
 import { query } from "@/lib/db";
+import { isUndefinedColumnError } from "@/lib/db-migration-guard";
 import { addDays, today } from "@/lib/date";
 import { computeProfit, toCents } from "@/lib/money";
 import type { PersonalExpenseInput, PersonalIncomeInput } from "@/lib/personal-validation";
@@ -322,6 +323,7 @@ type SavingsGoalRow = {
   user_id: string;
   name: string;
   target_amount: string;
+  current_amount?: string;
   created_at: Date | string;
 };
 
@@ -331,9 +333,15 @@ function mapSavingsGoal(r: SavingsGoalRow): SavingsGoal {
     userId: r.user_id,
     name: r.name,
     targetAmount: r.target_amount,
+    currentAmount: r.current_amount ?? "0.00",
     createdAt: toIso(r.created_at),
   };
 }
+
+const SAVINGS_GOAL_RETURN = `id, user_id, name, target_amount::text AS target_amount,
+  current_amount::text AS current_amount, created_at`;
+
+const SAVINGS_GOAL_RETURN_LEGACY = `id, user_id, name, target_amount::text AS target_amount, created_at`;
 
 export async function listPersonalIncomesInPeriod(
   userId: string,
@@ -366,27 +374,109 @@ export async function listPersonalExpensesInPeriod(
 }
 
 export async function listSavingsGoals(userId: string): Promise<SavingsGoal[]> {
-  const { rows } = await query<SavingsGoalRow>(
-    `SELECT id, user_id, name, target_amount::text AS target_amount, created_at
-     FROM savings_goals
-     WHERE user_id = $1
-     ORDER BY created_at ASC`,
-    [userId],
-  );
-  return rows.map(mapSavingsGoal);
+  try {
+    const { rows } = await query<SavingsGoalRow>(
+      `SELECT ${SAVINGS_GOAL_RETURN}
+       FROM savings_goals
+       WHERE user_id = $1
+       ORDER BY created_at ASC`,
+      [userId],
+    );
+    return rows.map(mapSavingsGoal);
+  } catch (err) {
+    if (!isUndefinedColumnError(err)) throw err;
+    const { rows } = await query<SavingsGoalRow>(
+      `SELECT ${SAVINGS_GOAL_RETURN_LEGACY}
+       FROM savings_goals
+       WHERE user_id = $1
+       ORDER BY created_at ASC`,
+      [userId],
+    );
+    return rows.map(mapSavingsGoal);
+  }
 }
 
 export async function createSavingsGoal(
   userId: string,
-  input: { name: string; targetAmount: number },
+  input: { name: string; targetAmount: number; currentAmount?: number },
 ): Promise<SavingsGoal> {
-  const { rows } = await query<SavingsGoalRow>(
-    `INSERT INTO savings_goals (user_id, name, target_amount)
-     VALUES ($1, $2, $3)
-     RETURNING id, user_id, name, target_amount::text AS target_amount, created_at`,
-    [userId, input.name, input.targetAmount.toFixed(2)],
-  );
-  return mapSavingsGoal(rows[0]);
+  const current = (input.currentAmount ?? 0).toFixed(2);
+  try {
+    const { rows } = await query<SavingsGoalRow>(
+      `INSERT INTO savings_goals (user_id, name, target_amount, current_amount)
+       VALUES ($1, $2, $3, $4)
+       RETURNING ${SAVINGS_GOAL_RETURN}`,
+      [userId, input.name, input.targetAmount.toFixed(2), current],
+    );
+    return mapSavingsGoal(rows[0]);
+  } catch (err) {
+    if (!isUndefinedColumnError(err)) throw err;
+    const { rows } = await query<SavingsGoalRow>(
+      `INSERT INTO savings_goals (user_id, name, target_amount)
+       VALUES ($1, $2, $3)
+       RETURNING ${SAVINGS_GOAL_RETURN_LEGACY}`,
+      [userId, input.name, input.targetAmount.toFixed(2)],
+    );
+    return mapSavingsGoal(rows[0]);
+  }
+}
+
+export async function updateSavingsGoal(
+  userId: string,
+  id: string,
+  patch: { name?: string; targetAmount?: number; currentAmount?: number },
+): Promise<SavingsGoal | null> {
+  const sets: string[] = [];
+  const params: unknown[] = [userId, id];
+  let idx = 3;
+
+  if (patch.name !== undefined) {
+    sets.push(`name = $${idx++}`);
+    params.push(patch.name);
+  }
+  if (patch.targetAmount !== undefined) {
+    sets.push(`target_amount = $${idx++}`);
+    params.push(patch.targetAmount.toFixed(2));
+  }
+  if (patch.currentAmount !== undefined) {
+    sets.push(`current_amount = $${idx++}`);
+    params.push(patch.currentAmount.toFixed(2));
+  }
+  if (sets.length === 0) return null;
+
+  try {
+    const { rows } = await query<SavingsGoalRow>(
+      `UPDATE savings_goals SET ${sets.join(", ")}
+       WHERE id = $2 AND user_id = $1
+       RETURNING ${SAVINGS_GOAL_RETURN}`,
+      params,
+    );
+    return rows[0] ? mapSavingsGoal(rows[0]) : null;
+  } catch (err) {
+    if (!isUndefinedColumnError(err)) throw err;
+    if (patch.currentAmount !== undefined) return null;
+
+    const legacySets: string[] = [];
+    const legacyParams: unknown[] = [userId, id];
+    let legacyIdx = 3;
+    if (patch.name !== undefined) {
+      legacySets.push(`name = $${legacyIdx++}`);
+      legacyParams.push(patch.name);
+    }
+    if (patch.targetAmount !== undefined) {
+      legacySets.push(`target_amount = $${legacyIdx++}`);
+      legacyParams.push(patch.targetAmount.toFixed(2));
+    }
+    if (legacySets.length === 0) return null;
+
+    const { rows } = await query<SavingsGoalRow>(
+      `UPDATE savings_goals SET ${legacySets.join(", ")}
+       WHERE id = $2 AND user_id = $1
+       RETURNING ${SAVINGS_GOAL_RETURN_LEGACY}`,
+      legacyParams,
+    );
+    return rows[0] ? mapSavingsGoal(rows[0]) : null;
+  }
 }
 
 export async function deleteSavingsGoal(userId: string, id: string): Promise<boolean> {
