@@ -39,3 +39,38 @@ export function isSubscriptionTier(value: string): value is SubscriptionTier {
 export function findPlan(tier: PaidSubscriptionTier, periodDays: number): SubscriptionPlan | undefined {
   return SUBSCRIPTION_PLANS.find((p) => p.tier === tier && p.periodDays === periodDays);
 }
+
+export type SubscriptionCycle = "period" | "year";
+
+export type TierPlan = {
+  amountTHB: number;
+  periodDays: number;
+};
+
+export function isPaidSubscriptionTier(tier: string): tier is PaidSubscriptionTier {
+  return isSubscriptionTier(tier) && tier !== "free";
+}
+
+/** Server-side price map — never trust client-supplied amounts. */
+export function getTierPlan(tier: string, cycle: SubscriptionCycle = "period"): TierPlan {
+  if (!isPaidSubscriptionTier(tier)) {
+    throw new Error(`Invalid subscription tier: ${tier}`);
+  }
+
+  if (cycle === "year") {
+    if (tier !== "org_pro") {
+      throw new Error(`Annual billing not available for tier: ${tier}`);
+    }
+    const annual = findPlan("org_pro", 365);
+    if (!annual) throw new Error(`No annual plan for tier: ${tier}`);
+    return { amountTHB: annual.priceBaht, periodDays: annual.periodDays };
+  }
+
+  const monthly = SUBSCRIPTION_PLANS.find((p) => p.tier === tier && p.periodDays !== 365);
+  if (!monthly) throw new Error(`Invalid subscription tier: ${tier}`);
+  return { amountTHB: monthly.priceBaht, periodDays: monthly.periodDays };
+}
+
+export function planLabel(tier: PaidSubscriptionTier, periodDays: number): string {
+  return findPlan(tier, periodDays)?.label ?? tier;
+}
