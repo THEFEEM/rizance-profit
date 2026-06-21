@@ -24,6 +24,7 @@ export type EntryRow = {
   note: string | null;
   category?: ExpenseCategoryKey | IncomeCategoryKey | string;
   createdAt: string;
+  savingsGoalName?: string;
 };
 
 function entryCategoryKey(e: EntryRow): string {
@@ -46,9 +47,11 @@ function entryTitle(e: EntryRow, ledger: "shop" | "personal"): string {
 
 function entryCategoryLabel(e: EntryRow, ledger: "shop" | "personal"): string {
   if (ledger === "personal") {
-    return e.kind === "income"
-      ? personalIncomeLabel(e.category ?? "other_income")
-      : personalExpenseLabel(e.category ?? "other_expense");
+    const base =
+      e.kind === "income"
+        ? personalIncomeLabel(e.category ?? "other_income")
+        : personalExpenseLabel(e.category ?? "other_expense");
+    return e.savingsGoalName ? `${base} · ${e.savingsGoalName}` : base;
   }
   return e.kind === "income"
     ? incomeCategoryLabel(e.category ?? "storefront")

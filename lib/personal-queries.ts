@@ -2,6 +2,10 @@ import { query } from "@/lib/db";
 import { isUndefinedColumnError } from "@/lib/db-migration-guard";
 import { addDays, today } from "@/lib/date";
 import { computeProfit, toCents } from "@/lib/money";
+import {
+  PERSONAL_SAVINGS_DEPOSIT,
+  PERSONAL_SAVINGS_WITHDRAWAL,
+} from "@/lib/personal-categories";
 import type { PersonalExpenseInput, PersonalIncomeInput } from "@/lib/personal-validation";
 import type {
   PersonalCategoryBreakdownItem,
@@ -11,6 +15,7 @@ import type {
   PersonalIncome,
   PersonalSummary,
   SavingsGoal,
+  SavingsTransaction,
 } from "@/types/personal";
 
 type IncomeRow = {
@@ -21,9 +26,13 @@ type IncomeRow = {
   note: string | null;
   entry_date: string;
   created_at: Date | string;
+  savings_goal_id?: string | null;
+  is_savings_withdrawal?: boolean;
 };
 
-type ExpenseRow = IncomeRow;
+type ExpenseRow = IncomeRow & {
+  is_savings_deposit?: boolean;
+};
 
 function toIso(v: Date | string): string {
   return v instanceof Date ? v.toISOString() : String(v);
@@ -38,6 +47,8 @@ function mapIncome(r: IncomeRow): PersonalIncome {
     note: r.note,
     entryDate: r.entry_date,
     createdAt: toIso(r.created_at),
+    savingsGoalId: r.savings_goal_id ?? null,
+    isSavingsWithdrawal: r.is_savings_withdrawal ?? false,
   };
 }
 
@@ -50,20 +61,96 @@ function mapExpense(r: ExpenseRow): PersonalExpense {
     note: r.note,
     entryDate: r.entry_date,
     createdAt: toIso(r.created_at),
+    savingsGoalId: r.savings_goal_id ?? null,
+    isSavingsDeposit: r.is_savings_deposit ?? false,
   };
 }
 
 const INCOME_RETURN = `id, user_id, amount::text AS amount, category, note,
+  entry_date::text AS entry_date, created_at,
+  savings_goal_id, is_savings_withdrawal`;
+
+const INCOME_RETURN_LEGACY = `id, user_id, amount::text AS amount, category, note,
   entry_date::text AS entry_date, created_at`;
 
-const EXPENSE_RETURN = INCOME_RETURN;
+const EXPENSE_RETURN = `id, user_id, amount::text AS amount, category, note,
+  entry_date::text AS entry_date, created_at,
+  savings_goal_id, is_savings_deposit`;
+
+const EXPENSE_RETURN_LEGACY = INCOME_RETURN_LEGACY;
+
+const INCOME_OPERATING = `COALESCE(is_savings_withdrawal, false) = false`;
+const EXPENSE_OPERATING = `COALESCE(is_savings_deposit, false) = false`;
+
+async function refreshSavingsGoalBalance(userId: string, goalId: string): Promise<void> {
+  try {
+    await query(
+      `UPDATE savings_goals SET current_amount = GREATEST(0, (
+         COALESCE((SELECT SUM(amount) FROM personal_expense_entries
+                   WHERE user_id = $1 AND savings_goal_id = $2 AND is_savings_deposit = true), 0)
+         - COALESCE((SELECT SUM(amount) FROM personal_income_entries
+                    WHERE user_id = $1 AND savings_goal_id = $2 AND is_savings_withdrawal = true), 0)
+       ))::numeric(12,2)
+       WHERE id = $2 AND user_id = $1`,
+      [userId, goalId],
+    );
+  } catch (err) {
+    if (!isUndefinedColumnError(err)) throw err;
+  }
+}
+
+type SummaryRow = {
+  income: string;
+  expense: string;
+  total_income: string;
+  total_expense: string;
+  income_count: string;
+  expense_count: string;
+};
+
+function mapSummaryRow(r: SummaryRow): PersonalSummary {
+  return {
+    income: r.income,
+    expense: r.expense,
+    balance: computeProfit(r.income, r.expense),
+    walletBalance: computeProfit(r.total_income, r.total_expense),
+    incomeCount: Number(r.income_count),
+    expenseCount: Number(r.expense_count),
+  };
+}
 
 async function summaryBetween(
   userId: string,
   start: string,
   end: string,
 ): Promise<PersonalSummary> {
-  const { rows } = await query<{
+  try {
+    const { rows } = await query<SummaryRow>(
+      `SELECT
+         COALESCE((SELECT SUM(amount) FROM personal_income_entries
+                   WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date
+                     AND ${INCOME_OPERATING}), 0)::text AS income,
+         COALESCE((SELECT SUM(amount) FROM personal_expense_entries
+                   WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date
+                     AND ${EXPENSE_OPERATING}), 0)::text AS expense,
+         COALESCE((SELECT SUM(amount) FROM personal_income_entries
+                   WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date), 0)::text AS total_income,
+         COALESCE((SELECT SUM(amount) FROM personal_expense_entries
+                   WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date), 0)::text AS total_expense,
+         (SELECT COUNT(*) FROM personal_income_entries
+          WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date
+            AND ${INCOME_OPERATING})::text AS income_count,
+         (SELECT COUNT(*) FROM personal_expense_entries
+          WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date
+            AND ${EXPENSE_OPERATING})::text AS expense_count`,
+      [userId, start, end],
+    );
+    return mapSummaryRow(rows[0]);
+  } catch (err) {
+    if (!isUndefinedColumnError(err)) throw err;
+  }
+
+  const { rows } = await query<Omit<SummaryRow, "total_income" | "total_expense"> & {
     income: string;
     expense: string;
     income_count: string;
@@ -81,37 +168,28 @@ async function summaryBetween(
     [userId, start, end],
   );
   const r = rows[0];
-  return {
+  const legacy = {
     income: r.income,
     expense: r.expense,
-    balance: computeProfit(r.income, r.expense),
-    incomeCount: Number(r.income_count),
-    expenseCount: Number(r.expense_count),
+    total_income: r.income,
+    total_expense: r.expense,
+    income_count: r.income_count,
+    expense_count: r.expense_count,
   };
+  return mapSummaryRow(legacy);
 }
 
 export async function personalAllTimeSummary(userId: string): Promise<PersonalSummary> {
-  const { rows } = await query<{
-    income: string;
-    expense: string;
-    income_count: string;
-    expense_count: string;
-  }>(
-    `SELECT
-       COALESCE((SELECT SUM(amount) FROM personal_income_entries WHERE user_id = $1), 0)::text AS income,
-       COALESCE((SELECT SUM(amount) FROM personal_expense_entries WHERE user_id = $1), 0)::text AS expense,
-       (SELECT COUNT(*) FROM personal_income_entries WHERE user_id = $1)::text AS income_count,
-       (SELECT COUNT(*) FROM personal_expense_entries WHERE user_id = $1)::text AS expense_count`,
+  const end = today();
+  const { rows: minRow } = await query<{ min_date: string | null }>(
+    `SELECT LEAST(
+       (SELECT MIN(entry_date)::text FROM personal_income_entries WHERE user_id = $1),
+       (SELECT MIN(entry_date)::text FROM personal_expense_entries WHERE user_id = $1)
+     ) AS min_date`,
     [userId],
   );
-  const r = rows[0];
-  return {
-    income: r.income,
-    expense: r.expense,
-    balance: computeProfit(r.income, r.expense),
-    incomeCount: Number(r.income_count),
-    expenseCount: Number(r.expense_count),
-  };
+  const start = minRow[0]?.min_date ?? end;
+  return summaryBetween(userId, start, end);
 }
 
 export async function personalPeriodSummary(
@@ -155,14 +233,39 @@ export async function personalCategoryBreakdown(
   type: "income" | "expense",
 ): Promise<PersonalCategoryBreakdownItem[]> {
   const table = type === "income" ? "personal_income_entries" : "personal_expense_entries";
+  const operating =
+    type === "income" ? INCOME_OPERATING : EXPENSE_OPERATING;
+
+  try {
+    const { rows } = await query<{ category: string; amount: string; count: string }>(
+      `SELECT category,
+              COALESCE(SUM(amount), 0)::text AS amount,
+              COUNT(*)::text AS count
+       FROM ${table}
+       WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date
+         AND ${operating}
+       GROUP BY category`,
+      [userId, start, end],
+    );
+    return mapBreakdownRows(rows);
+  } catch (err) {
+    if (!isUndefinedColumnError(err)) throw err;
+  }
+
   const { rows } = await query<{ category: string; amount: string; count: string }>(
     `SELECT category,
             COALESCE(SUM(amount), 0)::text AS amount,
             COUNT(*)::text AS count
      FROM ${table}
      WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date
+       AND category NOT IN ($4)
      GROUP BY category`,
-    [userId, start, end],
+    [
+      userId,
+      start,
+      end,
+      type === "income" ? PERSONAL_SAVINGS_WITHDRAWAL : PERSONAL_SAVINGS_DEPOSIT,
+    ],
   );
   return mapBreakdownRows(rows);
 }
@@ -175,13 +278,40 @@ export async function personalDailyProfitSeries(
   const span = Math.max(1, Math.floor(days));
   const start = addDays(end, -(span - 1));
 
+  try {
+    const { rows } = await query<{ entry_date: string; income: string; expense: string }>(
+      `WITH combined AS (
+         SELECT entry_date, amount, 'income' AS type FROM personal_income_entries
+         WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date
+           AND ${INCOME_OPERATING}
+         UNION ALL
+         SELECT entry_date, amount, 'expense' AS type FROM personal_expense_entries
+         WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date
+           AND ${EXPENSE_OPERATING}
+       )
+       SELECT
+         to_char(entry_date, 'YYYY-MM-DD') AS entry_date,
+         COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0)::text AS income,
+         COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0)::text AS expense
+       FROM combined
+       GROUP BY entry_date
+       ORDER BY entry_date ASC`,
+      [userId, start, end],
+    );
+    return buildDailySeries(rows, start, end);
+  } catch (err) {
+    if (!isUndefinedColumnError(err)) throw err;
+  }
+
   const { rows } = await query<{ entry_date: string; income: string; expense: string }>(
     `WITH combined AS (
        SELECT entry_date, amount, 'income' AS type FROM personal_income_entries
        WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date
+         AND category <> $4
        UNION ALL
        SELECT entry_date, amount, 'expense' AS type FROM personal_expense_entries
        WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date
+         AND category <> $5
      )
      SELECT
        to_char(entry_date, 'YYYY-MM-DD') AS entry_date,
@@ -190,9 +320,16 @@ export async function personalDailyProfitSeries(
      FROM combined
      GROUP BY entry_date
      ORDER BY entry_date ASC`,
-    [userId, start, end],
+    [userId, start, end, PERSONAL_SAVINGS_WITHDRAWAL, PERSONAL_SAVINGS_DEPOSIT],
   );
+  return buildDailySeries(rows, start, end);
+}
 
+function buildDailySeries(
+  rows: { entry_date: string; income: string; expense: string }[],
+  start: string,
+  end: string,
+): PersonalDailyPoint[] {
   const byDate = new Map(rows.map((r) => [r.entry_date, { income: r.income, expense: r.expense }]));
   const series: PersonalDailyPoint[] = [];
   for (let d = start; d <= end; d = addDays(d, 1)) {
@@ -215,11 +352,24 @@ export async function listPersonalIncomes(
      FROM personal_income_entries
      WHERE user_id = $1
      ORDER BY entry_date DESC, created_at DESC`;
-  const { rows } = await query<IncomeRow>(
-    limit && limit > 0 ? `${base} LIMIT $2` : base,
-    limit && limit > 0 ? [userId, limit] : [userId],
-  );
-  return rows.map(mapIncome);
+  try {
+    const { rows } = await query<IncomeRow>(
+      limit && limit > 0 ? `${base} LIMIT $2` : base,
+      limit && limit > 0 ? [userId, limit] : [userId],
+    );
+    return rows.map(mapIncome);
+  } catch (err) {
+    if (!isUndefinedColumnError(err)) throw err;
+    const legacyBase = `SELECT ${INCOME_RETURN_LEGACY}
+       FROM personal_income_entries
+       WHERE user_id = $1
+       ORDER BY entry_date DESC, created_at DESC`;
+    const { rows } = await query<IncomeRow>(
+      limit && limit > 0 ? `${legacyBase} LIMIT $2` : legacyBase,
+      limit && limit > 0 ? [userId, limit] : [userId],
+    );
+    return rows.map(mapIncome);
+  }
 }
 
 export async function listPersonalExpenses(
@@ -230,17 +380,67 @@ export async function listPersonalExpenses(
      FROM personal_expense_entries
      WHERE user_id = $1
      ORDER BY entry_date DESC, created_at DESC`;
-  const { rows } = await query<ExpenseRow>(
-    limit && limit > 0 ? `${base} LIMIT $2` : base,
-    limit && limit > 0 ? [userId, limit] : [userId],
-  );
-  return rows.map(mapExpense);
+  try {
+    const { rows } = await query<ExpenseRow>(
+      limit && limit > 0 ? `${base} LIMIT $2` : base,
+      limit && limit > 0 ? [userId, limit] : [userId],
+    );
+    return rows.map(mapExpense);
+  } catch (err) {
+    if (!isUndefinedColumnError(err)) throw err;
+    const legacyBase = `SELECT ${EXPENSE_RETURN_LEGACY}
+       FROM personal_expense_entries
+       WHERE user_id = $1
+       ORDER BY entry_date DESC, created_at DESC`;
+    const { rows } = await query<ExpenseRow>(
+      limit && limit > 0 ? `${legacyBase} LIMIT $2` : legacyBase,
+      limit && limit > 0 ? [userId, limit] : [userId],
+    );
+    return rows.map(mapExpense);
+  }
 }
 
 export async function listPersonalEntriesAll(
   userId: string,
   limit = 20,
 ): Promise<PersonalEntryRow[]> {
+  try {
+    const { rows } = await query<{
+      id: string;
+      kind: string;
+      amount: string;
+      category: string;
+      note: string | null;
+      entry_date: string;
+      created_at: Date | string;
+      savings_goal_id: string | null;
+      savings_goal_name: string | null;
+    }>(
+      `SELECT id, kind, amount::text AS amount, category, note,
+              entry_date::text AS entry_date, created_at,
+              savings_goal_id, savings_goal_name
+       FROM (
+         SELECT e.id, 'income' AS kind, e.amount, e.category, e.note, e.entry_date, e.created_at,
+                e.savings_goal_id, g.name AS savings_goal_name
+         FROM personal_income_entries e
+         LEFT JOIN savings_goals g ON g.id = e.savings_goal_id
+         WHERE e.user_id = $1
+         UNION ALL
+         SELECT e.id, 'expense' AS kind, e.amount, e.category, e.note, e.entry_date, e.created_at,
+                e.savings_goal_id, g.name AS savings_goal_name
+         FROM personal_expense_entries e
+         LEFT JOIN savings_goals g ON g.id = e.savings_goal_id
+         WHERE e.user_id = $1
+       ) merged
+       ORDER BY entry_date DESC, created_at DESC
+       LIMIT $2`,
+      [userId, limit],
+    );
+    return rows.map(mapEntryRow);
+  } catch (err) {
+    if (!isUndefinedColumnError(err)) throw err;
+  }
+
   const { rows } = await query<{
     id: string;
     kind: string;
@@ -263,7 +463,21 @@ export async function listPersonalEntriesAll(
      LIMIT $2`,
     [userId, limit],
   );
-  return rows.map((r) => ({
+  return rows.map((r) => mapEntryRow({ ...r, savings_goal_id: null, savings_goal_name: null }));
+}
+
+function mapEntryRow(r: {
+  id: string;
+  kind: string;
+  amount: string;
+  category: string;
+  note: string | null;
+  entry_date: string;
+  created_at: Date | string;
+  savings_goal_id: string | null;
+  savings_goal_name: string | null;
+}): PersonalEntryRow {
+  return {
     id: r.id,
     kind: r.kind as "income" | "expense",
     amount: r.amount,
@@ -271,7 +485,59 @@ export async function listPersonalEntriesAll(
     note: r.note,
     entryDate: r.entry_date,
     createdAt: toIso(r.created_at),
-  }));
+    savingsGoalId: r.savings_goal_id,
+    savingsGoalName: r.savings_goal_name,
+  };
+}
+
+export async function listSavingsTransactions(
+  userId: string,
+  limit = 20,
+): Promise<SavingsTransaction[]> {
+  try {
+    const { rows } = await query<{
+      id: string;
+      kind: string;
+      amount: string;
+      goal_id: string | null;
+      goal_name: string | null;
+      entry_date: string;
+      note: string | null;
+      created_at: Date | string;
+    }>(
+      `SELECT id, kind, amount::text AS amount, goal_id, goal_name,
+              entry_date::text AS entry_date, note, created_at
+       FROM (
+         SELECT e.id, 'deposit' AS kind, e.amount, e.savings_goal_id AS goal_id,
+                g.name AS goal_name, e.entry_date, e.note, e.created_at
+         FROM personal_expense_entries e
+         LEFT JOIN savings_goals g ON g.id = e.savings_goal_id
+         WHERE e.user_id = $1 AND e.is_savings_deposit = true
+         UNION ALL
+         SELECT e.id, 'withdrawal' AS kind, e.amount, e.savings_goal_id AS goal_id,
+                g.name AS goal_name, e.entry_date, e.note, e.created_at
+         FROM personal_income_entries e
+         LEFT JOIN savings_goals g ON g.id = e.savings_goal_id
+         WHERE e.user_id = $1 AND e.is_savings_withdrawal = true
+       ) merged
+       ORDER BY entry_date DESC, created_at DESC
+       LIMIT $2`,
+      [userId, limit],
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      kind: r.kind as "deposit" | "withdrawal",
+      amount: r.amount,
+      goalId: r.goal_id,
+      goalName: r.goal_name ?? "ไม่ระบุเป้า",
+      entryDate: r.entry_date,
+      note: r.note,
+      createdAt: toIso(r.created_at),
+    }));
+  } catch (err) {
+    if (!isUndefinedColumnError(err)) throw err;
+    return [];
+  }
 }
 
 export async function createPersonalIncome(
@@ -279,13 +545,31 @@ export async function createPersonalIncome(
   input: PersonalIncomeInput,
 ): Promise<PersonalIncome> {
   const entryDate = input.entryDate ?? today();
-  const { rows } = await query<IncomeRow>(
-    `INSERT INTO personal_income_entries (user_id, amount, category, note, entry_date)
-     VALUES ($1, $2, $3, $4, $5::date)
-     RETURNING ${INCOME_RETURN}`,
-    [userId, input.amount.toFixed(2), input.category, input.note ?? null, entryDate],
-  );
-  return mapIncome(rows[0]);
+  const isSavings = input.category === PERSONAL_SAVINGS_WITHDRAWAL;
+  const goalId = isSavings ? input.savingsGoalId ?? null : null;
+
+  try {
+    const { rows } = await query<IncomeRow>(
+      `INSERT INTO personal_income_entries
+         (user_id, amount, category, note, entry_date, is_savings_withdrawal, savings_goal_id)
+       VALUES ($1, $2, $3, $4, $5::date, $6, $7)
+       RETURNING ${INCOME_RETURN}`,
+      [
+        userId,
+        input.amount.toFixed(2),
+        input.category,
+        input.note ?? null,
+        entryDate,
+        isSavings,
+        goalId,
+      ],
+    );
+    if (isSavings && goalId) await refreshSavingsGoalBalance(userId, goalId);
+    return mapIncome(rows[0]);
+  } catch (err) {
+    if (!isSavings || !isUndefinedColumnError(err)) throw err;
+    throw new Error("Savings withdrawal requires migration 0020");
+  }
 }
 
 export async function createPersonalExpense(
@@ -293,29 +577,79 @@ export async function createPersonalExpense(
   input: PersonalExpenseInput,
 ): Promise<PersonalExpense> {
   const entryDate = input.entryDate ?? today();
-  const { rows } = await query<ExpenseRow>(
-    `INSERT INTO personal_expense_entries (user_id, amount, category, note, entry_date)
-     VALUES ($1, $2, $3, $4, $5::date)
-     RETURNING ${EXPENSE_RETURN}`,
-    [userId, input.amount.toFixed(2), input.category, input.note ?? null, entryDate],
-  );
-  return mapExpense(rows[0]);
+  const isSavings = input.category === PERSONAL_SAVINGS_DEPOSIT;
+  const goalId = isSavings ? input.savingsGoalId ?? null : null;
+
+  try {
+    const { rows } = await query<ExpenseRow>(
+      `INSERT INTO personal_expense_entries
+         (user_id, amount, category, note, entry_date, is_savings_deposit, savings_goal_id)
+       VALUES ($1, $2, $3, $4, $5::date, $6, $7)
+       RETURNING ${EXPENSE_RETURN}`,
+      [
+        userId,
+        input.amount.toFixed(2),
+        input.category,
+        input.note ?? null,
+        entryDate,
+        isSavings,
+        goalId,
+      ],
+    );
+    if (isSavings && goalId) await refreshSavingsGoalBalance(userId, goalId);
+    return mapExpense(rows[0]);
+  } catch (err) {
+    if (!isSavings || !isUndefinedColumnError(err)) throw err;
+    throw new Error("Savings deposit requires migration 0020");
+  }
+}
+
+async function incomeSavingsGoalId(userId: string, id: string): Promise<string | null> {
+  try {
+    const { rows } = await query<{ savings_goal_id: string | null }>(
+      `SELECT savings_goal_id FROM personal_income_entries WHERE id = $1 AND user_id = $2`,
+      [id, userId],
+    );
+    return rows[0]?.savings_goal_id ?? null;
+  } catch (err) {
+    if (isUndefinedColumnError(err)) return null;
+    throw err;
+  }
+}
+
+async function expenseSavingsGoalId(userId: string, id: string): Promise<string | null> {
+  try {
+    const { rows } = await query<{ savings_goal_id: string | null }>(
+      `SELECT savings_goal_id FROM personal_expense_entries WHERE id = $1 AND user_id = $2`,
+      [id, userId],
+    );
+    return rows[0]?.savings_goal_id ?? null;
+  } catch (err) {
+    if (isUndefinedColumnError(err)) return null;
+    throw err;
+  }
 }
 
 export async function deletePersonalIncome(userId: string, id: string): Promise<boolean> {
+  const goalId = await incomeSavingsGoalId(userId, id);
   const { rowCount } = await query(
     `DELETE FROM personal_income_entries WHERE id = $1 AND user_id = $2`,
     [id, userId],
   );
-  return (rowCount ?? 0) > 0;
+  const deleted = (rowCount ?? 0) > 0;
+  if (deleted && goalId) await refreshSavingsGoalBalance(userId, goalId);
+  return deleted;
 }
 
 export async function deletePersonalExpense(userId: string, id: string): Promise<boolean> {
+  const goalId = await expenseSavingsGoalId(userId, id);
   const { rowCount } = await query(
     `DELETE FROM personal_expense_entries WHERE id = $1 AND user_id = $2`,
     [id, userId],
   );
-  return (rowCount ?? 0) > 0;
+  const deleted = (rowCount ?? 0) > 0;
+  if (deleted && goalId) await refreshSavingsGoalBalance(userId, goalId);
+  return deleted;
 }
 
 type SavingsGoalRow = {
@@ -348,14 +682,28 @@ export async function listPersonalIncomesInPeriod(
   start: string,
   end: string,
 ): Promise<PersonalIncome[]> {
-  const { rows } = await query<IncomeRow>(
-    `SELECT ${INCOME_RETURN}
-     FROM personal_income_entries
-     WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date
-     ORDER BY entry_date DESC, created_at DESC`,
-    [userId, start, end],
-  );
-  return rows.map(mapIncome);
+  try {
+    const { rows } = await query<IncomeRow>(
+      `SELECT ${INCOME_RETURN}
+       FROM personal_income_entries
+       WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date
+         AND ${INCOME_OPERATING}
+       ORDER BY entry_date DESC, created_at DESC`,
+      [userId, start, end],
+    );
+    return rows.map(mapIncome);
+  } catch (err) {
+    if (!isUndefinedColumnError(err)) throw err;
+    const { rows } = await query<IncomeRow>(
+      `SELECT ${INCOME_RETURN_LEGACY}
+       FROM personal_income_entries
+       WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date
+         AND category <> $4
+       ORDER BY entry_date DESC, created_at DESC`,
+      [userId, start, end, PERSONAL_SAVINGS_WITHDRAWAL],
+    );
+    return rows.map(mapIncome);
+  }
 }
 
 export async function listPersonalExpensesInPeriod(
@@ -363,14 +711,28 @@ export async function listPersonalExpensesInPeriod(
   start: string,
   end: string,
 ): Promise<PersonalExpense[]> {
-  const { rows } = await query<ExpenseRow>(
-    `SELECT ${EXPENSE_RETURN}
-     FROM personal_expense_entries
-     WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date
-     ORDER BY entry_date DESC, created_at DESC`,
-    [userId, start, end],
-  );
-  return rows.map(mapExpense);
+  try {
+    const { rows } = await query<ExpenseRow>(
+      `SELECT ${EXPENSE_RETURN}
+       FROM personal_expense_entries
+       WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date
+         AND ${EXPENSE_OPERATING}
+       ORDER BY entry_date DESC, created_at DESC`,
+      [userId, start, end],
+    );
+    return rows.map(mapExpense);
+  } catch (err) {
+    if (!isUndefinedColumnError(err)) throw err;
+    const { rows } = await query<ExpenseRow>(
+      `SELECT ${EXPENSE_RETURN_LEGACY}
+       FROM personal_expense_entries
+       WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date
+         AND category <> $4
+       ORDER BY entry_date DESC, created_at DESC`,
+      [userId, start, end, PERSONAL_SAVINGS_DEPOSIT],
+    );
+    return rows.map(mapExpense);
+  }
 }
 
 export async function listSavingsGoals(userId: string): Promise<SavingsGoal[]> {
@@ -398,15 +760,14 @@ export async function listSavingsGoals(userId: string): Promise<SavingsGoal[]> {
 
 export async function createSavingsGoal(
   userId: string,
-  input: { name: string; targetAmount: number; currentAmount?: number },
+  input: { name: string; targetAmount: number },
 ): Promise<SavingsGoal> {
-  const current = (input.currentAmount ?? 0).toFixed(2);
   try {
     const { rows } = await query<SavingsGoalRow>(
       `INSERT INTO savings_goals (user_id, name, target_amount, current_amount)
-       VALUES ($1, $2, $3, $4)
+       VALUES ($1, $2, $3, 0)
        RETURNING ${SAVINGS_GOAL_RETURN}`,
-      [userId, input.name, input.targetAmount.toFixed(2), current],
+      [userId, input.name, input.targetAmount.toFixed(2)],
     );
     return mapSavingsGoal(rows[0]);
   } catch (err) {
@@ -424,7 +785,7 @@ export async function createSavingsGoal(
 export async function updateSavingsGoal(
   userId: string,
   id: string,
-  patch: { name?: string; targetAmount?: number; currentAmount?: number },
+  patch: { name?: string; targetAmount?: number },
 ): Promise<SavingsGoal | null> {
   const sets: string[] = [];
   const params: unknown[] = [userId, id];
@@ -438,10 +799,6 @@ export async function updateSavingsGoal(
     sets.push(`target_amount = $${idx++}`);
     params.push(patch.targetAmount.toFixed(2));
   }
-  if (patch.currentAmount !== undefined) {
-    sets.push(`current_amount = $${idx++}`);
-    params.push(patch.currentAmount.toFixed(2));
-  }
   if (sets.length === 0) return null;
 
   try {
@@ -454,26 +811,11 @@ export async function updateSavingsGoal(
     return rows[0] ? mapSavingsGoal(rows[0]) : null;
   } catch (err) {
     if (!isUndefinedColumnError(err)) throw err;
-    if (patch.currentAmount !== undefined) return null;
-
-    const legacySets: string[] = [];
-    const legacyParams: unknown[] = [userId, id];
-    let legacyIdx = 3;
-    if (patch.name !== undefined) {
-      legacySets.push(`name = $${legacyIdx++}`);
-      legacyParams.push(patch.name);
-    }
-    if (patch.targetAmount !== undefined) {
-      legacySets.push(`target_amount = $${legacyIdx++}`);
-      legacyParams.push(patch.targetAmount.toFixed(2));
-    }
-    if (legacySets.length === 0) return null;
-
     const { rows } = await query<SavingsGoalRow>(
-      `UPDATE savings_goals SET ${legacySets.join(", ")}
+      `UPDATE savings_goals SET ${sets.join(", ")}
        WHERE id = $2 AND user_id = $1
        RETURNING ${SAVINGS_GOAL_RETURN_LEGACY}`,
-      legacyParams,
+      params,
     );
     return rows[0] ? mapSavingsGoal(rows[0]) : null;
   }

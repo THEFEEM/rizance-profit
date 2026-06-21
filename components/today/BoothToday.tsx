@@ -8,6 +8,7 @@ import { BoothTodayHeroCard } from "@/components/today/BoothTodayHeroCard";
 import { BoothBudgetBar } from "@/components/today/BoothBudgetBar";
 import { TodayStatCards } from "@/components/TodayStatCards";
 import { BoothDayEntryList } from "@/components/BoothDayEntryList";
+import { ViewFullSummaryButton } from "@/components/shared/ViewFullSummaryButton";
 import type { Booth } from "@/types/booth";
 import type { User } from "@/types";
 
@@ -80,6 +81,8 @@ export async function BoothToday({
           </p>
         )}
       </div>
+
+      <ViewFullSummaryButton href={`/booth/${booth.id}/summary`} accent="amber" className="mt-4 pb-2" />
     </>
   );
 }

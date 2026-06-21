@@ -6,6 +6,7 @@ import {
   listPersonalIncomesInPeriod,
   listPersonalExpensesInPeriod,
   listSavingsGoals,
+  listSavingsTransactions,
 } from "@/lib/personal-queries";
 import {
   formatDayShort,
@@ -33,6 +34,8 @@ import {
 } from "@/lib/category-lucide-icons";
 import type { PersonalCategoryBreakdownItem } from "@/types/personal";
 import type { User } from "@/types";
+import { SavingsGoalsSection } from "@/components/today/SavingsGoalsSection";
+import { SavingsActivitySection } from "@/components/today/SavingsActivitySection";
 
 function sharePercent(part: string, total: string): number {
   const totalCents = toCents(total);
@@ -93,6 +96,7 @@ export async function PersonalStatsSummary({
     periodExpenses,
     dailySeries,
     goals,
+    savingsTx,
   ] = await Promise.all([
     personalPeriodSummary(user.id, start, end),
     personalCategoryBreakdown(user.id, start, end, "income"),
@@ -101,6 +105,7 @@ export async function PersonalStatsSummary({
     listPersonalExpensesInPeriod(user.id, start, end),
     personalDailyProfitSeries(user.id, days),
     listSavingsGoals(user.id),
+    listSavingsTransactions(user.id, 15),
   ]);
 
   const savingsRatePct = savingsRateFromGoals(goals);
@@ -173,6 +178,9 @@ export async function PersonalStatsSummary({
           </BreakdownSection>
         )}
       </div>
+
+      <SavingsGoalsSection goals={goals} currency={user.currency} />
+      <SavingsActivitySection transactions={savingsTx} currency={user.currency} />
     </>
   );
 }

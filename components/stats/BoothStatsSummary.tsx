@@ -1,4 +1,3 @@
-import Link from "next/link";
 import {
   boothDailyProfitSeries,
   boothSummary,
@@ -18,6 +17,7 @@ import {
 } from "@/components/stats/CategoryProgressList";
 import type { CategoryBreakdownEntry } from "@/components/stats/CategoryBreakdownPanel";
 import { SplitProfitCard } from "@/components/shared/SplitProfitCard";
+import { ViewFullSummaryButton } from "@/components/shared/ViewFullSummaryButton";
 import {
   expenseCategoryLabel,
   incomeCategoryLabel,
@@ -139,14 +139,11 @@ export async function BoothStatsSummary({
             ? `${entryTotal.toLocaleString()} รายการทั้งงาน`
             : "ยังไม่มีรายการในงานนี้"}
         </p>
-        <p className="px-4 pt-2 text-center">
-          <Link
-            href={`/booth/${booth.id}/summary`}
-            className="text-sm font-medium text-rz-amber"
-          >
-            ดูสรุปบูธเต็ม →
-          </Link>
-        </p>
+        <ViewFullSummaryButton
+          href={`/booth/${booth.id}/summary`}
+          accent="amber"
+          className="mt-3"
+        />
       </div>
 
       <section className="mt-6 px-4">
