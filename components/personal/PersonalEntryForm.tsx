@@ -115,8 +115,7 @@ export function PersonalEntryForm({
           onSave={save}
           saving={saving}
           tone={isIncome ? "income" : "expense"}
-          accent="rose"
-          saveTone={isIncome ? "rose" : "red"}
+          saveTone={isIncome ? "green" : "red"}
           saveLabel={isIncome ? "บันทึก รายรับ" : "บันทึก รายจ่าย"}
           currency={currency}
         />
@@ -124,7 +123,7 @@ export function PersonalEntryForm({
     >
       <EntryPageHeader title="บันทึกรายการ" />
       <EntryContextBanner target="personal" />
-      <EntryToggle value={tab} onChange={switchTab} disabled={saving} accent="rose" />
+      <EntryToggle value={tab} onChange={switchTab} disabled={saving} />
 
       <div className="flex flex-col gap-3 px-4 pb-4">
         {isIncome ? (

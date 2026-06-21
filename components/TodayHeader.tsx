@@ -1,4 +1,3 @@
-import { HeaderSettings } from "@/components/HeaderSettings";
 import { UserAvatar } from "@/components/UserAvatar";
 
 export function TodayHeader({
@@ -30,7 +29,6 @@ export function TodayHeader({
           <p className="text-[11px] text-rz-hint">{dateLabel}</p>
         </div>
       </div>
-      <HeaderSettings />
     </header>
   );
 }

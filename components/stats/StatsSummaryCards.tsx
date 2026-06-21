@@ -6,16 +6,24 @@ function profitRatePercent(income: string, profit: string): string {
   return Math.round((toCents(profit) / incomeCents) * 100).toString();
 }
 
+function savingsRateTone(pct: number): "green" | "amber" | "red" {
+  if (pct >= 70) return "green";
+  if (pct >= 30) return "amber";
+  return "red";
+}
+
 function SummaryCard({
   label,
   value,
   tone,
   accent = "green",
+  progressPct,
 }: {
   label: string;
   value: string;
   tone: "green" | "red" | "muted" | "amber" | "purple" | "rose";
   accent?: "green" | "amber" | "purple" | "rose";
+  progressPct?: number;
 }) {
   const valueClass =
     tone === "green"
@@ -39,12 +47,29 @@ function SummaryCard({
           ? "border-rz-purple/30"
           : "border-rz-border";
 
+  const progressBarClass =
+    tone === "green"
+      ? "bg-rz-green"
+      : tone === "amber"
+        ? "bg-rz-amber"
+        : tone === "red"
+          ? "bg-rz-red"
+          : "bg-rz-elevated";
+
   return (
     <div
       className={`rounded-[14px] border-[0.5px] bg-rz-card px-4 py-3.5 ${borderClass}`}
     >
       <p className="text-xs text-rz-muted">{label}</p>
       <p className={`mt-1 text-lg font-medium rz-tabular ${valueClass}`}>{value}</p>
+      {progressPct !== undefined && (
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-rz-elevated">
+          <div
+            className={`h-full rounded-full ${progressBarClass}`}
+            style={{ width: `${Math.min(100, Math.max(0, progressPct))}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -75,13 +100,15 @@ export function StatsSummaryCards({
     const balanceValue = balance ?? profit ?? "0.00";
     const balanceSign = moneySign(balanceValue);
     const balanceTone = balanceSign > 0 ? "green" : balanceSign < 0 ? "red" : "muted";
+    const savingsPct = Number(profitRatePercent(income, balanceValue));
+    const savingsTone = savingsRateTone(savingsPct);
 
     return (
       <div className="grid grid-cols-2 gap-3 px-4">
         <SummaryCard
           label="รายรับรวม"
           value={formatMoney(income, currency)}
-          tone="rose"
+          tone="green"
           accent="rose"
         />
         <SummaryCard label="รายจ่ายรวม" value={formatMoney(expense, currency)} tone="red" />
@@ -92,8 +119,9 @@ export function StatsSummaryCards({
         />
         <SummaryCard
           label="อัตราออม"
-          value={`${profitRatePercent(income, balanceValue)}%`}
-          tone="muted"
+          value={`${savingsPct}%`}
+          tone={savingsTone}
+          progressPct={savingsPct}
         />
       </div>
     );
@@ -110,7 +138,7 @@ export function StatsSummaryCards({
         <SummaryCard
           label="รายรับรวม"
           value={formatMoney(income, currency)}
-          tone="purple"
+          tone="green"
           accent="purple"
         />
         <SummaryCard label="รายจ่ายรวม" value={formatMoney(expense, currency)} tone="red" />
@@ -127,24 +155,14 @@ export function StatsSummaryCards({
   const profitValue = profit ?? "0.00";
   const profitSign = moneySign(profitValue);
   const profitTone =
-    profitSign > 0
-      ? accent === "amber"
-        ? "amber"
-        : accent === "purple"
-          ? "purple"
-          : "green"
-      : profitSign < 0
-        ? "red"
-        : "muted";
-  const incomeTone =
-    accent === "amber" ? "amber" : accent === "purple" ? "purple" : "green";
+    profitSign > 0 ? "green" : profitSign < 0 ? "red" : "muted";
 
   return (
     <div className="grid grid-cols-2 gap-3 px-4">
       <SummaryCard
         label="รายรับรวม"
         value={formatMoney(income, currency)}
-        tone={incomeTone}
+        tone="green"
         accent={accent}
       />
       <SummaryCard label="รายจ่ายรวม" value={formatMoney(expense, currency)} tone="red" />

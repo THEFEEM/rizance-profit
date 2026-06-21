@@ -199,7 +199,7 @@ function ClosedProjectCard({
       </div>
 
       <p className="mt-2.5 text-xs leading-relaxed text-rz-hint rz-tabular">
-        <span className="text-rz-purple">รายรับรวม {formatMoney(project.totalFunding, currency)}</span>
+        <span className="text-rz-green">รายรับรวม {formatMoney(project.totalFunding, currency)}</span>
         {" / "}
         <span className="text-rz-red">รายจ่ายรวม {formatMoney(project.totalSpent, currency)}</span>
         {" / "}

@@ -40,8 +40,8 @@ export function ProjectBudgetCard({
           <span className="text-rz-text">{formatMoney(summary.budgetTarget, currency)}</span>
         </div>
         <div className="flex justify-between gap-2">
-          <span className="text-rz-purple">{fundingLabel}</span>
-          <span className="text-rz-purple">{formatMoney(summary.totalFunding, currency)}</span>
+          <span className="text-rz-hint">{fundingLabel}</span>
+          <span className="text-rz-green">{formatMoney(summary.totalFunding, currency)}</span>
         </div>
         <div className="flex justify-between gap-2">
           <span className="text-rz-red">ใช้ไปแล้ว</span>

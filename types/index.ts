@@ -10,12 +10,10 @@ export type {
 
 export {
   EXPENSE_CATEGORIES,
-  EXPENSE_CATEGORY_GRID_OPTIONS,
   EXPENSE_CATEGORY_KEYS,
   EXPENSE_CATEGORY_OPTIONS,
   EXPENSE_COST_TYPE_LABELS,
   INCOME_CATEGORIES,
-  INCOME_CATEGORY_GRID_OPTIONS,
   INCOME_CATEGORY_KEYS,
   INCOME_CATEGORY_OPTIONS,
   LEGACY_EXPENSE_FORM_KEYS,
@@ -36,6 +34,11 @@ export {
   normalizeExpenseCategory,
   normalizeIncomeCategory,
 } from "@/lib/expense-categories";
+
+export {
+  SHOP_EXPENSE_GRID_OPTIONS as EXPENSE_CATEGORY_GRID_OPTIONS,
+  SHOP_INCOME_GRID_OPTIONS as INCOME_CATEGORY_GRID_OPTIONS,
+} from "@/lib/category-lucide-icons";
 
 import type { ExpenseCategoryKey, IncomeCategoryKey } from "@/lib/expense-categories";
 

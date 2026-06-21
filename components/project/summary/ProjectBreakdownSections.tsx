@@ -53,7 +53,7 @@ export function ProjectIncomeBreakdown({
   return (
     <section>
       <h2 className="mb-2.5 text-sm font-medium text-rz-muted">{title}</h2>
-      <BreakdownList rows={rows} currency={currency} amountClass="text-rz-purple" />
+      <BreakdownList rows={rows} currency={currency} amountClass="text-rz-green" />
     </section>
   );
 }

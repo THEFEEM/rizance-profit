@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 /** Mobile-first one-tap category picker — income/expense entry forms. */
 export function CategoryGrid<T extends string>({
   options,
@@ -6,7 +8,7 @@ export function CategoryGrid<T extends string>({
   columns = 3,
   accent = "green",
 }: {
-  options: readonly { value: T; label: string; icon: string; badge?: string }[];
+  options: readonly { value: T; label: string; icon: ReactNode; badge?: string }[];
   value: T;
   onChange: (value: T) => void;
   columns?: 2 | 3 | 4;
@@ -39,7 +41,7 @@ export function CategoryGrid<T extends string>({
               selected ? active : idle
             }`}
           >
-            <span className="text-xl leading-none" aria-hidden>
+            <span className="flex h-6 items-center justify-center" aria-hidden>
               {opt.icon}
             </span>
             <span className="mt-1 text-xs font-medium leading-tight">{opt.label}</span>

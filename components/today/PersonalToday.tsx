@@ -42,7 +42,7 @@ export async function PersonalToday({ user }: { user: User }) {
       <section className="px-4 pt-3">
         <div className="rounded-[14px] border-[0.5px] border-rz-rose/30 bg-rz-card px-[18px] py-[18px]">
           <p className="text-[11px] text-rz-hint">เงินคงเหลือ</p>
-          <p className={`rz-tabular mt-1 break-all text-[32px] font-medium leading-tight tracking-[-0.5px] text-rz-rose`}>
+          <p className={`rz-tabular mt-1 break-all text-[32px] font-medium leading-tight tracking-[-0.5px] ${balanceColor}`}>
             {formatMoney(allTime.balance, user.currency)}
           </p>
           <p className={`mt-1 text-xs ${balanceColor}`}>

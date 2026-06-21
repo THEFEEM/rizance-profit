@@ -19,11 +19,13 @@ import {
 import type { CategoryBreakdownEntry } from "@/components/stats/CategoryBreakdownPanel";
 import { SplitProfitCard } from "@/components/shared/SplitProfitCard";
 import {
-  expenseCategoryIcon,
   expenseCategoryLabel,
-  incomeCategoryIcon,
   incomeCategoryLabel,
 } from "@/lib/expense-categories";
+import {
+  renderShopExpenseIcon,
+  renderShopIncomeIcon,
+} from "@/lib/category-lucide-icons";
 import type { Booth } from "@/types/booth";
 import type { User } from "@/types";
 
@@ -39,7 +41,7 @@ function aggregateCategoryRows(
   totalAmount: string,
 ): CategoryProgressRow[] {
   const labelFn = kind === "income" ? incomeCategoryLabel : expenseCategoryLabel;
-  const iconFn = kind === "income" ? incomeCategoryIcon : expenseCategoryIcon;
+  const iconFn = kind === "income" ? renderShopIncomeIcon : renderShopExpenseIcon;
   const map = new Map<string, { amountCents: number; count: number }>();
 
   for (const e of entries) {

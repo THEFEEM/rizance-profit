@@ -196,7 +196,9 @@ export function ProfilePageContent({
           projectId={projectId}
         />
 
-        <ShopMemberEditor members={shopMembers} currency={user.currency} />
+        {(mode === "regular" || mode === "booth") && (
+          <ShopMemberEditor members={shopMembers} currency={user.currency} />
+        )}
 
         <section className="rounded-[14px] border-[0.5px] border-rz-border bg-rz-card">
           <h2 className="border-b-[0.5px] border-rz-border px-4 py-3 text-sm font-medium text-rz-text">

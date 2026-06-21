@@ -3,9 +3,8 @@ import { EntryField } from "@/components/entry/EntryField";
 import {
   PERSONAL_EXPENSE_GRID_OPTIONS,
   PERSONAL_INCOME_GRID_OPTIONS,
-  type PersonalExpenseKey,
-  type PersonalIncomeKey,
-} from "@/lib/personal-categories";
+} from "@/lib/category-lucide-icons";
+import type { PersonalExpenseKey, PersonalIncomeKey } from "@/lib/personal-categories";
 
 export function PersonalIncomeFields({
   category,

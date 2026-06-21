@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { formatDateLabel } from "@/lib/date";
 import { formatMoney } from "@/lib/money";
 import type { CategoryBreakdownEntry } from "@/components/stats/CategoryBreakdownPanel";
@@ -8,7 +9,7 @@ import type { CategoryBreakdownEntry } from "@/components/stats/CategoryBreakdow
 export type CategoryProgressRow = {
   category: string;
   label: string;
-  icon: string;
+  icon: ReactNode;
   amount: string;
   percentage: number;
   count: number;
@@ -38,16 +39,7 @@ export function CategoryProgressList({
           : accent === "purple"
             ? "bg-rz-purple"
             : "bg-rz-green";
-  const amountClass =
-    tone === "expense"
-      ? "text-rz-red"
-      : accent === "rose"
-        ? "text-rz-rose"
-        : accent === "amber"
-          ? "text-rz-amber"
-          : accent === "purple"
-            ? "text-rz-purple"
-            : "text-rz-green";
+  const amountClass = tone === "expense" ? "text-rz-red" : "text-rz-green";
 
   if (rows.length === 0) return null;
 
@@ -66,7 +58,7 @@ export function CategoryProgressList({
               className="tap-target flex w-full items-center gap-3 px-4 py-3.5 text-left active:bg-rz-elevated"
               aria-expanded={expanded}
             >
-              <span className="text-xl leading-none" aria-hidden>
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center" aria-hidden>
                 {row.icon}
               </span>
               <div className="min-w-0 flex-1">

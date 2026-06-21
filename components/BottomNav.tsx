@@ -3,14 +3,19 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BarChart3, Home, LayoutGrid, Plus, User } from "lucide-react";
 import { ModePicker } from "@/components/ModePicker";
 
+const NAV_ICON_SIZE = 22;
+const FAB_ICON_SIZE = 24;
+const ICON_STROKE = 2;
+
 const NAV_ITEMS = [
-  { key: "today", label: "หน้าหลัก", icon: "🏠", kind: "link" as const },
-  { key: "stats", label: "สถิติ", icon: "📊", kind: "link" as const },
-  { key: "entry", label: "+", icon: "➕", kind: "link" as const, prominent: true },
-  { key: "mode", label: "โหมด", icon: "🔀", kind: "action" as const },
-  { key: "profile", label: "ฉัน", icon: "👤", kind: "link" as const },
+  { key: "today", label: "หน้าหลัก", Icon: Home, kind: "link" as const },
+  { key: "stats", label: "สถิติ", Icon: BarChart3, kind: "link" as const },
+  { key: "entry", label: "+", Icon: Plus, kind: "link" as const, prominent: true },
+  { key: "mode", label: "โหมด", Icon: LayoutGrid, kind: "action" as const },
+  { key: "profile", label: "ฉัน", Icon: User, kind: "link" as const },
 ] as const;
 
 function isNavActive(
@@ -39,13 +44,6 @@ function accentClasses(mode: "regular" | "booth" | "project" | "personal", activ
   if (mode === "booth") return "text-rz-amber";
   if (mode === "project") return "text-rz-purple";
   return "text-rz-green";
-}
-
-function entryFabClasses(mode: "regular" | "booth" | "project" | "personal") {
-  if (mode === "personal") return "bg-rz-rose text-rz-bg ring-rz-rose/40";
-  if (mode === "booth") return "bg-rz-amber text-rz-bg ring-rz-amber/40";
-  if (mode === "project") return "bg-rz-purple text-rz-bg ring-rz-purple/40";
-  return "bg-rz-green text-rz-bg ring-rz-green/40";
 }
 
 export function BottomNav({
@@ -100,9 +98,11 @@ export function BottomNav({
                     pickerOpen ? accentClasses(mode, true) : "text-rz-hint"
                   }`}
                 >
-                  <span className="text-xl leading-none" aria-hidden>
-                    {item.icon}
-                  </span>
+                  <item.Icon
+                    size={NAV_ICON_SIZE}
+                    strokeWidth={ICON_STROKE}
+                    aria-hidden
+                  />
                   {item.label}
                 </button>
               );
@@ -121,10 +121,10 @@ export function BottomNav({
                   className={`tap-target no-select -mt-3 flex flex-1 flex-col items-center justify-end gap-0.5 pb-2 text-[10px] font-medium ${accent}`}
                 >
                   <span
-                    className={`flex h-12 w-12 items-center justify-center rounded-full text-2xl leading-none shadow-md ring-2 ${entryFabClasses(mode)}`}
+                    className="flex h-12 w-12 items-center justify-center rounded-full bg-rz-green text-rz-bg shadow-md ring-2 ring-rz-green/40"
                     aria-hidden
                   >
-                    {item.icon}
+                    <item.Icon size={FAB_ICON_SIZE} strokeWidth={ICON_STROKE} />
                   </span>
                   <span className="sr-only">{item.label}</span>
                 </Link>
@@ -137,9 +137,7 @@ export function BottomNav({
                 href={href}
                 className={`tap-target no-select flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium ${accent}`}
               >
-                <span className="text-xl leading-none" aria-hidden>
-                  {item.icon}
-                </span>
+                <item.Icon size={NAV_ICON_SIZE} strokeWidth={ICON_STROKE} aria-hidden />
                 {item.label}
               </Link>
             );
