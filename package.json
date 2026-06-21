@@ -34,7 +34,8 @@
     "test:project-summary": "node scripts/test-project-summary.mjs",
     "test:fix-pack-h-logic": "node scripts/test-fix-pack-h-logic.mjs",
     "test:fix-pack-i-logic": "node scripts/test-fix-pack-i-logic.mjs",
-    "test:subscription": "node scripts/test-subscription.mjs"
+    "test:subscription": "node scripts/test-subscription.mjs",
+    "test:payment": "node scripts/test-payment.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -42,6 +43,7 @@
     "jose": "^6.2.3",
     "lucide-react": "^1.21.0",
     "next": "16.2.7",
+    "omise": "^1.1.0",
     "pg": "^8.21.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
