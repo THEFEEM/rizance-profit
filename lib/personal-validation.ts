@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { isValidDate } from "@/lib/date";
-import { PERSONAL_EXPENSE_KEYS, PERSONAL_INCOME_KEYS } from "@/lib/personal-categories";
+import {
+  PERSONAL_EXPENSE_KEYS,
+  PERSONAL_INCOME_KEYS,
+  PERSONAL_SAVINGS_DEPOSIT,
+  PERSONAL_SAVINGS_WITHDRAWAL,
+} from "@/lib/personal-categories";
 
 const amount = z
   .number()
@@ -21,19 +26,59 @@ const entryDate = z
   .refine(isValidDate, "Date must be a valid YYYY-MM-DD")
   .optional();
 
-export const personalIncomeSchema = z.object({
-  amount,
-  category: z.enum(PERSONAL_INCOME_KEYS),
-  note,
-  entryDate,
-});
+const savingsGoalId = z.string().uuid("Invalid savings goal id").optional();
 
-export const personalExpenseSchema = z.object({
-  amount,
-  category: z.enum(PERSONAL_EXPENSE_KEYS),
-  note,
-  entryDate,
-});
+export const personalIncomeSchema = z
+  .object({
+    amount,
+    category: z.enum(PERSONAL_INCOME_KEYS),
+    note,
+    entryDate,
+    savingsGoalId,
+  })
+  .superRefine((data, ctx) => {
+    if (data.category === PERSONAL_SAVINGS_WITHDRAWAL) {
+      if (!data.savingsGoalId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "กรุณาเลือกเป้าหมายออม",
+          path: ["savingsGoalId"],
+        });
+      }
+    } else if (data.savingsGoalId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "เป้าหมายออมใช้ได้เฉพาะถอนเงินออม",
+        path: ["savingsGoalId"],
+      });
+    }
+  });
+
+export const personalExpenseSchema = z
+  .object({
+    amount,
+    category: z.enum(PERSONAL_EXPENSE_KEYS),
+    note,
+    entryDate,
+    savingsGoalId,
+  })
+  .superRefine((data, ctx) => {
+    if (data.category === PERSONAL_SAVINGS_DEPOSIT) {
+      if (!data.savingsGoalId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "กรุณาเลือกเป้าหมายออม",
+          path: ["savingsGoalId"],
+        });
+      }
+    } else if (data.savingsGoalId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "เป้าหมายออมใช้ได้เฉพาะออมเงิน",
+        path: ["savingsGoalId"],
+      });
+    }
+  });
 
 export type PersonalIncomeInput = z.infer<typeof personalIncomeSchema>;
 export type PersonalExpenseInput = z.infer<typeof personalExpenseSchema>;
@@ -46,26 +91,14 @@ const goalName = z.preprocess(
 export const savingsGoalSchema = z.object({
   name: goalName,
   targetAmount: amount,
-  currentAmount: z
-    .number()
-    .finite()
-    .min(0, "ยอดออมต้องไม่ติดลบ")
-    .max(9_999_999_999.99)
-    .optional(),
 });
 
 export const savingsGoalPatchSchema = z
   .object({
     name: goalName.optional(),
     targetAmount: amount.optional(),
-    currentAmount: z
-      .number()
-      .finite()
-      .min(0, "ยอดออมต้องไม่ติดลบ")
-      .max(9_999_999_999.99)
-      .optional(),
   })
-  .refine((d) => d.name !== undefined || d.targetAmount !== undefined || d.currentAmount !== undefined, {
+  .refine((d) => d.name !== undefined || d.targetAmount !== undefined, {
     message: "กรุณาระบุข้อมูลที่ต้องการแก้ไข",
   });
 

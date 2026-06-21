@@ -3,12 +3,15 @@ import {
   personalMonthlySummary,
   listPersonalEntriesAll,
   listSavingsGoals,
+  listSavingsTransactions,
 } from "@/lib/personal-queries";
 import { formatMoney, moneySign } from "@/lib/money";
 import { TodayStatCards } from "@/components/TodayStatCards";
 import { EntryList, type EntryRow } from "@/components/EntryList";
 import { PersonalBudgetBar } from "@/components/today/PersonalBudgetBar";
 import { SavingsGoalsSection } from "@/components/today/SavingsGoalsSection";
+import { SavingsActivitySection } from "@/components/today/SavingsActivitySection";
+import { ViewFullSummaryButton } from "@/components/shared/ViewFullSummaryButton";
 import type { User } from "@/types";
 
 /** Personal-mode Today — balance hero, monthly stats, budget, recent entries, goals. */
@@ -17,11 +20,12 @@ export async function PersonalToday({ user }: { user: User }) {
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
 
-  const [allTime, monthly, entries, goals] = await Promise.all([
+  const [allTime, monthly, entries, goals, savingsTx] = await Promise.all([
     personalAllTimeSummary(user.id),
     personalMonthlySummary(user.id, year, month),
     listPersonalEntriesAll(user.id, 10),
     listSavingsGoals(user.id),
+    listSavingsTransactions(user.id, 10),
   ]);
 
   const entryRows: EntryRow[] = entries.map((e) => ({
@@ -31,9 +35,11 @@ export async function PersonalToday({ user }: { user: User }) {
     note: e.note,
     category: e.category,
     createdAt: e.createdAt,
+    savingsGoalName: e.savingsGoalName ?? undefined,
   }));
 
-  const balanceSign = moneySign(allTime.balance);
+  const walletBalance = allTime.walletBalance;
+  const balanceSign = moneySign(walletBalance);
   const balanceColor =
     balanceSign > 0 ? "text-rz-green" : balanceSign < 0 ? "text-rz-red" : "text-rz-hint";
 
@@ -43,11 +49,14 @@ export async function PersonalToday({ user }: { user: User }) {
         <div className="rounded-[14px] border-[0.5px] border-rz-rose/30 bg-rz-card px-[18px] py-[18px]">
           <p className="text-[11px] text-rz-hint">เงินคงเหลือ</p>
           <p className={`rz-tabular mt-1 break-all text-[32px] font-medium leading-tight tracking-[-0.5px] ${balanceColor}`}>
-            {formatMoney(allTime.balance, user.currency)}
+            {formatMoney(walletBalance, user.currency)}
           </p>
           <p className={`mt-1 text-xs ${balanceColor}`}>
             รายรับ {formatMoney(allTime.income, user.currency)} · รายจ่าย{" "}
             {formatMoney(allTime.expense, user.currency)}
+          </p>
+          <p className="mt-0.5 text-[10px] text-rz-hint">
+            (ไม่รวมออม/ถอน — นับแยกในเป้าหมายออม)
           </p>
         </div>
       </section>
@@ -87,6 +96,9 @@ export async function PersonalToday({ user }: { user: User }) {
       </section>
 
       <SavingsGoalsSection goals={goals} currency={user.currency} />
+      <SavingsActivitySection transactions={savingsTx} currency={user.currency} />
+
+      <ViewFullSummaryButton href="/personal/summary" accent="rose" className="mt-4 pb-2" />
     </>
   );
 }

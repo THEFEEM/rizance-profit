@@ -11,6 +11,7 @@ export const PERSONAL_INCOME_KEYS = [
   "bonus",
   "loan_return",
   "other_income",
+  "savings_withdrawal",
 ] as const;
 
 export type PersonalIncomeKey = (typeof PERSONAL_INCOME_KEYS)[number];
@@ -30,9 +31,13 @@ export const PERSONAL_EXPENSE_KEYS = [
   "installment",
   "social",
   "other_expense",
+  "savings_deposit",
 ] as const;
 
 export type PersonalExpenseKey = (typeof PERSONAL_EXPENSE_KEYS)[number];
+
+export const PERSONAL_SAVINGS_WITHDRAWAL = "savings_withdrawal" as const;
+export const PERSONAL_SAVINGS_DEPOSIT = "savings_deposit" as const;
 
 export const PERSONAL_INCOME_LABELS: Record<PersonalIncomeKey, string> = {
   salary: "เงินเดือน",
@@ -43,6 +48,7 @@ export const PERSONAL_INCOME_LABELS: Record<PersonalIncomeKey, string> = {
   bonus: "โบนัส",
   loan_return: "เงินกู้คืนมา",
   other_income: "อื่นๆ",
+  savings_withdrawal: "ถอนเงินออม",
 };
 
 export const PERSONAL_INCOME_ICONS: Record<PersonalIncomeKey, string> = {
@@ -54,6 +60,7 @@ export const PERSONAL_INCOME_ICONS: Record<PersonalIncomeKey, string> = {
   bonus: "🎁",
   loan_return: "💸",
   other_income: "···",
+  savings_withdrawal: "🏦",
 };
 
 export const PERSONAL_EXPENSE_LABELS: Record<PersonalExpenseKey, string> = {
@@ -71,6 +78,7 @@ export const PERSONAL_EXPENSE_LABELS: Record<PersonalExpenseKey, string> = {
   installment: "ผ่อน/บัตรเครดิต",
   social: "สังคม",
   other_expense: "อื่นๆ",
+  savings_deposit: "ออมเงิน",
 };
 
 export const PERSONAL_EXPENSE_ICONS: Record<PersonalExpenseKey, string> = {
@@ -88,6 +96,7 @@ export const PERSONAL_EXPENSE_ICONS: Record<PersonalExpenseKey, string> = {
   installment: "💳",
   social: "👥",
   other_expense: "···",
+  savings_deposit: "🏦",
 };
 
 export const PERSONAL_INCOME_GRID_OPTIONS = PERSONAL_INCOME_KEYS.map((key) => ({
@@ -124,4 +133,12 @@ export function isPersonalIncomeKey(key: string): key is PersonalIncomeKey {
 
 export function isPersonalExpenseKey(key: string): key is PersonalExpenseKey {
   return (PERSONAL_EXPENSE_KEYS as readonly string[]).includes(key);
+}
+
+export function isSavingsWithdrawalCategory(key: string): boolean {
+  return key === PERSONAL_SAVINGS_WITHDRAWAL;
+}
+
+export function isSavingsDepositCategory(key: string): boolean {
+  return key === PERSONAL_SAVINGS_DEPOSIT;
 }

@@ -4,7 +4,49 @@ import {
   PERSONAL_EXPENSE_GRID_OPTIONS,
   PERSONAL_INCOME_GRID_OPTIONS,
 } from "@/lib/category-lucide-icons";
-import type { PersonalExpenseKey, PersonalIncomeKey } from "@/lib/personal-categories";
+import {
+  PERSONAL_SAVINGS_DEPOSIT,
+  PERSONAL_SAVINGS_WITHDRAWAL,
+  type PersonalExpenseKey,
+  type PersonalIncomeKey,
+} from "@/lib/personal-categories";
+import type { SavingsGoal } from "@/types/personal";
+
+function SavingsGoalSelect({
+  goals,
+  value,
+  onChange,
+  disabled,
+}: {
+  goals: SavingsGoal[];
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+}) {
+  if (goals.length === 0) {
+    return (
+      <p className="rounded-lg border-[0.5px] border-rz-border bg-rz-elevated px-3 py-2 text-xs text-rz-hint">
+        ยังไม่มีเป้าหมายออม — สร้างเป้าหมายที่หน้าหลักก่อน
+      </p>
+    );
+  }
+
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
+      className="w-full rounded-lg border-[0.5px] border-rz-border bg-rz-bg px-3 py-2 text-sm text-rz-text outline-none focus:border-rz-rose disabled:opacity-50"
+    >
+      <option value="">เลือกเป้าหมาย</option>
+      {goals.map((g) => (
+        <option key={g.id} value={g.id}>
+          {g.name}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 export function PersonalIncomeFields({
   category,
@@ -15,6 +57,9 @@ export function PersonalIncomeFields({
   onDateChange,
   maxDate,
   disabled = false,
+  goals,
+  savingsGoalId,
+  onSavingsGoalChange,
 }: {
   category: PersonalIncomeKey;
   onCategoryChange: (v: PersonalIncomeKey) => void;
@@ -24,7 +69,12 @@ export function PersonalIncomeFields({
   onDateChange: (v: string) => void;
   maxDate: string;
   disabled?: boolean;
+  goals: SavingsGoal[];
+  savingsGoalId: string;
+  onSavingsGoalChange: (v: string) => void;
 }) {
+  const isSavings = category === PERSONAL_SAVINGS_WITHDRAWAL;
+
   return (
     <>
       <div>
@@ -37,6 +87,18 @@ export function PersonalIncomeFields({
           accent="rose"
         />
       </div>
+
+      {isSavings && (
+        <div>
+          <p className="mb-1.5 text-xs text-rz-muted">เป้าหมายออม</p>
+          <SavingsGoalSelect
+            goals={goals}
+            value={savingsGoalId}
+            onChange={onSavingsGoalChange}
+            disabled={disabled}
+          />
+        </div>
+      )}
 
       <EntryField
         label="บันทึกเพิ่มเติม (ไม่บังคับ)"
@@ -69,6 +131,9 @@ export function PersonalExpenseFields({
   onDateChange,
   maxDate,
   disabled = false,
+  goals,
+  savingsGoalId,
+  onSavingsGoalChange,
 }: {
   category: PersonalExpenseKey;
   onCategoryChange: (v: PersonalExpenseKey) => void;
@@ -78,7 +143,12 @@ export function PersonalExpenseFields({
   onDateChange: (v: string) => void;
   maxDate: string;
   disabled?: boolean;
+  goals: SavingsGoal[];
+  savingsGoalId: string;
+  onSavingsGoalChange: (v: string) => void;
 }) {
+  const isSavings = category === PERSONAL_SAVINGS_DEPOSIT;
+
   return (
     <>
       <div>
@@ -91,6 +161,18 @@ export function PersonalExpenseFields({
           accent="rose"
         />
       </div>
+
+      {isSavings && (
+        <div>
+          <p className="mb-1.5 text-xs text-rz-muted">เป้าหมายออม</p>
+          <SavingsGoalSelect
+            goals={goals}
+            value={savingsGoalId}
+            onChange={onSavingsGoalChange}
+            disabled={disabled}
+          />
+        </div>
+      )}
 
       <EntryField
         label="บันทึกเพิ่มเติม (ไม่บังคับ)"

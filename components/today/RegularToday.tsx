@@ -14,6 +14,7 @@ import { TodayStatCards } from "@/components/TodayStatCards";
 import { TodayCategoryMiniList } from "@/components/today/TodayCategoryMiniList";
 import { EntryList, type EntryRow } from "@/components/EntryList";
 import { SplitProfitCard } from "@/components/shared/SplitProfitCard";
+import { ViewFullSummaryButton } from "@/components/shared/ViewFullSummaryButton";
 import { buildTodayCategoryGroups } from "@/lib/today-category-groups";
 import type { User } from "@/types";
 
@@ -102,6 +103,8 @@ export async function RegularToday({ user }: { user: User }) {
           </p>
         )}
       </div>
+
+      <ViewFullSummaryButton href="/summary" accent="green" className="mt-4 pb-2" />
     </>
   );
 }

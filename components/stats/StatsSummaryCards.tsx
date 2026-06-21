@@ -6,24 +6,21 @@ function profitRatePercent(income: string, profit: string): string {
   return Math.round((toCents(profit) / incomeCents) * 100).toString();
 }
 
-function savingsRateTone(pct: number): "green" | "amber" | "red" {
-  if (pct >= 70) return "green";
-  if (pct >= 30) return "amber";
-  return "red";
-}
-
 function SummaryCard({
   label,
   value,
   tone,
   accent = "green",
   progressPct,
+  progressAccent,
 }: {
   label: string;
   value: string;
   tone: "green" | "red" | "muted" | "amber" | "purple" | "rose";
   accent?: "green" | "amber" | "purple" | "rose";
   progressPct?: number;
+  /** Progress bar color — defaults to tone; use accent for rate % cards. */
+  progressAccent?: "green" | "amber" | "purple" | "rose";
 }) {
   const valueClass =
     tone === "green"
@@ -45,16 +42,23 @@ function SummaryCard({
         ? "border-rz-amber/30"
         : accent === "purple" && tone === "purple"
           ? "border-rz-purple/30"
-          : "border-rz-border";
+          : accent === "green" && tone === "green"
+            ? "border-rz-green/30"
+            : "border-rz-border";
 
+  const barAccent = progressAccent ?? (tone === "green" || tone === "amber" || tone === "red" ? tone : accent);
   const progressBarClass =
-    tone === "green"
+    barAccent === "green"
       ? "bg-rz-green"
-      : tone === "amber"
+      : barAccent === "amber"
         ? "bg-rz-amber"
-        : tone === "red"
-          ? "bg-rz-red"
-          : "bg-rz-elevated";
+        : barAccent === "purple"
+          ? "bg-rz-purple"
+          : barAccent === "rose"
+            ? "bg-rz-rose"
+            : barAccent === "red"
+              ? "bg-rz-red"
+              : "bg-rz-elevated";
 
   return (
     <div
@@ -96,7 +100,7 @@ export function StatsSummaryCards({
   remaining?: string;
   budgetUsedPct?: number;
   balance?: string;
-  /** Manual savings progress from goals (overrides income/balance-derived rate). */
+  /** Savings progress from goals (current / target aggregate). */
   savingsRatePct?: number;
 }) {
   if (variant === "personal") {
@@ -107,7 +111,6 @@ export function StatsSummaryCards({
       savingsRatePct !== undefined
         ? savingsRatePct
         : Number(profitRatePercent(income, balanceValue));
-    const savingsTone = savingsRateTone(savingsPct);
 
     return (
       <div className="grid grid-cols-2 gap-3 px-4">
@@ -126,8 +129,10 @@ export function StatsSummaryCards({
         <SummaryCard
           label="อัตราออม"
           value={`${savingsPct}%`}
-          tone={savingsTone}
+          tone="rose"
+          accent="rose"
           progressPct={savingsPct}
+          progressAccent="rose"
         />
       </div>
     );
@@ -153,7 +158,7 @@ export function StatsSummaryCards({
           value={formatMoney(remain, currency)}
           tone={remainTone}
         />
-        <SummaryCard label="ใช้ไป" value={pctDisplay} tone="muted" />
+        <SummaryCard label="ใช้ไป" value={pctDisplay} tone="purple" accent="purple" />
       </div>
     );
   }
@@ -181,7 +186,8 @@ export function StatsSummaryCards({
       <SummaryCard
         label="อัตรากำไร"
         value={`${profitRatePercent(income, profitValue)}%`}
-        tone="muted"
+        tone={accent}
+        accent={accent}
       />
     </div>
   );

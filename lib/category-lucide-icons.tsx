@@ -18,6 +18,7 @@ import {
   Megaphone,
   Package,
   PartyPopper,
+  PiggyBank,
   Shirt,
   Smartphone,
   Store,
@@ -63,6 +64,7 @@ const PERSONAL_INCOME_LUCIDE: Record<PersonalIncomeKey, LucideIcon> = {
   bonus: Gift,
   loan_return: HandCoins,
   other_income: Ellipsis,
+  savings_withdrawal: PiggyBank,
 };
 
 const PERSONAL_EXPENSE_LUCIDE: Record<PersonalExpenseKey, LucideIcon> = {
@@ -80,6 +82,7 @@ const PERSONAL_EXPENSE_LUCIDE: Record<PersonalExpenseKey, LucideIcon> = {
   installment: CreditCard,
   social: PartyPopper,
   other_expense: Ellipsis,
+  savings_deposit: PiggyBank,
 };
 
 const SHOP_INCOME_LUCIDE: Record<IncomeCategoryKey, LucideIcon> = {

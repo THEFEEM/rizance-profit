@@ -23,26 +23,20 @@ export function SavingsGoalsSection({
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [target, setTarget] = useState("");
-  const [current, setCurrent] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editCurrent, setEditCurrent] = useState("");
   const [editTarget, setEditTarget] = useState("");
+  const [editName, setEditName] = useState("");
 
   async function addGoal() {
     const parsedTarget = Number(target.replace(/,/g, ""));
-    const parsedCurrent = Number(current.replace(/,/g, "") || "0");
     if (!name.trim()) {
       setError("กรุณาระบุชื่อเป้าหมาย");
       return;
     }
     if (!Number.isFinite(parsedTarget) || parsedTarget <= 0) {
       setError("กรุณาระบุจำนวนเป้าหมายที่ถูกต้อง");
-      return;
-    }
-    if (!Number.isFinite(parsedCurrent) || parsedCurrent < 0) {
-      setError("ยอดออมต้องไม่ติดลบ");
       return;
     }
     setSaving(true);
@@ -54,7 +48,6 @@ export function SavingsGoalsSection({
         body: JSON.stringify({
           name: name.trim(),
           targetAmount: parsedTarget,
-          currentAmount: parsedCurrent,
         }),
       });
       if (!res.ok) {
@@ -66,7 +59,6 @@ export function SavingsGoalsSection({
       setGoals((prev) => [...prev, json.data]);
       setName("");
       setTarget("");
-      setCurrent("");
       setAdding(false);
       router.refresh();
     } finally {
@@ -76,13 +68,12 @@ export function SavingsGoalsSection({
 
   async function saveEdit(goalId: string) {
     const parsedTarget = Number(editTarget.replace(/,/g, ""));
-    const parsedCurrent = Number(editCurrent.replace(/,/g, ""));
-    if (!Number.isFinite(parsedTarget) || parsedTarget <= 0) {
-      setError("กรุณาระบุเป้าหมายที่ถูกต้อง");
+    if (!editName.trim()) {
+      setError("กรุณาระบุชื่อเป้าหมาย");
       return;
     }
-    if (!Number.isFinite(parsedCurrent) || parsedCurrent < 0) {
-      setError("ยอดออมต้องไม่ติดลบ");
+    if (!Number.isFinite(parsedTarget) || parsedTarget <= 0) {
+      setError("กรุณาระบุเป้าหมายที่ถูกต้อง");
       return;
     }
     setSaving(true);
@@ -92,8 +83,8 @@ export function SavingsGoalsSection({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          name: editName.trim(),
           targetAmount: parsedTarget,
-          currentAmount: parsedCurrent,
         }),
       });
       if (!res.ok) {
@@ -142,19 +133,14 @@ export function SavingsGoalsSection({
           <input
             type="number"
             inputMode="decimal"
-            value={current}
-            onChange={(e) => setCurrent(e.target.value)}
-            placeholder="ออมไว้แล้ว"
-            className="mt-2 w-full rounded-lg border-[0.5px] border-rz-border bg-rz-bg px-3 py-2 text-sm text-rz-text outline-none focus:border-rz-rose"
-          />
-          <input
-            type="number"
-            inputMode="decimal"
             value={target}
             onChange={(e) => setTarget(e.target.value)}
             placeholder="เป้าหมาย"
             className="mt-2 w-full rounded-lg border-[0.5px] border-rz-border bg-rz-bg px-3 py-2 text-sm text-rz-text outline-none focus:border-rz-rose"
           />
+          <p className="mt-2 text-xs text-rz-hint">
+            ยอดออมคำนวณจากรายการ &quot;ออมเงิน&quot; / &quot;ถอนเงินออม&quot; ในหน้าบันทึก
+          </p>
           {error && <p className="mt-2 text-xs text-rz-red">{error}</p>}
           <div className="mt-3 flex gap-2">
             <button
@@ -197,7 +183,7 @@ export function SavingsGoalsSection({
                       type="button"
                       onClick={() => {
                         setEditingId(goal.id);
-                        setEditCurrent(goal.currentAmount);
+                        setEditName(goal.name);
                         setEditTarget(goal.targetAmount);
                         setError(null);
                       }}
@@ -211,12 +197,11 @@ export function SavingsGoalsSection({
                 {editing ? (
                   <div className="mt-2 space-y-2">
                     <label className="block text-xs text-rz-muted">
-                      ออมไว้แล้ว
+                      ชื่อเป้าหมาย
                       <input
-                        type="number"
-                        inputMode="decimal"
-                        value={editCurrent}
-                        onChange={(e) => setEditCurrent(e.target.value)}
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
                         className="mt-1 w-full rounded-lg border-[0.5px] border-rz-border bg-rz-bg px-3 py-2 text-sm text-rz-text outline-none focus:border-rz-rose"
                       />
                     </label>
@@ -258,7 +243,7 @@ export function SavingsGoalsSection({
                       />
                     </div>
                     <p className="mt-1.5 text-xs text-rz-hint rz-tabular">
-                      {formatMoney(goal.currentAmount, currency)} /{" "}
+                      ออมแล้ว {formatMoney(goal.currentAmount, currency)} /{" "}
                       {formatMoney(goal.targetAmount, currency)} ({pct.toFixed(0)}%)
                     </p>
                   </>

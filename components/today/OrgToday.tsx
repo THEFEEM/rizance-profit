@@ -1,4 +1,3 @@
-import Link from "next/link";
 import {
   listActivities,
   listProjectExpensesForProject,
@@ -11,6 +10,7 @@ import type { User } from "@/types";
 import { ActivityListSection } from "@/components/project/ActivityListSection";
 import { OrgProjectEntryList } from "@/components/project/OrgProjectEntryList";
 import { ProjectBudgetCard } from "@/components/project/ProjectBudgetCard";
+import { ViewFullSummaryButton } from "@/components/shared/ViewFullSummaryButton";
 
 /** Org-mode Today — budget overview, quick actions, recent entries, activities. */
 export async function OrgToday({ user, project }: { user: User; project: Project }) {
@@ -80,14 +80,11 @@ export async function OrgToday({ user, project }: { user: User; project: Project
       </div>
 
       {!closed && (
-        <div className="px-4">
-          <Link
-            href={`/projects/${projectId}`}
-            className="tap-target block rounded-[14px] border-[0.5px] border-rz-border bg-rz-card px-4 py-3 text-center text-sm font-medium text-rz-purple active:bg-rz-elevated"
-          >
-            เปิดหน้าองค์กรเต็ม →
-          </Link>
-        </div>
+        <ViewFullSummaryButton
+          href={`/projects/${projectId}/summary`}
+          accent="purple"
+          className="pb-2"
+        />
       )}
     </div>
   );

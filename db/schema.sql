@@ -354,9 +354,11 @@ CREATE TABLE IF NOT EXISTS personal_income_entries (
   amount NUMERIC(12,2) NOT NULL CHECK (amount > 0),
   category VARCHAR(30) NOT NULL
     CHECK (category IN ('salary','business','freelance','scholarship',
-           'family','bonus','loan_return','other_income')),
+           'family','bonus','loan_return','other_income','savings_withdrawal')),
   note TEXT,
   entry_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  savings_goal_id UUID,
+  is_savings_withdrawal BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_personal_income_user
@@ -369,9 +371,11 @@ CREATE TABLE IF NOT EXISTS personal_expense_entries (
   category VARCHAR(30) NOT NULL
     CHECK (category IN ('food','transport','education','rent','water',
            'electricity','internet','phone','health','clothing',
-           'donation','installment','social','other_expense')),
+           'donation','installment','social','other_expense','savings_deposit')),
   note TEXT,
   entry_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  savings_goal_id UUID,
+  is_savings_deposit BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_personal_expense_user

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Home, LayoutGrid, Plus, User } from "lucide-react";
+import { BarChart3, Home, LayoutGrid, Plus, Settings } from "lucide-react";
 import { ModePicker } from "@/components/ModePicker";
 
 const NAV_ICON_SIZE = 22;
@@ -15,7 +15,7 @@ const NAV_ITEMS = [
   { key: "stats", label: "สถิติ", Icon: BarChart3, kind: "link" as const },
   { key: "entry", label: "+", Icon: Plus, kind: "link" as const, prominent: true },
   { key: "mode", label: "โหมด", Icon: LayoutGrid, kind: "action" as const },
-  { key: "profile", label: "ฉัน", Icon: User, kind: "link" as const },
+  { key: "profile", label: "ตั้งค่า", Icon: Settings, kind: "link" as const },
 ] as const;
 
 function isNavActive(

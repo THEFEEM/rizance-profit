@@ -14,8 +14,13 @@ import { EntryContextBanner } from "@/components/EntryContextBanner";
 import { EntryList, type EntryRow } from "@/components/EntryList";
 import { apiFetch } from "@/lib/api-client";
 import { today } from "@/lib/date";
-import type { PersonalExpenseKey, PersonalIncomeKey } from "@/lib/personal-categories";
-import type { PersonalEntryRow, PersonalExpense, PersonalIncome } from "@/types/personal";
+import {
+  PERSONAL_SAVINGS_DEPOSIT,
+  PERSONAL_SAVINGS_WITHDRAWAL,
+  type PersonalExpenseKey,
+  type PersonalIncomeKey,
+} from "@/lib/personal-categories";
+import type { PersonalEntryRow, PersonalExpense, PersonalIncome, SavingsGoal } from "@/types/personal";
 
 function toEntryRows(entries: PersonalEntryRow[]): EntryRow[] {
   return entries.map((e) => ({
@@ -25,16 +30,19 @@ function toEntryRows(entries: PersonalEntryRow[]): EntryRow[] {
     note: e.note,
     category: e.category,
     createdAt: e.createdAt,
+    savingsGoalName: e.savingsGoalName ?? undefined,
   }));
 }
 
 export function PersonalEntryForm({
   initialTab,
   entries,
+  goals,
   currency = "THB",
 }: {
   initialTab?: string | null;
   entries: PersonalEntryRow[];
+  goals: SavingsGoal[];
   currency?: string;
 }) {
   const router = useRouter();
@@ -44,10 +52,12 @@ export function PersonalEntryForm({
   const [incomeCategory, setIncomeCategory] = useState<PersonalIncomeKey>("salary");
   const [incomeNote, setIncomeNote] = useState("");
   const [incomeDate, setIncomeDate] = useState(today());
+  const [incomeGoalId, setIncomeGoalId] = useState("");
 
   const [expenseCategory, setExpenseCategory] = useState<PersonalExpenseKey>("food");
   const [expenseNote, setExpenseNote] = useState("");
   const [expenseDate, setExpenseDate] = useState(today());
+  const [expenseGoalId, setExpenseGoalId] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +78,12 @@ export function PersonalEntryForm({
     setError(null);
 
     if (tab === "income") {
+      const isSavings = incomeCategory === PERSONAL_SAVINGS_WITHDRAWAL;
+      if (isSavings && !incomeGoalId) {
+        setError("กรุณาเลือกเป้าหมายออม");
+        setSaving(false);
+        return;
+      }
       const res = await apiFetch<PersonalIncome>("/api/personal/income", {
         method: "POST",
         body: JSON.stringify({
@@ -75,15 +91,23 @@ export function PersonalEntryForm({
           category: incomeCategory,
           note: incomeNote.trim() || undefined,
           entryDate: incomeDate,
+          savingsGoalId: isSavings ? incomeGoalId : undefined,
         }),
       });
       if (res.ok) {
         setRaw("");
+        setIncomeGoalId("");
         router.refresh();
       } else {
-        setError(res.fields?.amount?.[0] ?? res.message);
+        setError(res.fields?.savingsGoalId?.[0] ?? res.fields?.amount?.[0] ?? res.message);
       }
     } else {
+      const isSavings = expenseCategory === PERSONAL_SAVINGS_DEPOSIT;
+      if (isSavings && !expenseGoalId) {
+        setError("กรุณาเลือกเป้าหมายออม");
+        setSaving(false);
+        return;
+      }
       const res = await apiFetch<PersonalExpense>("/api/personal/expense", {
         method: "POST",
         body: JSON.stringify({
@@ -91,13 +115,15 @@ export function PersonalEntryForm({
           category: expenseCategory,
           note: expenseNote.trim() || undefined,
           entryDate: expenseDate,
+          savingsGoalId: isSavings ? expenseGoalId : undefined,
         }),
       });
       if (res.ok) {
         setRaw("");
+        setExpenseGoalId("");
         router.refresh();
       } else {
-        setError(res.fields?.amount?.[0] ?? res.message);
+        setError(res.fields?.savingsGoalId?.[0] ?? res.fields?.amount?.[0] ?? res.message);
       }
     }
 
@@ -136,6 +162,9 @@ export function PersonalEntryForm({
             onDateChange={setIncomeDate}
             maxDate={maxDate}
             disabled={saving}
+            goals={goals}
+            savingsGoalId={incomeGoalId}
+            onSavingsGoalChange={setIncomeGoalId}
           />
         ) : (
           <PersonalExpenseFields
@@ -147,6 +176,9 @@ export function PersonalEntryForm({
             onDateChange={setExpenseDate}
             maxDate={maxDate}
             disabled={saving}
+            goals={goals}
+            savingsGoalId={expenseGoalId}
+            onSavingsGoalChange={setExpenseGoalId}
           />
         )}
 
