@@ -46,6 +46,28 @@ const goalName = z.preprocess(
 export const savingsGoalSchema = z.object({
   name: goalName,
   targetAmount: amount,
+  currentAmount: z
+    .number()
+    .finite()
+    .min(0, "ยอดออมต้องไม่ติดลบ")
+    .max(9_999_999_999.99)
+    .optional(),
 });
 
+export const savingsGoalPatchSchema = z
+  .object({
+    name: goalName.optional(),
+    targetAmount: amount.optional(),
+    currentAmount: z
+      .number()
+      .finite()
+      .min(0, "ยอดออมต้องไม่ติดลบ")
+      .max(9_999_999_999.99)
+      .optional(),
+  })
+  .refine((d) => d.name !== undefined || d.targetAmount !== undefined || d.currentAmount !== undefined, {
+    message: "กรุณาระบุข้อมูลที่ต้องการแก้ไข",
+  });
+
 export type SavingsGoalInput = z.infer<typeof savingsGoalSchema>;
+export type SavingsGoalPatchInput = z.infer<typeof savingsGoalPatchSchema>;

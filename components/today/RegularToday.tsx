@@ -1,4 +1,5 @@
 import {
+  monthToDateSummary,
   allTimeSummary,
   allTimeCashIncome,
   dailySummary,
@@ -19,12 +20,13 @@ import type { User } from "@/types";
 /** Regular-shop Today — total sales hero + today's breakdown + partner split. */
 export async function RegularToday({ user }: { user: User }) {
   const date = today();
-  const [allTime, summary, incomes, expenses, cashIncome, split] = await Promise.all([
-    allTimeSummary(user.id),
+  const [monthly, summary, incomes, expenses, cashIncome, allTime, split] = await Promise.all([
+    monthToDateSummary(user.id),
     dailySummary(user.id, date),
     listIncomeByDate(user.id, date),
     listExpenseByDate(user.id, date),
     allTimeCashIncome(user.id),
+    allTimeSummary(user.id),
     shopSplitProfit(user.id, date, date),
   ]);
 
@@ -55,11 +57,13 @@ export async function RegularToday({ user }: { user: User }) {
   return (
     <>
       <TodayBalanceCard
-        totalSales={allTime.income}
-        cumulativeProfit={allTime.profit}
+        totalSales={monthly.income}
+        cumulativeProfit={monthly.profit}
         todayProfit={summary.profit}
         cashInHand={cashInHand}
         currency={user.currency}
+        salesLabel="ยอดขายเดือนนี้"
+        profitLabel="กำไรเดือนนี้"
       />
 
       <TodayStatCards

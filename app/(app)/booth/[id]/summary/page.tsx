@@ -17,6 +17,7 @@ export default async function BoothSummaryPage({ params }: { params: Promise<{ i
   return (
     <BoothSummaryView
       boothId={id}
+      userId={user.id}
       summary={summary}
       split={split}
       currency={user.currency}

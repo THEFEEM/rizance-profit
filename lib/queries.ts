@@ -1,4 +1,5 @@
 import { query } from "@/lib/db";
+import { isUndefinedColumnError } from "@/lib/db-migration-guard";
 import { computeProfit, sumDecimals, toCents } from "@/lib/money";
 import type {
   AllTimeSummary,
@@ -18,7 +19,7 @@ import type {
   User,
 } from "@/types";
 import type { ExpenseInput, IncomeInput } from "@/lib/validation";
-import { addDays, monthRange, periodRange, today } from "@/lib/date";
+import { addDays, currentMonth, monthRange, periodRange, today } from "@/lib/date";
 import { isFixed } from "@/lib/expense-categories";
 import { centsToDecimalString } from "@/lib/money";
 
@@ -80,7 +81,11 @@ function mapIncome(r: IncomeRow): Income {
   };
 }
 
-type ExpenseRow = IncomeRow & { category: string };
+type ExpenseRow = IncomeRow & {
+  category: string;
+  is_advance?: boolean;
+  payer_name?: string | null;
+};
 
 function mapExpense(r: ExpenseRow): Expense {
   return {
@@ -90,6 +95,8 @@ function mapExpense(r: ExpenseRow): Expense {
     note: r.note,
     entryDate: r.entry_date,
     createdAt: toIso(r.created_at),
+    isAdvance: r.is_advance,
+    payerName: r.payer_name ?? null,
   };
 }
 
@@ -273,6 +280,24 @@ export async function deleteIncome(userId: string, id: string): Promise<boolean>
 export async function createExpense(userId: string, input: ExpenseInput): Promise<Expense> {
   const entryDate = input.entryDate ?? today();
   const category = input.category ?? "expense_misc";
+  const isAdvance = input.isAdvance === true;
+  const payerName = input.payerName ?? null;
+
+  if (isAdvance) {
+    try {
+      const { rows } = await query<ExpenseRow>(
+        `INSERT INTO expense_entries (user_id, amount, category, note, entry_date, is_advance, payer_name)
+         VALUES ($1, $2, $3, $4, $5::date, true, $6)
+         RETURNING id, amount, category, note, entry_date::text AS entry_date, created_at,
+           is_advance, payer_name`,
+        [userId, input.amount.toFixed(2), category, input.note ?? null, entryDate, payerName],
+      );
+      return mapExpense(rows[0]);
+    } catch (err) {
+      if (!isUndefinedColumnError(err)) throw err;
+    }
+  }
+
   const { rows } = await query<ExpenseRow>(
     `INSERT INTO expense_entries (user_id, amount, category, note, entry_date)
      VALUES ($1, $2, $3, $4, $5::date)
@@ -316,8 +341,6 @@ export async function deleteExpense(userId: string, id: string): Promise<boolean
   return (rowCount ?? 0) > 0;
 }
 
-// ---- summaries (computed, never stored) -----------------------------------
-
 export async function allTimeSummary(userId: string): Promise<AllTimeSummary> {
   const { rows } = await query<{
     income: string;
@@ -331,6 +354,38 @@ export async function allTimeSummary(userId: string): Promise<AllTimeSummary> {
        (SELECT COUNT(*) FROM income_entries  WHERE user_id = $1)::text AS income_count,
        (SELECT COUNT(*) FROM expense_entries WHERE user_id = $1)::text AS expense_count`,
     [userId],
+  );
+  const r = rows[0];
+  return {
+    income: r.income,
+    expense: r.expense,
+    profit: computeProfit(r.income, r.expense),
+    incomeCount: Number(r.income_count),
+    expenseCount: Number(r.expense_count),
+  };
+}
+
+/** Calendar month-to-date (day 1 → today, Asia/Bangkok) — regular shop only. */
+export async function monthToDateSummary(userId: string): Promise<AllTimeSummary> {
+  const month = currentMonth();
+  const { start } = monthRange(month);
+  const end = today();
+  const { rows } = await query<{
+    income: string;
+    expense: string;
+    income_count: string;
+    expense_count: string;
+  }>(
+    `SELECT
+       COALESCE((SELECT SUM(amount) FROM income_entries
+                 WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date), 0)::text AS income,
+       COALESCE((SELECT SUM(amount) FROM expense_entries
+                 WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date), 0)::text AS expense,
+       (SELECT COUNT(*) FROM income_entries
+        WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date)::text AS income_count,
+       (SELECT COUNT(*) FROM expense_entries
+        WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date)::text AS expense_count`,
+    [userId, start, end],
   );
   const r = rows[0];
   return {

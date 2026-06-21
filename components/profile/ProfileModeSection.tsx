@@ -39,16 +39,25 @@ export function ProfileModeSection({
     let cancelled = false;
     (async () => {
       setLoading(true);
+      setError(null);
       const [boothRes, projectRes] = await Promise.all([
         apiFetch<Booth[]>("/api/booths"),
         apiFetch<ProjectListItem[]>("/api/projects"),
       ]);
       if (cancelled) return;
       setLoading(false);
+      const errors: string[] = [];
       if (boothRes.ok) setBooths(boothRes.data);
-      else setBooths([]);
+      else {
+        setBooths([]);
+        errors.push(boothRes.message || "โหลดรายการบูธไม่สำเร็จ");
+      }
       if (projectRes.ok) setProjects(projectRes.data);
-      else setProjects([]);
+      else {
+        setProjects([]);
+        errors.push(projectRes.message || "โหลดรายการโครงการไม่สำเร็จ");
+      }
+      if (errors.length > 0) setError(errors.join(" · "));
     })();
     return () => {
       cancelled = true;

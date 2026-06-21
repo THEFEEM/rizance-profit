@@ -1,9 +1,11 @@
+import { savingsRateFromGoals } from "@/lib/advance-creditors";
 import {
   personalCategoryBreakdown,
   personalDailyProfitSeries,
   personalPeriodSummary,
   listPersonalIncomesInPeriod,
   listPersonalExpensesInPeriod,
+  listSavingsGoals,
 } from "@/lib/personal-queries";
 import {
   formatDayShort,
@@ -90,6 +92,7 @@ export async function PersonalStatsSummary({
     periodIncomes,
     periodExpenses,
     dailySeries,
+    goals,
   ] = await Promise.all([
     personalPeriodSummary(user.id, start, end),
     personalCategoryBreakdown(user.id, start, end, "income"),
@@ -97,7 +100,10 @@ export async function PersonalStatsSummary({
     listPersonalIncomesInPeriod(user.id, start, end),
     listPersonalExpensesInPeriod(user.id, start, end),
     personalDailyProfitSeries(user.id, days),
+    listSavingsGoals(user.id),
   ]);
+
+  const savingsRatePct = savingsRateFromGoals(goals);
 
   const totalIncome = periodData.income;
   const totalExpense = periodData.expense;
@@ -128,6 +134,7 @@ export async function PersonalStatsSummary({
           currency={user.currency}
           variant="personal"
           accent="rose"
+          savingsRatePct={savingsRatePct}
         />
         <p className="px-4 pt-2 text-center text-xs text-rz-hint">
           {formatPeriodRangeLabel(start, end)}

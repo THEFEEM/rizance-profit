@@ -14,6 +14,7 @@ import { DailyProfitChart } from "@/components/stats/DailyProfitChart";
 import { BreakdownSection, ProgressBarRow } from "@/components/stats/BreakdownSection";
 import { CategoryProgressList } from "@/components/stats/CategoryProgressList";
 import { ProjectSummaryHeader } from "@/components/project/summary/ProjectSummaryHeader";
+import { ProjectAdvanceCreditorsSection } from "@/components/project/summary/ProjectAdvanceCreditorsSection";
 
 function chartDataFromSeries(series: DailyExpensePoint[], useWeekdayLabels: boolean) {
   return series.map((p) => ({
@@ -21,6 +22,23 @@ function chartDataFromSeries(series: DailyExpensePoint[], useWeekdayLabels: bool
     label: useWeekdayLabels ? formatWeekdayShortThai(p.date) : formatDayShort(p.date),
     expense: Number(p.expense),
     expenseDisplay: p.expense,
+  }));
+}
+
+function rollupAdvanceByPayer(
+  activities: { advanceByPayer: { payerName: string; unreimbursed: string }[] }[],
+) {
+  const map = new Map<string, number>();
+  for (const activity of activities) {
+    for (const p of activity.advanceByPayer) {
+      const cents = Math.round(Number(p.unreimbursed) * 100);
+      if (cents <= 0) continue;
+      map.set(p.payerName, (map.get(p.payerName) ?? 0) + cents);
+    }
+  }
+  return [...map.entries()].map(([payerName, cents]) => ({
+    payerName,
+    unreimbursed: (cents / 100).toFixed(2),
   }));
 }
 
@@ -82,6 +100,11 @@ export function ProjectOverviewView({
           />
         </div>
       </section>
+
+      <ProjectAdvanceCreditorsSection
+        advanceByPayer={rollupAdvanceByPayer(summary.activities)}
+        currency={currency}
+      />
 
       <div className="mt-6 space-y-6">
         {fundRows.length > 0 && (

@@ -86,7 +86,7 @@ export async function PersonalToday({ user }: { user: User }) {
         )}
       </section>
 
-      <SavingsGoalsSection goals={goals} balance={allTime.balance} currency={user.currency} />
+      <SavingsGoalsSection goals={goals} currency={user.currency} />
     </>
   );
 }

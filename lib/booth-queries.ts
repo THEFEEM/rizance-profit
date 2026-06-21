@@ -742,7 +742,7 @@ export async function deleteBoothMember(
 
 // ---- profit split (derived) -------------------------------------------------
 
-async function listBoothAdvances(userId: string, boothId: string) {
+export async function listBoothAdvances(userId: string, boothId: string) {
   const { rows } = await query<{
     creditor_key: string;
     member_id: string | null;

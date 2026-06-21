@@ -85,6 +85,7 @@ export function StatsSummaryCards({
   remaining,
   budgetUsedPct = 0,
   balance,
+  savingsRatePct,
 }: {
   income: string;
   expense: string;
@@ -95,12 +96,17 @@ export function StatsSummaryCards({
   remaining?: string;
   budgetUsedPct?: number;
   balance?: string;
+  /** Manual savings progress from goals (overrides income/balance-derived rate). */
+  savingsRatePct?: number;
 }) {
   if (variant === "personal") {
     const balanceValue = balance ?? profit ?? "0.00";
     const balanceSign = moneySign(balanceValue);
     const balanceTone = balanceSign > 0 ? "green" : balanceSign < 0 ? "red" : "muted";
-    const savingsPct = Number(profitRatePercent(income, balanceValue));
+    const savingsPct =
+      savingsRatePct !== undefined
+        ? savingsRatePct
+        : Number(profitRatePercent(income, balanceValue));
     const savingsTone = savingsRateTone(savingsPct);
 
     return (

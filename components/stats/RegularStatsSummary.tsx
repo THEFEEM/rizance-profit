@@ -23,6 +23,7 @@ import { StatsSummaryCards } from "@/components/stats/StatsSummaryCards";
 import { DailyProfitChart } from "@/components/stats/DailyProfitChart";
 import { BreakdownSection, ProgressBarRow } from "@/components/stats/BreakdownSection";
 import { SplitProfitCard } from "@/components/shared/SplitProfitCard";
+import { ShopAdvanceCreditorsSection } from "@/components/shop/ShopAdvanceCreditorsSection";
 import {
   CategoryProgressList,
   type CategoryProgressRow,
@@ -215,12 +216,15 @@ export async function RegularStatsSummary({
       </div>
 
       {shopSplit && (
-        <SplitProfitCard
-          split={shopSplit}
-          currency={user.currency}
-          accent="green"
-          periodLabel={PERIOD_LABELS[period]}
-        />
+        <>
+          <SplitProfitCard
+            split={shopSplit}
+            currency={user.currency}
+            accent="green"
+            periodLabel={PERIOD_LABELS[period]}
+          />
+          <ShopAdvanceCreditorsSection userId={user.id} currency={user.currency} />
+        </>
       )}
     </>
   );

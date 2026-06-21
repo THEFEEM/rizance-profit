@@ -54,11 +54,12 @@ export type PersonalEntryRow = {
   createdAt: string;
 };
 
-/** Savings goal — target only; saved amount is computed from personal balance. */
+/** Savings goal — manual saved amount + target (not derived from ledger). */
 export type SavingsGoal = {
   id: string;
   userId: string;
   name: string;
   targetAmount: string;
+  currentAmount: string;
   createdAt: string;
 };
