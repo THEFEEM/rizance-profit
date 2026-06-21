@@ -35,7 +35,8 @@
     "test:fix-pack-h-logic": "node scripts/test-fix-pack-h-logic.mjs",
     "test:fix-pack-i-logic": "node scripts/test-fix-pack-i-logic.mjs",
     "test:subscription": "node scripts/test-subscription.mjs",
-    "test:payment": "node scripts/test-payment.mjs"
+    "test:payment": "node scripts/test-payment.mjs",
+    "test:payment-webhook": "node scripts/test-payment-webhook.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
