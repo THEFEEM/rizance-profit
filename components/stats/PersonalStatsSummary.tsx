@@ -22,11 +22,13 @@ import {
 } from "@/components/stats/CategoryProgressList";
 import type { CategoryBreakdownEntry } from "@/components/stats/CategoryBreakdownPanel";
 import {
-  personalExpenseIcon,
   personalExpenseLabel,
-  personalIncomeIcon,
   personalIncomeLabel,
 } from "@/lib/personal-categories";
+import {
+  renderPersonalExpenseIcon,
+  renderPersonalIncomeIcon,
+} from "@/lib/category-lucide-icons";
 import type { PersonalCategoryBreakdownItem } from "@/types/personal";
 import type { User } from "@/types";
 
@@ -42,7 +44,7 @@ function toCategoryProgressRows(
   totalAmount: string,
 ): CategoryProgressRow[] {
   const labelFn = kind === "income" ? personalIncomeLabel : personalExpenseLabel;
-  const iconFn = kind === "income" ? personalIncomeIcon : personalExpenseIcon;
+  const iconFn = kind === "income" ? renderPersonalIncomeIcon : renderPersonalExpenseIcon;
   return items
     .map((item) => ({
       category: item.category,

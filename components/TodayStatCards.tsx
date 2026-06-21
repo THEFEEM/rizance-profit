@@ -24,7 +24,7 @@ export function TodayStatCards({
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[11px] text-rz-hint">{incomeLabel}</p>
-            <p className="rz-tabular mt-0.5 text-[17px] font-medium text-rz-text">
+            <p className="rz-tabular mt-0.5 text-[17px] font-medium text-rz-green">
               {formatMoney(income, currency)}
             </p>
           </div>
@@ -38,7 +38,7 @@ export function TodayStatCards({
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[11px] text-rz-hint">{expenseLabel}</p>
-            <p className="rz-tabular mt-0.5 text-[17px] font-medium text-rz-text">
+            <p className="rz-tabular mt-0.5 text-[17px] font-medium text-rz-red">
               {formatMoney(expense, currency)}
             </p>
           </div>

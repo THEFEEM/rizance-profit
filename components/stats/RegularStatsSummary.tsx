@@ -29,11 +29,13 @@ import {
 } from "@/components/stats/CategoryProgressList";
 import type { CategoryBreakdownEntry } from "@/components/stats/CategoryBreakdownPanel";
 import {
-  expenseCategoryIcon,
   expenseCategoryLabel,
-  incomeCategoryIcon,
   incomeCategoryLabel,
 } from "@/lib/expense-categories";
+import {
+  renderShopExpenseIcon,
+  renderShopIncomeIcon,
+} from "@/lib/category-lucide-icons";
 import type { CategoryBreakdownItem, User } from "@/types";
 
 function sharePercent(part: string, total: string): number {
@@ -48,7 +50,7 @@ function toCategoryProgressRows(
   totalAmount: string,
 ): CategoryProgressRow[] {
   const labelFn = kind === "income" ? incomeCategoryLabel : expenseCategoryLabel;
-  const iconFn = kind === "income" ? incomeCategoryIcon : expenseCategoryIcon;
+  const iconFn = kind === "income" ? renderShopIncomeIcon : renderShopExpenseIcon;
   return items
     .map((item) => ({
       category: item.category,

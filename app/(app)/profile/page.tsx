@@ -13,7 +13,8 @@ export default async function ProfilePage() {
 
   const rawContext = (await cookies()).get(CONTEXT_COOKIE)?.value;
   const ctx = await resolveTodayContext(user.id, undefined, rawContext);
-  const shopMembers = await listShopMembers(user.id);
+  const shopMembers =
+    ctx.mode === "regular" || ctx.mode === "booth" ? await listShopMembers(user.id) : [];
 
   return (
     <ProfilePageContent

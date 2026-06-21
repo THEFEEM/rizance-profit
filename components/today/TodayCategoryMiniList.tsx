@@ -1,6 +1,7 @@
 "use client";
 
 import { formatMoney } from "@/lib/money";
+import { renderShopExpenseIcon, renderShopIncomeIcon } from "@/lib/category-lucide-icons";
 import type { TodayCategoryGroup } from "@/lib/today-category-groups";
 
 export function TodayCategoryMiniList({
@@ -28,10 +29,14 @@ export function TodayCategoryMiniList({
             className="flex min-h-8 shrink-0 items-center gap-2 rounded-full border-[0.5px] border-rz-border bg-rz-card px-3 py-1.5 active:bg-rz-elevated"
           >
             <span
-              className={`text-sm ${g.kind === "income" ? "text-rz-green" : "text-rz-red"}`}
+              className={`flex h-5 w-5 items-center justify-center ${
+                g.kind === "income" ? "text-rz-green" : "text-rz-red"
+              }`}
               aria-hidden
             >
-              {g.icon}
+              {g.kind === "income"
+                ? renderShopIncomeIcon(g.category, 16)
+                : renderShopExpenseIcon(g.category, 16)}
             </span>
             <span className="text-[11px] text-rz-muted">{g.label}</span>
             <span

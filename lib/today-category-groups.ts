@@ -1,10 +1,8 @@
 import type { EntryRow } from "@/components/EntryList";
 import { sumDecimals, toCents } from "@/lib/money";
 import {
-  expenseCategoryIcon,
   expenseCategoryLabel,
   expenseCategoryOrder,
-  incomeCategoryIcon,
   incomeCategoryLabel,
   incomeCategoryOrder,
 } from "@/lib/expense-categories";
@@ -12,7 +10,7 @@ import {
 export type TodayCategoryGroup = {
   key: string;
   kind: "income" | "expense";
-  icon: string;
+  category: string;
   label: string;
   subtotal: string;
 };
@@ -39,11 +37,10 @@ export function buildTodayCategoryGroups(entries: EntryRow[]): TodayCategoryGrou
     const category = key.split(":")[1]!;
     const label =
       kind === "income" ? incomeCategoryLabel(category) : expenseCategoryLabel(category);
-    const icon = kind === "income" ? incomeCategoryIcon(category) : expenseCategoryIcon(category);
     groups.push({
       key,
       kind,
-      icon,
+      category,
       label,
       subtotal,
     });

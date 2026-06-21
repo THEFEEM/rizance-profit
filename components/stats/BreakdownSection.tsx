@@ -40,14 +40,7 @@ export function ProgressBarRow({
         : tone === "amber"
           ? "bg-rz-amber"
           : "bg-rz-purple";
-  const amountClass =
-    tone === "green"
-      ? "text-rz-green"
-      : tone === "red"
-        ? "text-rz-red"
-        : tone === "amber"
-          ? "text-rz-amber"
-          : "text-rz-text";
+  const amountClass = tone === "red" ? "text-rz-red" : "text-rz-green";
 
   const pct = Math.min(100, Math.max(0, percentage));
 
