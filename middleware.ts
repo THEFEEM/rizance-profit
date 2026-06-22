@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/jwt";
-import { isVercel } from "@/lib/env";
+import { getAppUrl, isVercel } from "@/lib/env";
 
 const PUBLIC_PATHS = ["/login", "/register"];
+const LEGACY_APP_HOST = "rizance-profit.vercel.app";
 
 function isPublicStaticFile(pathname: string): boolean {
   const PUBLIC_FILES = ["/sw.js", "/manifest.json", "/favicon.ico"];
@@ -16,11 +17,16 @@ function isPublicStaticFile(pathname: string): boolean {
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const host = req.headers.get("host") ?? req.nextUrl.host;
 
   // Belt-and-suspenders: force HTTPS on production (Vercel terminates TLS at the edge).
   if (isVercel() && req.headers.get("x-forwarded-proto") === "http") {
-    const host = req.headers.get("host") ?? req.nextUrl.host;
     return NextResponse.redirect(`https://${host}${pathname}${req.nextUrl.search}`, 301);
+  }
+
+  // Permanent redirect from the old production Vercel host to the canonical app domain.
+  if (host === LEGACY_APP_HOST) {
+    return NextResponse.redirect(`${getAppUrl()}${pathname}${req.nextUrl.search}`, 308);
   }
 
   // PWA / static passthrough — must run before auth (sw.js, manifest, icons).
