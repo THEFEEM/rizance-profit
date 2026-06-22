@@ -9,6 +9,7 @@ import { SetupField, SetupPrimaryButton } from "@/components/booth/setup/SetupFi
 import { UserIcon } from "@/components/booth/setup/icons";
 import { ROLE_STYLES } from "@/components/booth/summary/role-styles";
 import { apiFetch } from "@/lib/api-client";
+import { today } from "@/lib/date";
 import { formatMoney } from "@/lib/money";
 import type { AppContext } from "@/types/context";
 import type { User } from "@/types";
@@ -51,6 +52,8 @@ export function CreateShopForm({
   const [role, setRole] = useState<ShopMemberRole>("investor");
   const [investmentRaw, setInvestmentRaw] = useState("");
   const [padOpen, setPadOpen] = useState(false);
+  const [openingBalanceRaw, setOpeningBalanceRaw] = useState("");
+  const [openingPadOpen, setOpeningPadOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -100,6 +103,31 @@ export function CreateShopForm({
       return;
     }
 
+    const openingBalance = openingBalanceRaw === "" ? 0 : Number(openingBalanceRaw);
+    if (!Number.isFinite(openingBalance) || openingBalance < 0) {
+      setSaving(false);
+      setError("กรุณาระบุเงินตั้งต้นที่ถูกต้อง");
+      return;
+    }
+
+    if (openingBalance > 0) {
+      const incomeRes = await apiFetch("/api/income", {
+        method: "POST",
+        body: JSON.stringify({
+          amount: openingBalance,
+          category: "other_income",
+          paymentMethod: "cash",
+          note: "ยอดยกมา",
+          entryDate: today(),
+        }),
+      });
+      if (!incomeRes.ok) {
+        setSaving(false);
+        setError(incomeRes.fields?.amount?.[0] ?? incomeRes.message);
+        return;
+      }
+    }
+
     for (const m of pending) {
       const memberRes = await apiFetch("/api/shop/members", {
         method: "POST",
@@ -144,6 +172,35 @@ export function CreateShopForm({
         value={shopName}
         onChange={(e) => setShopName(e.target.value)}
       />
+
+      <section>
+        <h2 className="mb-2 text-sm font-medium text-rz-muted">เงินตั้งต้นในร้าน (ถ้ามี)</h2>
+        <div className="rounded-[14px] border-[0.5px] border-rz-border bg-rz-card p-4">
+          <p className="rz-tabular text-lg font-medium text-rz-text">
+            {formatTyped(openingBalanceRaw) || "0"}
+          </p>
+          {openingPadOpen ? (
+            <QuickAmountPad
+              value={openingBalanceRaw}
+              onChange={setOpeningBalanceRaw}
+              onSave={() => setOpeningPadOpen(false)}
+              saveLabel="ตกลง"
+              accent="green"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setOpeningPadOpen(true)}
+              className="tap-target text-sm font-medium text-rz-green"
+            >
+              ใส่จำนวน →
+            </button>
+          )}
+          <p className="mt-2 text-xs text-rz-hint">
+            เงินที่ร้านมีอยู่แล้วก่อนเริ่มใช้ Rizance (เช่น ยอดยกมาจากที่จดไว้)
+          </p>
+        </div>
+      </section>
 
       <section>
         <h2 className="mb-2 text-sm font-medium text-rz-muted">เพิ่มสมาชิก (หุ้นส่วน)</h2>
