@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { LogOut, Pencil } from "lucide-react";
 import { ProfileModeSection } from "@/components/profile/ProfileModeSection";
 import { ShopMemberEditor } from "@/components/shop/ShopMemberEditor";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -139,10 +141,10 @@ export function ProfilePageContent({
                   setDraft(name);
                   setEditing(true);
                 }}
-                className="tap-target rounded-full px-2 py-1 text-sm text-rz-hint active:text-rz-muted"
+                className="tap-target flex h-8 w-8 items-center justify-center rounded-full text-rz-muted active:bg-rz-elevated active:text-rz-hint"
                 aria-label="แก้ไขชื่อ"
               >
-                ✏️
+                <Pencil className="h-4 w-4" strokeWidth={2} aria-hidden />
               </button>
             </div>
           )}
@@ -204,8 +206,16 @@ export function ProfilePageContent({
           <h2 className="border-b-[0.5px] border-rz-border px-4 py-3 text-sm font-medium text-rz-text">
             อื่นๆ
           </h2>
-          <p className="border-b-[0.5px] border-rz-border px-4 py-3 text-sm text-rz-muted">
-            📋 เกี่ยวกับแอป {getAppVersionLabel()}
+          <p className="flex items-center gap-3 border-b-[0.5px] border-rz-border px-4 py-3 text-sm text-rz-muted">
+            <Image
+              src="/icons/icon-192.png"
+              alt=""
+              width={22}
+              height={22}
+              className="h-[22px] w-[22px] shrink-0 rounded-full object-cover"
+              unoptimized
+            />
+            <span>เกี่ยวกับแอป {getAppVersionLabel()}</span>
           </p>
         </section>
 
@@ -214,7 +224,9 @@ export function ProfilePageContent({
             ติดต่อเรา
           </h2>
           <ul className="divide-y divide-rz-border">
-            {CONTACT_CHANNELS.map((channel) => (
+            {CONTACT_CHANNELS.map((channel) => {
+              const ChannelIcon = channel.icon;
+              return (
               <li key={channel.id}>
                 <a
                   href={channel.href}
@@ -222,9 +234,11 @@ export function ProfilePageContent({
                   rel={channel.href.startsWith("http") ? "noopener noreferrer" : undefined}
                   className="flex items-center gap-3 px-4 py-3 text-sm active:bg-rz-elevated"
                 >
-                  <span className="text-base" aria-hidden>
-                    {channel.icon}
-                  </span>
+                  <ChannelIcon
+                    className="h-4 w-4 shrink-0 text-rz-muted"
+                    strokeWidth={2}
+                    aria-hidden
+                  />
                   <span className="min-w-0 flex-1">
                     <span className="block text-rz-muted">{channel.label}</span>
                     <span className="block truncate text-rz-text">{channel.value}</span>
@@ -234,7 +248,8 @@ export function ProfilePageContent({
                   </span>
                 </a>
               </li>
-            ))}
+              );
+            })}
           </ul>
         </section>
 
@@ -242,9 +257,10 @@ export function ProfilePageContent({
           type="button"
           onClick={logout}
           disabled={logoutBusy}
-          className="tap-target flex min-h-12 w-full items-center justify-center rounded-[14px] border-[0.5px] border-rz-border bg-rz-card text-sm font-medium text-rz-red active:bg-rz-elevated disabled:opacity-50"
+          className="tap-target flex min-h-12 w-full items-center justify-center gap-2 rounded-[14px] border-[0.5px] border-rz-border bg-rz-card text-sm font-medium text-rz-red active:bg-rz-elevated disabled:opacity-50"
         >
-          {logoutBusy ? "กำลังออก…" : "🚪 ออกจากระบบ"}
+          {!logoutBusy && <LogOut className="h-4 w-4" strokeWidth={2} aria-hidden />}
+          {logoutBusy ? "กำลังออก…" : "ออกจากระบบ"}
         </button>
       </div>
     </div>
