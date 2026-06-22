@@ -74,6 +74,11 @@ export function BoothDayEntryList({
     return badge ? `${date} · ${badge}` : date;
   }
 
+  function signedAmount(row: Row): string {
+    const sign = row.kind === "income" ? "+ " : "− ";
+    return `${sign}${formatMoney(row.entry.amount, currency)}`;
+  }
+
   async function confirmDelete() {
     if (!pending || deleting) return;
     const id = pending.entry.id;
@@ -186,7 +191,7 @@ export function BoothDayEntryList({
       {pending && (
         <DeleteConfirm
           title={title(pending)}
-          amount={formatMoney(pending.entry.amount, currency)}
+          amount={signedAmount(pending)}
           onConfirm={confirmDelete}
           onCancel={() => setPending(null)}
           busy={deleting === pending.entry.id}

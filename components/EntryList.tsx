@@ -92,6 +92,11 @@ export function EntryList({
   const visible = readOnly ? entries : entries.filter((e) => !removed.has(e.id));
   const isToday = appearance === "today";
 
+  function signedAmount(row: EntryRow): string {
+    const sign = row.kind === "income" ? "+ " : "− ";
+    return `${sign}${formatMoney(row.amount, currency)}`;
+  }
+
   async function confirmDelete() {
     if (!pending || deleting) return;
     setDeleting(pending.id);
@@ -208,7 +213,7 @@ export function EntryList({
       {pending && (
         <DeleteConfirm
           title={entryTitle(pending, ledger)}
-          amount={formatMoney(pending.amount, currency)}
+          amount={signedAmount(pending)}
           onConfirm={confirmDelete}
           onCancel={() => setPending(null)}
           busy={deleting === pending.id}
