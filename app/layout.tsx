@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import RegisterSW from "@/components/pwa/RegisterSW";
+import { getAppUrl } from "@/lib/env";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -11,6 +12,10 @@ const geistSans = Geist({
 export const metadata: Metadata = {
   title: "Rizance",
   description: "Know your real profit",
+  metadataBase: new URL(getAppUrl()),
+  alternates: {
+    canonical: "/",
+  },
   manifest: "/manifest.json",
   icons: {
     icon: [
