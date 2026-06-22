@@ -59,6 +59,14 @@ export async function OrgToday({ user, project }: { user: User; project: Project
       </div>
 
       <div className="px-4">
+        <ActivityListSection
+          projectId={projectId}
+          activities={summary.activities}
+          currency={user.currency}
+        />
+      </div>
+
+      <div className="px-4">
         <h2 className="mb-2.5 text-sm font-medium text-rz-muted">รายการล่าสุด</h2>
         <OrgProjectEntryList
           incomes={incomes}
@@ -68,14 +76,6 @@ export async function OrgToday({ user, project }: { user: User; project: Project
           currency={user.currency}
           kind="all"
           limit={10}
-        />
-      </div>
-
-      <div className="px-4">
-        <ActivityListSection
-          projectId={projectId}
-          activities={summary.activities}
-          currency={user.currency}
         />
       </div>
 
