@@ -75,6 +75,7 @@ export type Expense = {
   id: string;
   amount: string;
   category: ExpenseCategory;
+  paymentMethod?: string;
   note: string | null;
   entryDate: string; // YYYY-MM-DD
   createdAt: string;

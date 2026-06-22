@@ -92,6 +92,7 @@ function mapExpense(r: ExpenseRow): Expense {
     id: r.id,
     amount: r.amount,
     category: r.category as ExpenseCategory,
+    paymentMethod: r.payment_method,
     note: r.note,
     entryDate: r.entry_date,
     createdAt: toIso(r.created_at),
@@ -281,7 +282,30 @@ export async function createExpense(userId: string, input: ExpenseInput): Promis
   const entryDate = input.entryDate ?? today();
   const category = input.category ?? "expense_misc";
   const isAdvance = input.isAdvance === true;
-  const payerName = input.payerName ?? null;
+  const payerName = isAdvance ? (input.payerName ?? null) : null;
+  const paymentMethod = input.paymentMethod ?? "cash";
+
+  try {
+    const { rows } = await query<ExpenseRow>(
+      `INSERT INTO expense_entries (user_id, amount, category, payment_method, note, entry_date, is_advance, payer_name)
+       VALUES ($1, $2, $3, $4, $5, $6::date, $7, $8)
+       RETURNING id, amount, category, payment_method, note, entry_date::text AS entry_date, created_at,
+         is_advance, payer_name`,
+      [
+        userId,
+        input.amount.toFixed(2),
+        category,
+        paymentMethod,
+        input.note ?? null,
+        entryDate,
+        isAdvance,
+        payerName,
+      ],
+    );
+    return mapExpense(rows[0]);
+  } catch (err) {
+    if (!isUndefinedColumnError(err)) throw err;
+  }
 
   if (isAdvance) {
     try {
@@ -493,6 +517,56 @@ export async function periodIncomeByCashTransfer(
   );
   const r = rows[0];
   return { cashIncome: r.cash_income, transferIncome: r.transfer_income };
+}
+
+/** All-time cash vs transfer income — regular shop only. */
+export async function allTimeIncomeByCashTransfer(
+  userId: string,
+): Promise<{ cashIncome: string; transferIncome: string }> {
+  const { rows } = await query<{ cash_income: string; transfer_income: string }>(
+    `SELECT
+       COALESCE(SUM(CASE WHEN payment_method = 'cash' THEN amount ELSE 0 END), 0)::text AS cash_income,
+       COALESCE(SUM(CASE WHEN payment_method = 'transfer' THEN amount ELSE 0 END), 0)::text AS transfer_income
+     FROM income_entries
+     WHERE user_id = $1`,
+    [userId],
+  );
+  const r = rows[0];
+  return { cashIncome: r.cash_income, transferIncome: r.transfer_income };
+}
+
+/** Cash vs transfer expense totals for a date range — regular shop only. */
+export async function periodExpenseByCashTransfer(
+  userId: string,
+  start: string,
+  end: string,
+): Promise<{ cashExpense: string; transferExpense: string }> {
+  const { rows } = await query<{ cash_expense: string; transfer_expense: string }>(
+    `SELECT
+       COALESCE(SUM(CASE WHEN payment_method = 'cash' THEN amount ELSE 0 END), 0)::text AS cash_expense,
+       COALESCE(SUM(CASE WHEN payment_method = 'transfer' THEN amount ELSE 0 END), 0)::text AS transfer_expense
+     FROM expense_entries
+     WHERE user_id = $1 AND entry_date >= $2 AND entry_date <= $3`,
+    [userId, start, end],
+  );
+  const r = rows[0];
+  return { cashExpense: r.cash_expense, transferExpense: r.transfer_expense };
+}
+
+/** All-time cash vs transfer expense — regular shop only. */
+export async function allTimeExpenseByCashTransfer(
+  userId: string,
+): Promise<{ cashExpense: string; transferExpense: string }> {
+  const { rows } = await query<{ cash_expense: string; transfer_expense: string }>(
+    `SELECT
+       COALESCE(SUM(CASE WHEN payment_method = 'cash' THEN amount ELSE 0 END), 0)::text AS cash_expense,
+       COALESCE(SUM(CASE WHEN payment_method = 'transfer' THEN amount ELSE 0 END), 0)::text AS transfer_expense
+     FROM expense_entries
+     WHERE user_id = $1`,
+    [userId],
+  );
+  const r = rows[0];
+  return { cashExpense: r.cash_expense, transferExpense: r.transfer_expense };
 }
 
 /** Fixed vs variable expense totals for a date range — derived from category via isFixed(). */

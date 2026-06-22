@@ -99,6 +99,7 @@ export const expenseSchema = z
   .object({
     amount,
     category: expenseCategory,
+    paymentMethod,
     note,
     entryDate,
     isAdvance: z.boolean().optional(),
