@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/Button";
 
-/** Inline confirm step before deleting an entry (replaces window.confirm). */
+/** Confirm dialog before deleting a transaction entry. */
 export function DeleteConfirm({
   title,
   amount,
@@ -22,24 +22,33 @@ export function DeleteConfirm({
       role="dialog"
       aria-modal="true"
       aria-labelledby="delete-title"
+      onClick={onCancel}
     >
-      <div className="w-full max-w-sm rounded-[14px] border-[0.5px] border-rz-border bg-rz-card p-5 shadow-xl">
+      <div
+        className="w-full max-w-sm rounded-[14px] border-[0.5px] border-rz-border bg-rz-card p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <h2 id="delete-title" className="text-lg font-medium text-rz-text">
-          Delete entry?
+          ลบรายการนี้?
         </h2>
         <p className="mt-2 text-sm text-rz-muted">
           <span className="font-medium text-rz-text">{title}</span>
-          {" · "}
+          {" "}
           <span className="rz-tabular">{amount}</span>
         </p>
-        <p className="mt-1 text-sm text-rz-hint">This cannot be undone.</p>
+        <p className="mt-1 text-sm text-rz-hint">การลบไม่สามารถกู้คืนได้</p>
         <div className="mt-5 grid grid-cols-2 gap-3">
           <Button variant="secondary" fullWidth onClick={onCancel} disabled={busy}>
-            Cancel
+            ยกเลิก
           </Button>
-          <Button variant="danger" fullWidth onClick={onConfirm} disabled={busy}>
-            {busy ? "Deleting…" : "Delete"}
-          </Button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={busy}
+            className="tap-target no-select inline-flex w-full items-center justify-center rounded-[11px] border-[0.5px] border-transparent bg-[#DC2626] px-5 text-sm font-medium text-white transition-opacity active:opacity-90 disabled:opacity-40"
+          >
+            {busy ? "กำลังลบ…" : "ลบ"}
+          </button>
         </div>
       </div>
     </div>

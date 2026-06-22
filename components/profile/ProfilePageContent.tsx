@@ -6,11 +6,11 @@ import { ProfileModeSection } from "@/components/profile/ProfileModeSection";
 import { ShopMemberEditor } from "@/components/shop/ShopMemberEditor";
 import { UserAvatar } from "@/components/UserAvatar";
 import { apiFetch } from "@/lib/api-client";
+import { CONTACT_CHANNELS } from "@/lib/contact-channels";
+import { getAppVersionLabel } from "@/lib/app-version";
 import type { AuthProvider } from "@/types";
 import type { ShopMember } from "@/types/shop";
 import type { User } from "@/types";
-
-const APP_VERSION = "v1.0";
 
 function authProviderBadge(provider: AuthProvider): string | null {
   if (provider === "google") return "เข้าสู่ระบบด้วย Google";
@@ -88,7 +88,7 @@ export function ProfilePageContent({
   return (
     <div className="px-4 pb-8 pt-4" data-context="profile">
       <div className="flex flex-col items-center text-center">
-        <UserAvatar name={profileLabel} avatarUrl={user.avatarUrl} size="lg" />
+        <UserAvatar name={profileLabel} avatarUrl={user.avatarUrl} size="lg" brandFallback />
 
         <div className="mt-4 w-full max-w-xs">
           {editing ? (
@@ -204,7 +204,38 @@ export function ProfilePageContent({
           <h2 className="border-b-[0.5px] border-rz-border px-4 py-3 text-sm font-medium text-rz-text">
             อื่นๆ
           </h2>
-          <p className="px-4 py-3 text-sm text-rz-muted">📋 เกี่ยวกับแอป {APP_VERSION}</p>
+          <p className="border-b-[0.5px] border-rz-border px-4 py-3 text-sm text-rz-muted">
+            📋 เกี่ยวกับแอป {getAppVersionLabel()}
+          </p>
+        </section>
+
+        <section className="rounded-[14px] border-[0.5px] border-rz-border bg-rz-card">
+          <h2 className="border-b-[0.5px] border-rz-border px-4 py-3 text-sm font-medium text-rz-text">
+            ติดต่อเรา
+          </h2>
+          <ul className="divide-y divide-rz-border">
+            {CONTACT_CHANNELS.map((channel) => (
+              <li key={channel.id}>
+                <a
+                  href={channel.href}
+                  target={channel.href.startsWith("http") ? "_blank" : undefined}
+                  rel={channel.href.startsWith("http") ? "noopener noreferrer" : undefined}
+                  className="flex items-center gap-3 px-4 py-3 text-sm active:bg-rz-elevated"
+                >
+                  <span className="text-base" aria-hidden>
+                    {channel.icon}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-rz-muted">{channel.label}</span>
+                    <span className="block truncate text-rz-text">{channel.value}</span>
+                  </span>
+                  <span className="text-rz-hint" aria-hidden>
+                    ›
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
         </section>
 
         <button
