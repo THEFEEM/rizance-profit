@@ -75,6 +75,9 @@ export async function PersonalToday({ user }: { user: User }) {
         currency={user.currency}
       />
 
+      <SavingsGoalsSection goals={goals} currency={user.currency} />
+      <SavingsActivitySection transactions={savingsTx} currency={user.currency} />
+
       <section className="mt-4 px-4">
         <h2 className="mb-2 text-sm font-medium text-rz-text">รายการล่าสุด</h2>
         {entryRows.length > 0 ? (
@@ -94,9 +97,6 @@ export async function PersonalToday({ user }: { user: User }) {
           </p>
         )}
       </section>
-
-      <SavingsGoalsSection goals={goals} currency={user.currency} />
-      <SavingsActivitySection transactions={savingsTx} currency={user.currency} />
 
       <ViewFullSummaryButton href="/personal/summary" accent="rose" className="mt-4 pb-2" />
     </>
