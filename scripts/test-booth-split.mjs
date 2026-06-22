@@ -330,6 +330,40 @@ const fifo = computeAdvanceRepayments("1000.00", [
 assert("FIFO pays B first 500", fifo.find((r) => r.memberId === "b")?.amount === "500.00");
 assert("FIFO pays A remaining 500", fifo.find((r) => r.memberId === "a")?.amount === "500.00");
 
+// Shop capital repayment — repay equity before split
+const capitalPending = computeSplitProfit({
+  poolBudget: "0.00",
+  poolGetsShare: false,
+  profitSplitMethod: "by_equity",
+  startDate: "2026-06-01",
+  endDate: "2026-06-01",
+  totalIncome: "8000.00",
+  totalExpense: "3000.00",
+  advances: [],
+  repayCapitalFirst: true,
+  members: [investor("a", "A", "6000.00"), investor("b", "B", "4000.00")],
+});
+assert("capital pending netProfit 5000", capitalPending.netProfit === "5000.00");
+assert("capital pending not fully repaid", capitalPending.capitalFullyRepaid === false);
+assert("capital pending repaid 5000", capitalPending.capitalRepaid === "5000.00");
+assert("capital pending A share 0", capitalPending.memberShares.find((s) => s.memberId === "a")?.flooredShare === "0.00");
+
+const capitalDone = computeSplitProfit({
+  poolBudget: "0.00",
+  poolGetsShare: false,
+  profitSplitMethod: "by_equity",
+  startDate: "2026-06-01",
+  endDate: "2026-06-01",
+  totalIncome: "20000.00",
+  totalExpense: "3000.00",
+  advances: [],
+  repayCapitalFirst: true,
+  members: [investor("a", "A", "6000.00"), investor("b", "B", "4000.00")],
+});
+assert("capital done splittable 7000", capitalDone.splittableProfit === "7000.00");
+assert("capital done A floored 4200", capitalDone.memberShares.find((s) => s.memberId === "a")?.flooredShare === "4200.00");
+assert("capital done B floored 2800", capitalDone.memberShares.find((s) => s.memberId === "b")?.flooredShare === "2800.00");
+
 console.log("");
 if (failed === 0) {
   console.log("All assertions passed.");
