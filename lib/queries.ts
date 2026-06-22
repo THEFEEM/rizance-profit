@@ -12,13 +12,14 @@ import type {
   ExpenseCategory,
   Income,
   IncomeCategory,
+  MoneyTransfer,
   MonthlyDay,
   MonthlySummary,
   PeriodKey,
   PeriodSummary,
   User,
 } from "@/types";
-import type { ExpenseInput, IncomeInput } from "@/lib/validation";
+import type { ExpenseInput, IncomeInput, TransferInput } from "@/lib/validation";
 import { addDays, currentMonth, monthRange, periodRange, today } from "@/lib/date";
 import { isFixed } from "@/lib/expense-categories";
 import { centsToDecimalString } from "@/lib/money";
@@ -363,6 +364,78 @@ export async function deleteExpense(userId: string, id: string): Promise<boolean
     [id, userId],
   );
   return (rowCount ?? 0) > 0;
+}
+
+// ---- money transfers (shop cash↔transfer) ------------------------------------
+
+type TransferRow = {
+  id: string;
+  amount: string;
+  direction: string;
+  note: string | null;
+  entry_date: string;
+  created_at: Date | string;
+};
+
+function mapTransfer(r: TransferRow): MoneyTransfer {
+  return {
+    id: r.id,
+    amount: r.amount,
+    direction: r.direction as MoneyTransfer["direction"],
+    note: r.note,
+    entryDate: r.entry_date,
+    createdAt: toIso(r.created_at),
+  };
+}
+
+export async function createTransfer(userId: string, input: TransferInput): Promise<MoneyTransfer> {
+  const entryDate = input.entryDate ?? today();
+  const { rows } = await query<TransferRow>(
+    `INSERT INTO money_transfers (user_id, amount, direction, note, entry_date)
+     VALUES ($1, $2, $3, $4, $5::date)
+     RETURNING id, amount, direction, note, entry_date::text AS entry_date, created_at`,
+    [userId, input.amount.toFixed(2), input.direction, input.note ?? null, entryDate],
+  );
+  return mapTransfer(rows[0]);
+}
+
+export async function deleteTransfer(userId: string, id: string): Promise<boolean> {
+  const { rowCount } = await query(`DELETE FROM money_transfers WHERE id = $1 AND user_id = $2`, [
+    id,
+    userId,
+  ]);
+  return (rowCount ?? 0) > 0;
+}
+
+export async function listTransfersInPeriod(
+  userId: string,
+  start: string,
+  end: string,
+): Promise<MoneyTransfer[]> {
+  const { rows } = await query<TransferRow>(
+    `SELECT id, amount, direction, note, entry_date::text AS entry_date, created_at
+     FROM money_transfers
+     WHERE user_id = $1 AND entry_date >= $2 AND entry_date <= $3
+     ORDER BY entry_date DESC, created_at DESC`,
+    [userId, start, end],
+  );
+  return rows.map(mapTransfer);
+}
+
+/** All-time transfer totals by direction — for cash/transfer on-hand balance. */
+export async function allTimeTransfersByDirection(
+  userId: string,
+): Promise<{ cashToTransfer: string; transferToCash: string }> {
+  const { rows } = await query<{ cash_to_transfer: string; transfer_to_cash: string }>(
+    `SELECT
+       COALESCE(SUM(CASE WHEN direction = 'cash_to_transfer' THEN amount ELSE 0 END), 0)::text AS cash_to_transfer,
+       COALESCE(SUM(CASE WHEN direction = 'transfer_to_cash' THEN amount ELSE 0 END), 0)::text AS transfer_to_cash
+     FROM money_transfers
+     WHERE user_id = $1`,
+    [userId],
+  );
+  const r = rows[0];
+  return { cashToTransfer: r.cash_to_transfer, transferToCash: r.transfer_to_cash };
 }
 
 export async function allTimeSummary(userId: string): Promise<AllTimeSummary> {

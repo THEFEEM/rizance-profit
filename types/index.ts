@@ -83,6 +83,23 @@ export type Expense = {
   payerName?: string | null;
 };
 
+export const TRANSFER_DIRECTIONS = ["cash_to_transfer", "transfer_to_cash"] as const;
+export type TransferDirection = (typeof TRANSFER_DIRECTIONS)[number];
+
+export const TRANSFER_DIRECTION_LABELS: Record<TransferDirection, string> = {
+  cash_to_transfer: "ฝากเข้าบัญชี",
+  transfer_to_cash: "ถอนเป็นเงินสด",
+};
+
+export type MoneyTransfer = {
+  id: string;
+  amount: string;
+  direction: TransferDirection;
+  note: string | null;
+  entryDate: string;
+  createdAt: string;
+};
+
 export const PERIOD_KEYS = ["today", "month", "last_7", "last_14", "last_30"] as const;
 export type PeriodKey = (typeof PERIOD_KEYS)[number];
 

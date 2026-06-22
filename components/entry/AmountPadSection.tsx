@@ -22,10 +22,10 @@ export function AmountPadSection({
   saving?: boolean;
   closed?: boolean;
   saveLabel?: string;
-  accent?: "green" | "amber" | "rose";
-  saveTone?: "green" | "amber" | "red" | "rose";
+  accent?: "green" | "amber" | "rose" | "blue";
+  saveTone?: "green" | "amber" | "red" | "rose" | "blue";
   currency?: string;
-  tone?: "income" | "expense";
+  tone?: "income" | "expense" | "neutral";
   closedMessage?: string;
 }) {
   return (
