@@ -1,7 +1,6 @@
 import {
   monthToDateSummary,
   allTimeSummary,
-  allTimeCashIncome,
   dailySummary,
   listIncomeByDate,
   listExpenseByDate,
@@ -21,17 +20,16 @@ import type { User } from "@/types";
 /** Regular-shop Today — total sales hero + today's breakdown + partner split. */
 export async function RegularToday({ user }: { user: User }) {
   const date = today();
-  const [monthly, summary, incomes, expenses, cashIncome, allTime, split] = await Promise.all([
+  const [monthly, summary, incomes, expenses, allTime, split] = await Promise.all([
     monthToDateSummary(user.id),
     dailySummary(user.id, date),
     listIncomeByDate(user.id, date),
     listExpenseByDate(user.id, date),
-    allTimeCashIncome(user.id),
     allTimeSummary(user.id),
     shopSplitProfit(user.id, date, date),
   ]);
 
-  const cashInHand = computeProfit(cashIncome, allTime.expense);
+  const cashInHand = computeProfit(allTime.income, allTime.expense);
 
   const entries: EntryRow[] = [
     ...incomes.map((i) => ({

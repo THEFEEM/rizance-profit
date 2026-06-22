@@ -51,7 +51,7 @@ export function TodayBalanceCard({
             </p>
             {cashInHand !== undefined && (
               <div className="mt-2 border-t-[0.5px] border-rz-border pt-2">
-                <p className="text-[11px] text-rz-hint">เงินสดในมือ</p>
+                <p className="text-[11px] text-rz-hint">เงินคงเหลือ</p>
                 <p className={`rz-tabular mt-0.5 text-sm font-medium ${profitColor(cashInHand)}`}>
                   {formatMoney(cashInHand, currency)}
                 </p>

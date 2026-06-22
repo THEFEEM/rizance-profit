@@ -10,7 +10,7 @@ export function boothNetBalance(
   return { remainingBudget, netBalance };
 }
 
-/** ยอดสุทธิ (เงินในมือ) = งบคงเหลือ + รายรับรวม — matches booth Today hero. */
+/** เงินคงเหลือ = งบคงเหลือ + รายรับรวม — matches booth Today hero. */
 export function BoothNetBalanceHighlight({
   remainingBudget,
   totalIncome,
@@ -37,7 +37,7 @@ export function BoothNetBalanceHighlight({
           </svg>
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-rz-text">ยอดสุทธิ (เงินในมือ)</p>
+          <p className="text-sm font-medium text-rz-text">เงินคงเหลือ</p>
           <p className="text-xs text-rz-hint">
             งบคงเหลือ {formatMoney(remainingBudget, currency)} + รายรับรวม{" "}
             {formatMoney(totalIncome, currency)}
@@ -65,7 +65,7 @@ export function BoothNetBalanceRow({
   return (
     <div className="border-t-[0.5px] border-rz-border px-4 py-3">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-sm text-rz-muted">ยอดสุทธิ (เงินในมือ)</span>
+        <span className="text-sm text-rz-muted">เงินคงเหลือ</span>
         <span className="rz-tabular text-sm font-medium text-rz-blue">
           {formatMoney(netBalance, currency)}
         </span>

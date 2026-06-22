@@ -29,7 +29,7 @@ export function BoothTodayHeroCard({
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <p className="text-[11px] text-rz-hint">เงินในมือ</p>
+            <p className="text-[11px] text-rz-hint">เงินคงเหลือ</p>
             <p className="rz-tabular mt-0.5 text-base font-medium text-rz-green">
               {formatMoney(cashInHand, currency)}
             </p>
