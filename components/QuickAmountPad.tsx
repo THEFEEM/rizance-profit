@@ -43,8 +43,8 @@ export function QuickAmountPad({
   onSave: () => void;
   saving?: boolean;
   saveLabel?: string;
-  accent?: "green" | "amber" | "rose";
-  saveTone?: "green" | "amber" | "red" | "rose";
+  accent?: "green" | "amber" | "rose" | "blue";
+  saveTone?: "green" | "amber" | "red" | "rose" | "blue";
 }) {
   const press = (k: Key) => onChange(applyKey(value, k));
   const canSave = !!value && Number(value) > 0 && !saving;
@@ -54,9 +54,11 @@ export function QuickAmountPad({
       ? "bg-rz-red text-rz-bg active:opacity-90 disabled:opacity-40"
       : tone === "rose"
         ? "bg-rz-rose text-rz-bg active:opacity-90 disabled:opacity-40"
-      : tone === "amber"
-        ? "bg-rz-amber text-rz-bg active:opacity-90 disabled:opacity-40"
-        : "bg-rz-green text-rz-bg active:opacity-90 disabled:opacity-40";
+        : tone === "amber"
+          ? "bg-rz-amber text-rz-bg active:opacity-90 disabled:opacity-40"
+          : tone === "blue"
+            ? "bg-rz-blue text-rz-bg active:opacity-90 disabled:opacity-40"
+            : "bg-rz-green text-rz-bg active:opacity-90 disabled:opacity-40";
 
   return (
     <div className="no-select grid grid-cols-4 gap-2 p-2">

@@ -12,14 +12,16 @@ export function EntryOptionButton({
   disabled?: boolean;
   onClick: () => void;
   children: React.ReactNode;
-  accent?: "green" | "amber";
+  accent?: "green" | "amber" | "blue";
   layout?: "chip" | "row";
   className?: string;
 }) {
   const active =
     accent === "amber"
       ? "border-rz-amber bg-rz-amber text-rz-bg"
-      : "border-rz-green bg-rz-green text-rz-bg";
+      : accent === "blue"
+        ? "border-rz-blue bg-rz-blue text-rz-bg"
+        : "border-rz-green bg-rz-green text-rz-bg";
   const idle =
     "border-rz-border bg-rz-card text-rz-text active:bg-rz-elevated";
 

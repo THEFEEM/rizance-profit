@@ -3,6 +3,7 @@ import {
   dailySummary,
   allTimeIncomeByCashTransfer,
   allTimeExpenseByCashTransfer,
+  allTimeTransfersByDirection,
   listIncomeByDate,
   listExpenseByDate,
 } from "@/lib/queries";
@@ -21,7 +22,7 @@ import type { User } from "@/types";
 /** Regular-shop Today — total sales hero + today's breakdown + partner split. */
 export async function RegularToday({ user }: { user: User }) {
   const date = today();
-  const [monthly, summary, incomes, expenses, incomeByMethod, expenseByMethod, split] =
+  const [monthly, summary, incomes, expenses, incomeByMethod, expenseByMethod, transfersByDirection, split] =
     await Promise.all([
     monthToDateSummary(user.id),
     dailySummary(user.id, date),
@@ -29,13 +30,17 @@ export async function RegularToday({ user }: { user: User }) {
     listExpenseByDate(user.id, date),
     allTimeIncomeByCashTransfer(user.id),
     allTimeExpenseByCashTransfer(user.id),
+    allTimeTransfersByDirection(user.id),
     shopSplitProfit(user.id, date, date),
   ]);
 
-  const cashOnHand = computeProfit(incomeByMethod.cashIncome, expenseByMethod.cashExpense);
+  const cashOnHand = computeProfit(
+    sumDecimals(incomeByMethod.cashIncome, transfersByDirection.transferToCash),
+    sumDecimals(expenseByMethod.cashExpense, transfersByDirection.cashToTransfer),
+  );
   const transferOnHand = computeProfit(
-    incomeByMethod.transferIncome,
-    expenseByMethod.transferExpense,
+    sumDecimals(incomeByMethod.transferIncome, transfersByDirection.cashToTransfer),
+    sumDecimals(expenseByMethod.transferExpense, transfersByDirection.transferToCash),
   );
   const totalOnHand = sumDecimals(cashOnHand, transferOnHand);
 

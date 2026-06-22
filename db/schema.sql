@@ -72,6 +72,25 @@ CREATE INDEX IF NOT EXISTS idx_income_user_date  ON income_entries  (user_id, en
 CREATE INDEX IF NOT EXISTS idx_expense_user_date ON expense_entries (user_id, entry_date);
 
 -- =========================================================
+-- money_transfers — shop cash↔transfer moves (Phase 3.5)
+-- NOT income/expense — zero-sum between cashOnHand and transferOnHand
+-- direction: cash_to_transfer | transfer_to_cash
+-- =========================================================
+CREATE TABLE IF NOT EXISTS money_transfers (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount      NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  direction   VARCHAR(20) NOT NULL
+              CHECK (direction IN ('cash_to_transfer', 'transfer_to_cash')),
+  note        VARCHAR(255),
+  entry_date  DATE NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_money_transfer_user_date
+  ON money_transfers (user_id, entry_date);
+
+-- =========================================================
 -- shop_members — shop partnership / equity split (E7)
 -- investor + manager only; no wages (salary = expense entry)
 -- =========================================================

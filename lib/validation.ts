@@ -118,6 +118,17 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type IncomeInput = z.infer<typeof incomeSchema>;
 export type ExpenseInput = z.infer<typeof expenseSchema>;
 
+const transferDirection = z.enum(["cash_to_transfer", "transfer_to_cash"]);
+
+export const transferSchema = z.object({
+  amount,
+  direction: transferDirection,
+  note,
+  entryDate,
+});
+
+export type TransferInput = z.infer<typeof transferSchema>;
+
 /** Build a { field: [messages] } map from a ZodError (version-safe). */
 export function fieldErrorsFrom(error: z.ZodError): Record<string, string[]> {
   const fields: Record<string, string[]> = {};
