@@ -1,7 +1,8 @@
 import type Omise from "omise";
 import { query } from "@/lib/db";
 import { getOmise } from "@/lib/omise";
-import type { PaidSubscriptionTier } from "@/lib/pricing";
+import { isPaidSubscriptionTier, type PaidSubscriptionTier } from "@/lib/pricing";
+import { extendPeriod } from "@/lib/subscription";
 
 export type PaymentStatus = "pending" | "paid" | "failed" | "expired";
 
@@ -101,4 +102,81 @@ export async function findPaymentByChargeId(
     [userId, chargeId],
   );
   return rows[0] ? mapPaymentRow(rows[0]) : null;
+}
+
+export async function findPaymentRecordByOmiseChargeId(
+  chargeId: string,
+): Promise<PaymentRecord | null> {
+  const { rows } = await query<PaymentRow>(
+    `SELECT id, user_id, tier, amount::text AS amount, period_days, status,
+            omise_charge_id, paid_at, created_at
+     FROM payment_records
+     WHERE omise_charge_id = $1`,
+    [chargeId],
+  );
+  return rows[0] ? mapPaymentRow(rows[0]) : null;
+}
+
+export type PaidPaymentFlip = {
+  userId: string;
+  tier: PaidSubscriptionTier;
+  periodDays: number;
+};
+
+/** Atomic pending → paid flip. Returns row only when this call won the race. */
+export async function markPaymentPaidIfPending(
+  omiseChargeId: string,
+): Promise<PaidPaymentFlip | null> {
+  const { rows } = await query<{ user_id: string; tier: string; period_days: number }>(
+    `UPDATE payment_records
+     SET status = 'paid', paid_at = now()
+     WHERE omise_charge_id = $1 AND status = 'pending'
+     RETURNING user_id, tier, period_days`,
+    [omiseChargeId],
+  );
+  if (rows.length === 0) return null;
+  const row = rows[0];
+  if (!isPaidSubscriptionTier(row.tier)) return null;
+  return { userId: row.user_id, tier: row.tier, periodDays: row.period_days };
+}
+
+export type FulfillPaidResult = "extended" | "already_paid" | "not_found" | "skipped";
+
+/**
+ * Idempotent fulfillment after Omise confirms charge.paid.
+ * extendPeriod runs only when the atomic pending→paid UPDATE returns a row.
+ */
+export async function fulfillPaidPaymentRecord(omiseChargeId: string): Promise<FulfillPaidResult> {
+  const record = await findPaymentRecordByOmiseChargeId(omiseChargeId);
+  if (!record) return "not_found";
+  if (record.status === "paid") return "already_paid";
+
+  const flipped = await markPaymentPaidIfPending(omiseChargeId);
+  if (!flipped) {
+    const again = await findPaymentRecordByOmiseChargeId(omiseChargeId);
+    if (again?.status === "paid") return "already_paid";
+    return "skipped";
+  }
+
+  await extendPeriod(flipped.userId, flipped.tier, flipped.periodDays);
+  return "extended";
+}
+
+const CHARGE_WEBHOOK_KEYS = new Set(["charge.complete", "charge.capture"]);
+
+type OmiseWebhookEvent = {
+  object?: string;
+  key?: string;
+  data?: { object?: string; id?: string };
+};
+
+/** Extract charge id from Omise webhook event body (charge.complete, etc.). */
+export function parseChargeIdFromOmiseWebhook(body: unknown): string | null {
+  if (!body || typeof body !== "object") return null;
+  const event = body as OmiseWebhookEvent;
+  if (event.object !== "event") return null;
+  if (event.key && !CHARGE_WEBHOOK_KEYS.has(event.key)) return null;
+  const data = event.data;
+  if (!data || data.object !== "charge" || typeof data.id !== "string") return null;
+  return data.id;
 }
