@@ -1,10 +1,19 @@
 import { CategoryGrid } from "@/components/CategoryGrid";
 import { EntryField } from "@/components/entry/EntryField";
-import { EXPENSE_CATEGORY_GRID_OPTIONS, type ExpenseCategoryKey } from "@/types";
+import { EntryOptionButton } from "@/components/entry/EntryOptionButton";
+import {
+  EXPENSE_CATEGORY_GRID_OPTIONS,
+  PAYMENT_METHOD_LABELS,
+  PAYMENT_METHODS,
+  type ExpenseCategoryKey,
+  type PaymentMethod,
+} from "@/types";
 
 export function RegularExpenseFields({
   category,
   onCategoryChange,
+  paymentMethod,
+  onPaymentMethodChange,
   note,
   onNoteChange,
   date,
@@ -18,6 +27,8 @@ export function RegularExpenseFields({
 }: {
   category: ExpenseCategoryKey;
   onCategoryChange: (v: ExpenseCategoryKey) => void;
+  paymentMethod: PaymentMethod;
+  onPaymentMethodChange: (v: PaymentMethod) => void;
   note: string;
   onNoteChange: (v: string) => void;
   date: string;
@@ -40,6 +51,23 @@ export function RegularExpenseFields({
           columns={2}
           accent="green"
         />
+      </div>
+
+      <div>
+        <p className="mb-1.5 text-xs text-rz-muted">จ่ายด้วย</p>
+        <div className="flex flex-wrap gap-2">
+          {PAYMENT_METHODS.map((m) => (
+            <EntryOptionButton
+              key={m}
+              selected={paymentMethod === m}
+              disabled={disabled}
+              onClick={() => onPaymentMethodChange(m)}
+              accent="green"
+            >
+              {PAYMENT_METHOD_LABELS[m]}
+            </EntryOptionButton>
+          ))}
+        </div>
       </div>
 
       {onAdvanceChange && (

@@ -53,11 +53,12 @@ export function ShopEntryForm({
   const [raw, setRaw] = useState("");
 
   const [incomeCategory, setIncomeCategory] = useState<IncomeCategoryKey>("storefront");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
+  const [incomePaymentMethod, setIncomePaymentMethod] = useState<PaymentMethod>("cash");
   const [incomeNote, setIncomeNote] = useState("");
   const [incomeDate, setIncomeDate] = useState(today());
 
   const [expenseCategory, setExpenseCategory] = useState<ExpenseCategoryKey>("materials");
+  const [expensePaymentMethod, setExpensePaymentMethod] = useState<PaymentMethod>("cash");
   const [expenseNote, setExpenseNote] = useState("");
   const [expenseDate, setExpenseDate] = useState(today());
   const [expenseAdvance, setExpenseAdvance] = useState(false);
@@ -87,7 +88,7 @@ export function ShopEntryForm({
         body: JSON.stringify({
           amount: Number(raw),
           category: incomeCategory,
-          paymentMethod,
+          paymentMethod: incomePaymentMethod,
           note: incomeNote.trim() || undefined,
           entryDate: incomeDate,
         }),
@@ -109,6 +110,7 @@ export function ShopEntryForm({
         body: JSON.stringify({
           amount: Number(raw),
           category: expenseCategory,
+          paymentMethod: expensePaymentMethod,
           note: expenseNote.trim() || undefined,
           entryDate: expenseDate,
           isAdvance: expenseAdvance || undefined,
@@ -153,8 +155,8 @@ export function ShopEntryForm({
           <RegularIncomeFields
             category={incomeCategory}
             onCategoryChange={setIncomeCategory}
-            paymentMethod={paymentMethod}
-            onPaymentMethodChange={setPaymentMethod}
+            paymentMethod={incomePaymentMethod}
+            onPaymentMethodChange={setIncomePaymentMethod}
             note={incomeNote}
             onNoteChange={setIncomeNote}
             date={incomeDate}
@@ -166,6 +168,8 @@ export function ShopEntryForm({
           <RegularExpenseFields
             category={expenseCategory}
             onCategoryChange={setExpenseCategory}
+            paymentMethod={expensePaymentMethod}
+            onPaymentMethodChange={setExpensePaymentMethod}
             note={expenseNote}
             onNoteChange={setExpenseNote}
             date={expenseDate}

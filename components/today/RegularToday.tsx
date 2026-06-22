@@ -1,12 +1,13 @@
 import {
   monthToDateSummary,
-  allTimeSummary,
   dailySummary,
+  allTimeIncomeByCashTransfer,
+  allTimeExpenseByCashTransfer,
   listIncomeByDate,
   listExpenseByDate,
 } from "@/lib/queries";
 import { today } from "@/lib/date";
-import { computeProfit } from "@/lib/money";
+import { computeProfit, sumDecimals } from "@/lib/money";
 import { shopSplitProfit } from "@/lib/shop-split";
 import { TodayBalanceCard } from "@/components/TodayBalanceCard";
 import { TodayStatCards } from "@/components/TodayStatCards";
@@ -20,16 +21,23 @@ import type { User } from "@/types";
 /** Regular-shop Today — total sales hero + today's breakdown + partner split. */
 export async function RegularToday({ user }: { user: User }) {
   const date = today();
-  const [monthly, summary, incomes, expenses, allTime, split] = await Promise.all([
+  const [monthly, summary, incomes, expenses, incomeByMethod, expenseByMethod, split] =
+    await Promise.all([
     monthToDateSummary(user.id),
     dailySummary(user.id, date),
     listIncomeByDate(user.id, date),
     listExpenseByDate(user.id, date),
-    allTimeSummary(user.id),
+    allTimeIncomeByCashTransfer(user.id),
+    allTimeExpenseByCashTransfer(user.id),
     shopSplitProfit(user.id, date, date),
   ]);
 
-  const cashInHand = computeProfit(allTime.income, allTime.expense);
+  const cashOnHand = computeProfit(incomeByMethod.cashIncome, expenseByMethod.cashExpense);
+  const transferOnHand = computeProfit(
+    incomeByMethod.transferIncome,
+    expenseByMethod.transferExpense,
+  );
+  const totalOnHand = sumDecimals(cashOnHand, transferOnHand);
 
   const entries: EntryRow[] = [
     ...incomes.map((i) => ({
@@ -58,8 +66,9 @@ export async function RegularToday({ user }: { user: User }) {
       <TodayBalanceCard
         totalSales={monthly.income}
         cumulativeProfit={monthly.profit}
-        todayProfit={summary.profit}
-        cashInHand={cashInHand}
+        totalOnHand={totalOnHand}
+        cashOnHand={cashOnHand}
+        transferOnHand={transferOnHand}
         currency={user.currency}
         salesLabel="ยอดขายเดือนนี้"
         profitLabel="กำไรเดือนนี้"

@@ -56,6 +56,8 @@ CREATE TABLE IF NOT EXISTS expense_entries (
                'rent', 'wage', 'equipment', 'materials',
                'utilities', 'shipping', 'marketing', 'expense_misc'
              )),
+  payment_method VARCHAR(20) NOT NULL DEFAULT 'cash'
+             CHECK (payment_method IN ('cash', 'transfer')),
   note       VARCHAR(255),
   entry_date DATE NOT NULL,
   is_advance BOOLEAN NOT NULL DEFAULT false,
