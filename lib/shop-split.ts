@@ -1,5 +1,4 @@
-import { query } from "@/lib/db";
-import { computeProfit } from "@/lib/money";
+import { allTimeSummary } from "@/lib/queries";
 import {
   computeSplitProfit,
   inclusiveEventDays,
@@ -7,27 +6,6 @@ import {
   type SplitProfitResult,
 } from "@/lib/booth-split";
 import { listShopMembers } from "@/lib/shop-member-queries";
-
-async function shopPeriodSummary(
-  userId: string,
-  start: string,
-  end: string,
-): Promise<{ income: string; expense: string; profit: string }> {
-  const { rows } = await query<{ income: string; expense: string }>(
-    `SELECT
-       COALESCE((SELECT SUM(amount) FROM income_entries
-                 WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date), 0)::text AS income,
-       COALESCE((SELECT SUM(amount) FROM expense_entries
-                 WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date), 0)::text AS expense`,
-    [userId, start, end],
-  );
-  const r = rows[0];
-  return {
-    income: r.income,
-    expense: r.expense,
-    profit: computeProfit(r.income, r.expense),
-  };
-}
 
 function toSplitMemberInput(m: {
   id: string;
@@ -45,7 +23,7 @@ function toSplitMemberInput(m: {
   };
 }
 
-/** Shop profit split for a date range — reuses booth computeSplitProfit (by_equity, no pool/wage/advance). */
+/** Shop profit split — all-time P&L, repay capital before equity split. */
 export async function shopSplitProfit(
   userId: string,
   periodStart: string,
@@ -55,7 +33,7 @@ export async function shopSplitProfit(
   const participants = members.filter((m) => Number(m.investmentAmount) > 0);
   if (participants.length === 0) return null;
 
-  const summary = await shopPeriodSummary(userId, periodStart, periodEnd);
+  const allTime = await allTimeSummary(userId);
 
   return computeSplitProfit({
     poolBudget: "0.00",
@@ -63,10 +41,11 @@ export async function shopSplitProfit(
     profitSplitMethod: "by_equity",
     startDate: periodStart,
     endDate: periodEnd,
-    totalIncome: summary.income,
-    totalExpense: summary.expense,
+    totalIncome: allTime.income,
+    totalExpense: allTime.expense,
     advances: [],
     members: members.map(toSplitMemberInput),
+    repayCapitalFirst: true,
   });
 }
 

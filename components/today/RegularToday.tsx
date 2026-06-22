@@ -76,7 +76,7 @@ export async function RegularToday({ user }: { user: User }) {
           split={split}
           currency={user.currency}
           accent="green"
-          periodLabel="วันนี้"
+          periodLabel="ทั้งหมด"
           variant="compact"
         />
       )}

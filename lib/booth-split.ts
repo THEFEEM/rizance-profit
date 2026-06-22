@@ -31,6 +31,8 @@ export type SplitProfitInput = {
   totalExpense: string;
   advances: AdvanceInput[];
   members: SplitMemberInput[];
+  /** Shop: repay total member equity from profit before splitting remainder. */
+  repayCapitalFirst?: boolean;
 };
 
 export type AdvanceRepayment = {
@@ -79,6 +81,12 @@ export type SplitProfitResult = {
   remainder: string;
   isLoss: boolean;
   warning?: string;
+  /** Shop capital repayment — only set when repayCapitalFirst is true. */
+  repayCapitalFirst?: boolean;
+  totalCapital?: string;
+  capitalRepaid?: string;
+  capitalFullyRepaid?: boolean;
+  splittableProfit?: string;
 };
 
 /** Inclusive calendar days for booth event (Bangkok dates as YYYY-MM-DD). */
@@ -237,6 +245,55 @@ function shareWeights(
   };
 }
 
+function resolveCapitalSplit(
+  repayCapitalFirst: boolean,
+  netProfit: string,
+  totalCapital: string,
+): {
+  profitToSplit: string;
+  capitalRepaid: string;
+  capitalFullyRepaid: boolean;
+  splittableProfit: string;
+} {
+  if (!repayCapitalFirst || toCents(totalCapital) <= 0) {
+    return {
+      profitToSplit: netProfit,
+      capitalRepaid: "0.00",
+      capitalFullyRepaid: true,
+      splittableProfit: netProfit,
+    };
+  }
+
+  const netCents = toCents(netProfit);
+  const capitalCents = toCents(totalCapital);
+
+  if (netCents <= 0) {
+    return {
+      profitToSplit: "0.00",
+      capitalRepaid: "0.00",
+      capitalFullyRepaid: false,
+      splittableProfit: "0.00",
+    };
+  }
+
+  if (netCents < capitalCents) {
+    return {
+      profitToSplit: "0.00",
+      capitalRepaid: netProfit,
+      capitalFullyRepaid: false,
+      splittableProfit: "0.00",
+    };
+  }
+
+  const splittableProfit = computeProfit(netProfit, totalCapital);
+  return {
+    profitToSplit: splittableProfit,
+    capitalRepaid: totalCapital,
+    capitalFullyRepaid: true,
+    splittableProfit,
+  };
+}
+
 /** Pure profit-split math — derived on read, never stored. */
 export function computeSplitProfit(input: SplitProfitInput): SplitProfitResult {
   const eventDays = inclusiveEventDays(input.startDate, input.endDate);
@@ -253,6 +310,11 @@ export function computeSplitProfit(input: SplitProfitInput): SplitProfitResult {
   const netProfit = computeProfit(grossProfit, repayTotal);
   const isLoss = toCents(netProfit) < 0;
 
+  const repayCapitalFirst = input.repayCapitalFirst ?? false;
+  const totalCapital = memberEquity;
+  const capitalSplit = resolveCapitalSplit(repayCapitalFirst, netProfit, totalCapital);
+  const profitToSplit = capitalSplit.profitToSplit;
+
   const repaymentByMember = new Map(
     advanceRepayments
       .filter((r) => r.role === "member" && r.memberId)
@@ -267,7 +329,7 @@ export function computeSplitProfit(input: SplitProfitInput): SplitProfitResult {
   );
 
   const memberShares: MemberShare[] = memberWeights.map(({ member, numerator, denominator }) => {
-    const exact = exactShareByRatio(netProfit, numerator, denominator);
+    const exact = exactShareByRatio(profitToSplit, numerator, denominator);
     const wage =
       member.role === "manager" && member.wageAmount && member.wageType
         ? centsToDecimalString(
@@ -344,13 +406,13 @@ export function computeSplitProfit(input: SplitProfitInput): SplitProfitResult {
   let poolExact = "0.00";
   let poolFloored = "0.00";
   if (poolWeight) {
-    poolExact = exactShareByRatio(netProfit, poolWeight.numerator, poolWeight.denominator);
+    poolExact = exactShareByRatio(profitToSplit, poolWeight.numerator, poolWeight.denominator);
     poolFloored = floorWholeBaht(poolExact);
   }
 
   const flooredMemberTotal = sumDecimals(0, ...memberShares.map((s) => s.flooredShare));
   const flooredWithPool = sumDecimals(flooredMemberTotal, poolFloored);
-  const remainder = computeProfit(netProfit, flooredWithPool);
+  const remainder = computeProfit(profitToSplit, flooredWithPool);
 
   return {
     method: input.profitSplitMethod,
@@ -373,5 +435,14 @@ export function computeSplitProfit(input: SplitProfitInput): SplitProfitResult {
     remainder,
     isLoss,
     warning,
+    ...(repayCapitalFirst
+      ? {
+          repayCapitalFirst: true,
+          totalCapital,
+          capitalRepaid: capitalSplit.capitalRepaid,
+          capitalFullyRepaid: capitalSplit.capitalFullyRepaid,
+          splittableProfit: capitalSplit.splittableProfit,
+        }
+      : {}),
   };
 }

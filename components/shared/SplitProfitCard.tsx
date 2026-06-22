@@ -1,13 +1,64 @@
 import { RoleBadge } from "@/components/booth/summary/role-styles";
 import { splitPercents } from "@/components/booth/summary/split-percents";
-import { formatMoney, moneySign } from "@/lib/money";
-import { MEMBER_ROLE_LABELS, type SplitProfitResult } from "@/types/booth";
+import { formatMoney, moneySign, toCents } from "@/lib/money";
+import type { SplitProfitResult } from "@/lib/booth-split";
+import { MEMBER_ROLE_LABELS } from "@/types/booth";
 
 function shareAmountColor(isLoss: boolean, amount: string) {
   const sign = moneySign(amount);
   if (isLoss || sign < 0) return "text-rz-red";
   if (sign > 0) return "text-rz-green";
   return "text-rz-hint";
+}
+
+function capitalRepayProgressPct(split: SplitProfitResult): number {
+  const total = toCents(split.totalCapital ?? "0");
+  if (total <= 0) return 0;
+  const repaid = toCents(split.capitalRepaid ?? "0");
+  return Math.min(100, Math.max(0, (repaid / total) * 100));
+}
+
+function CapitalRepayBanner({
+  split,
+  currency,
+}: {
+  split: SplitProfitResult;
+  currency: string;
+}) {
+  if (!split.repayCapitalFirst || split.capitalFullyRepaid) return null;
+
+  if (split.isLoss) {
+    return (
+      <div className="border-b-[0.5px] border-rz-border px-4 py-3">
+        <div className="flex items-center justify-between gap-2 text-xs">
+          <span className="text-rz-hint">ขาดทุน</span>
+          <span className="rz-tabular font-medium text-rz-red">
+            {formatMoney(split.netProfit, currency)}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  const pct = capitalRepayProgressPct(split);
+
+  return (
+    <div className="border-b-[0.5px] border-rz-border px-4 py-3">
+      <div className="mb-1.5 flex items-center justify-between gap-2 text-xs">
+        <span className="text-rz-hint">กำลังคืนทุน</span>
+        <span className="rz-tabular text-rz-muted">
+          {formatMoney(split.capitalRepaid ?? "0", currency)} /{" "}
+          {formatMoney(split.totalCapital ?? "0", currency)}
+        </span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-rz-elevated">
+        <div
+          className="h-full rounded-full bg-rz-green"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
 }
 
 export type SplitProfitCardProps = {
@@ -31,13 +82,14 @@ export function SplitProfitCard({
 }: SplitProfitCardProps) {
   const percents = splitPercents(split);
   const titleAccent = accent === "amber" ? "text-rz-amber" : "text-rz-green";
+  const showProfitSplit = !split.repayCapitalFirst || split.capitalFullyRepaid;
 
   const shareMembers = split.memberShares.filter(
     (s) => s.role === "investor" || s.role === "manager",
   );
 
   const showPoolShare =
-    split.poolGetsShare && moneySign(split.poolShare.flooredShare) !== 0;
+    showProfitSplit && split.poolGetsShare && moneySign(split.poolShare.flooredShare) !== 0;
 
   const hasParticipants = shareMembers.length > 0 || showPoolShare;
 
@@ -50,21 +102,34 @@ export function SplitProfitCard({
       <section className={`px-4 pt-3 ${className}`}>
         <h2 className={`mb-2 text-sm font-medium ${titleAccent}`}>{heading}</h2>
         <div className="overflow-hidden rounded-[14px] border-[0.5px] border-rz-border bg-rz-card">
+          <CapitalRepayBanner split={split} currency={currency} />
           <ul className="divide-y divide-rz-border">
             {shareMembers.map((s) => {
               const pct = percents.members.get(s.memberId) ?? "0%";
-              const shareColor = shareAmountColor(split.isLoss, s.flooredShare);
+              const hasEquity = Number(s.investmentAmount) > 0;
+              const displayAmount = showProfitSplit ? s.flooredShare : "0.00";
+              const shareColor = showProfitSplit
+                ? shareAmountColor(split.isLoss, s.flooredShare)
+                : "text-rz-hint";
+
               return (
                 <li
                   key={s.memberId}
                   className="flex items-center justify-between gap-3 px-4 py-3 text-sm"
                 >
-                  <span className="font-medium text-rz-text">
-                    {s.name}{" "}
-                    <span className="font-normal text-rz-hint">({pct})</span>
+                  <span className="min-w-0 font-medium text-rz-text">
+                    {s.name}
+                    {showProfitSplit && hasEquity && (
+                      <span className="font-normal text-rz-hint"> ({pct})</span>
+                    )}
+                    {!showProfitSplit && hasEquity && (
+                      <span className="mt-0.5 block text-xs font-normal text-rz-hint">
+                        ลงทุน {formatMoney(s.investmentAmount, currency)}
+                      </span>
+                    )}
                   </span>
-                  <span className={`rz-tabular font-medium ${shareColor}`}>
-                    {formatMoney(s.flooredShare, currency)}
+                  <span className={`rz-tabular shrink-0 font-medium ${shareColor}`}>
+                    {formatMoney(displayAmount, currency)}
                   </span>
                 </li>
               );
@@ -84,6 +149,8 @@ export function SplitProfitCard({
             {split.warning}
           </div>
         )}
+
+        <CapitalRepayBanner split={split} currency={currency} />
 
         {!hasParticipants && !split.warning && (
           <p className="px-4 py-4 text-sm text-rz-amber">{emptyHint}</p>
@@ -113,14 +180,17 @@ export function SplitProfitCard({
             {shareMembers.map((s) => {
               const pct = percents.members.get(s.memberId);
               const hasEquity = Number(s.investmentAmount) > 0;
-              const shareColor = shareAmountColor(split.isLoss, s.flooredShare);
+              const displayAmount = showProfitSplit ? s.flooredShare : "0.00";
+              const shareColor = showProfitSplit
+                ? shareAmountColor(split.isLoss, s.flooredShare)
+                : "text-rz-hint";
 
               return (
                 <li key={s.memberId} className="px-4 py-3.5">
                   <div className="flex items-start justify-between gap-3">
                     <span className="text-sm font-medium text-rz-text">{s.name}</span>
                     <span className={`rz-tabular text-[15px] font-medium ${shareColor}`}>
-                      {formatMoney(s.flooredShare, currency)}
+                      {formatMoney(displayAmount, currency)}
                     </span>
                   </div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-rz-hint">
@@ -130,23 +200,23 @@ export function SplitProfitCard({
                         ลงทุน {formatMoney(s.investmentAmount, currency)} · {pct}
                       </span>
                     )}
-                    {moneySign(s.wageCost) > 0 && (
+                    {showProfitSplit && moneySign(s.wageCost) > 0 && (
                       <span className="text-rz-red">
                         + ค่าแรง {formatMoney(s.wageCost, currency)}
                       </span>
                     )}
                   </div>
-                  {s.exactShare !== s.flooredShare && (
+                  {showProfitSplit && s.exactShare !== s.flooredShare && (
                     <p className="mt-1 text-xs text-rz-placeholder">
                       ส่วนแบ่งแท้จริง {formatMoney(s.exactShare, currency)}
                     </p>
                   )}
-                  {moneySign(s.advanceRepayment) > 0 && (
+                  {showProfitSplit && moneySign(s.advanceRepayment) > 0 && (
                     <p className="mt-1 text-xs text-rz-green">
                       ได้คืนออกก่อน {formatMoney(s.advanceRepayment, currency)}
                     </p>
                   )}
-                  {s.eventDays !== null && s.eventDays > 0 && (
+                  {showProfitSplit && s.eventDays !== null && s.eventDays > 0 && (
                     <p className="mt-0.5 text-xs text-rz-placeholder">รายวัน × {s.eventDays} วัน</p>
                   )}
                 </li>

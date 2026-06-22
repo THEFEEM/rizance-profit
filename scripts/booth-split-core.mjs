@@ -160,6 +160,46 @@ function shareWeights(method, poolBudget, poolGetsShare, members) {
   };
 }
 
+function resolveCapitalSplit(repayCapitalFirst, netProfit, totalCapital) {
+  if (!repayCapitalFirst || toCents(totalCapital) <= 0) {
+    return {
+      profitToSplit: netProfit,
+      capitalRepaid: "0.00",
+      capitalFullyRepaid: true,
+      splittableProfit: netProfit,
+    };
+  }
+
+  const netCents = toCents(netProfit);
+  const capitalCents = toCents(totalCapital);
+
+  if (netCents <= 0) {
+    return {
+      profitToSplit: "0.00",
+      capitalRepaid: "0.00",
+      capitalFullyRepaid: false,
+      splittableProfit: "0.00",
+    };
+  }
+
+  if (netCents < capitalCents) {
+    return {
+      profitToSplit: "0.00",
+      capitalRepaid: netProfit,
+      capitalFullyRepaid: false,
+      splittableProfit: "0.00",
+    };
+  }
+
+  const splittableProfit = computeProfit(netProfit, totalCapital);
+  return {
+    profitToSplit: splittableProfit,
+    capitalRepaid: totalCapital,
+    capitalFullyRepaid: true,
+    splittableProfit,
+  };
+}
+
 export function computeSplitProfit(input) {
   const eventDays = inclusiveEventDays(input.startDate, input.endDate);
   const memberEquity = computeMemberEquity(input.members);
@@ -175,6 +215,11 @@ export function computeSplitProfit(input) {
   const netProfit = computeProfit(grossProfit, repayTotal);
   const isLoss = toCents(netProfit) < 0;
 
+  const repayCapitalFirst = input.repayCapitalFirst ?? false;
+  const totalCapital = memberEquity;
+  const capitalSplit = resolveCapitalSplit(repayCapitalFirst, netProfit, totalCapital);
+  const profitToSplit = capitalSplit.profitToSplit;
+
   const repaymentByMember = new Map(
     advanceRepayments
       .filter((r) => r.role === "member" && r.memberId)
@@ -189,7 +234,7 @@ export function computeSplitProfit(input) {
   );
 
   const memberShares = memberWeights.map(({ member, numerator, denominator }) => {
-    const exact = exactShareByRatio(netProfit, numerator, denominator);
+    const exact = exactShareByRatio(profitToSplit, numerator, denominator);
     const wage =
       (member.role === "manager" || member.role === "employee") &&
       member.wageAmount &&
@@ -262,13 +307,13 @@ export function computeSplitProfit(input) {
   let poolExact = "0.00";
   let poolFloored = "0.00";
   if (poolWeight) {
-    poolExact = exactShareByRatio(netProfit, poolWeight.numerator, poolWeight.denominator);
+    poolExact = exactShareByRatio(profitToSplit, poolWeight.numerator, poolWeight.denominator);
     poolFloored = floorWholeBaht(poolExact);
   }
 
   const flooredMemberTotal = sumDecimals(0, ...memberShares.map((s) => s.flooredShare));
   const flooredWithPool = sumDecimals(flooredMemberTotal, poolFloored);
-  const remainder = computeProfit(netProfit, flooredWithPool);
+  const remainder = computeProfit(profitToSplit, flooredWithPool);
 
   return {
     method: input.profitSplitMethod,
@@ -291,5 +336,14 @@ export function computeSplitProfit(input) {
     remainder,
     isLoss,
     warning,
+    ...(repayCapitalFirst
+      ? {
+          repayCapitalFirst: true,
+          totalCapital,
+          capitalRepaid: capitalSplit.capitalRepaid,
+          capitalFullyRepaid: capitalSplit.capitalFullyRepaid,
+          splittableProfit: capitalSplit.splittableProfit,
+        }
+      : {}),
   };
 }
