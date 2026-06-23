@@ -4,6 +4,7 @@ import { DateNav } from "@/components/DateNav";
 import { MonthNav } from "@/components/MonthNav";
 import { EntryList, type EntryRow } from "@/components/EntryList";
 import { MonthHistoryList } from "@/components/summary/MonthHistoryList";
+import { MonthlyYearOverview } from "@/components/summary/MonthlyYearOverview";
 import { SummaryModeToggle } from "@/components/summary/SummaryModeToggle";
 import { SummaryRows } from "@/components/SummaryRows";
 import {
@@ -19,6 +20,7 @@ import {
   listIncomeByDate,
   monthlySummary,
   monthsWithActivity,
+  yearMonthlySeries,
 } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/session";
 import { parseShopSummaryParams, SHOP_SUMMARY_LABELS } from "@/lib/summary-params";
@@ -97,9 +99,11 @@ export default async function ShopSummaryPage({
     );
   }
 
-  const [summary, monthHistory] = await Promise.all([
+  const chartYear = Number(month.slice(0, 4));
+  const [summary, monthHistory, yearlySeries] = await Promise.all([
     monthlySummary(user.id, month),
     monthsWithActivity(user.id, 12),
+    yearMonthlySeries(user.id, chartYear),
   ]);
 
   return (
@@ -121,6 +125,12 @@ export default async function ShopSummaryPage({
           appearance="stats"
         />
       </div>
+
+      <MonthlyYearOverview
+        series={yearlySeries}
+        year={chartYear}
+        currency={user.currency}
+      />
 
       <div className="mt-6">
         <h2 className="px-4 pb-2 text-sm font-medium text-rz-muted">รายวัน</h2>

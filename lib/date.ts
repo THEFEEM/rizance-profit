@@ -202,3 +202,24 @@ export function formatMonthLabel(month: string): string {
     year: "numeric",
   }).format(dt);
 }
+
+const THAI_MONTH_SHORT = [
+  "ม.ค.",
+  "ก.พ.",
+  "มี.ค.",
+  "เม.ย.",
+  "พ.ค.",
+  "มิ.ย.",
+  "ก.ค.",
+  "ส.ค.",
+  "ก.ย.",
+  "ต.ค.",
+  "พ.ย.",
+  "ธ.ค.",
+] as const;
+
+/** Short Thai month label for chart axis — "2026-06" → "มิ.ย." */
+export function formatMonthShortThai(month: string): string {
+  const [, m] = month.split("-").map(Number);
+  return THAI_MONTH_SHORT[m - 1] ?? month;
+}

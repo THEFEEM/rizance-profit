@@ -9,6 +9,7 @@ import type {
   CategoryBreakdownItem,
   DailyProfitPoint,
   DailySummary,
+  MonthlyProfitPoint,
   Expense,
   ExpenseCategory,
   Income,
@@ -22,7 +23,7 @@ import type {
   User,
 } from "@/types";
 import type { ExpenseInput, IncomeInput, TransferInput } from "@/lib/validation";
-import { addDays, currentMonth, monthRange, periodRange, today } from "@/lib/date";
+import { addDays, addMonths, currentMonth, monthRange, periodRange, today } from "@/lib/date";
 import { isFixed } from "@/lib/expense-categories";
 import { centsToDecimalString } from "@/lib/money";
 
@@ -816,4 +817,49 @@ export async function monthsWithActivity(
     expense: r.expense,
     profit: computeProfit(r.income, r.expense),
   }));
+}
+
+/** Per-month income/expense for a calendar year — zero-filled Jan through current month (or Dec for past years). */
+export async function yearMonthlySeries(
+  userId: string,
+  year?: number,
+): Promise<MonthlyProfitPoint[]> {
+  const calendarYear = Number(today().slice(0, 4));
+  const y = year ?? calendarYear;
+  const yearStr = String(y);
+
+  const { rows } = await query<{ month: string; income: string; expense: string }>(
+    `WITH combined AS (
+       SELECT to_char(entry_date, 'YYYY-MM') AS month, amount, 'income' AS type
+       FROM income_entries
+       WHERE user_id = $1 AND to_char(entry_date, 'YYYY') = $2
+       UNION ALL
+       SELECT to_char(entry_date, 'YYYY-MM'), amount, 'expense'
+       FROM expense_entries
+       WHERE user_id = $1 AND to_char(entry_date, 'YYYY') = $2
+     )
+     SELECT
+       month,
+       COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0)::text AS income,
+       COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0)::text AS expense
+     FROM combined
+     GROUP BY month
+     ORDER BY month ASC`,
+    [userId, yearStr],
+  );
+
+  const byMonth = new Map(rows.map((r) => [r.month, { income: r.income, expense: r.expense }]));
+  const endMonth = y === calendarYear ? currentMonth() : `${y}-12`;
+
+  const series: MonthlyProfitPoint[] = [];
+  for (let m = `${y}-01`; m <= endMonth; m = addMonths(m, 1)) {
+    const row = byMonth.get(m) ?? { income: "0.00", expense: "0.00" };
+    series.push({
+      month: m,
+      income: row.income,
+      expense: row.expense,
+      profit: computeProfit(row.income, row.expense),
+    });
+  }
+  return series;
 }
