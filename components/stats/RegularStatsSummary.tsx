@@ -24,6 +24,7 @@ import { DailyProfitChart } from "@/components/stats/DailyProfitChart";
 import { BreakdownSection, ProgressBarRow } from "@/components/stats/BreakdownSection";
 import { SplitProfitCard } from "@/components/shared/SplitProfitCard";
 import { ShopAdvanceCreditorsSection } from "@/components/shop/ShopAdvanceCreditorsSection";
+import { ShopProfitWithdrawalSection } from "@/components/shop/ShopProfitWithdrawalSection";
 import {
   CategoryProgressList,
   type CategoryProgressRow,
@@ -223,6 +224,7 @@ export async function RegularStatsSummary({
             accent="green"
             periodLabel={PERIOD_LABELS[period]}
           />
+          <ShopProfitWithdrawalSection userId={user.id} currency={user.currency} />
           <ShopAdvanceCreditorsSection userId={user.id} currency={user.currency} />
         </>
       )}

@@ -129,6 +129,26 @@ CREATE INDEX IF NOT EXISTS idx_capital_tx_member
   ON capital_transactions (member_id, entry_date);
 
 -- =========================================================
+-- profit_withdrawals — shop profit share withdrawals (W1)
+-- Tracks paper-profit withdrawals per member; no payment_method in W1.
+-- =========================================================
+CREATE TABLE IF NOT EXISTS profit_withdrawals (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  member_id   UUID NOT NULL REFERENCES shop_members(id) ON DELETE CASCADE,
+  amount      NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  note        VARCHAR(255),
+  entry_date  DATE NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_profit_withdrawals_user_date
+  ON profit_withdrawals (user_id, entry_date);
+
+CREATE INDEX IF NOT EXISTS idx_profit_withdrawals_member
+  ON profit_withdrawals (member_id, entry_date);
+
+-- =========================================================
 -- Cost & Pricing (computed costs never stored)
 -- =========================================================
 CREATE TABLE IF NOT EXISTS ingredients (

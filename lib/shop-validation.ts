@@ -60,3 +60,12 @@ export const capitalTxSchema = z.object({
 });
 
 export type CapitalTxInput = z.infer<typeof capitalTxSchema>;
+
+export const profitWithdrawalSchema = z.object({
+  memberId: z.string().uuid("Invalid member id"),
+  amount: moneyPositive,
+  note,
+  entryDate,
+});
+
+export type ProfitWithdrawalInput = z.infer<typeof profitWithdrawalSchema>;
