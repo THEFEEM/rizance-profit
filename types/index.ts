@@ -134,6 +134,14 @@ export type DailyProfitPoint = {
   profit: string;
 };
 
+/** Per-month income/expense/profit for yearly bar chart — zero-filled months included. */
+export type MonthlyProfitPoint = {
+  month: string;
+  income: string;
+  expense: string;
+  profit: string;
+};
+
 export type DailyExpensePoint = {
   date: string;
   expense: string;
