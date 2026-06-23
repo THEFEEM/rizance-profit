@@ -105,6 +105,28 @@ CREATE TABLE IF NOT EXISTS shop_members (
 );
 CREATE INDEX IF NOT EXISTS idx_shop_members_user ON shop_members (user_id);
 
+-- =========================================================
+-- capital_transactions — shop capital ledger (Phase 2B)
+-- investment_amount on shop_members = synced cache of SUM(ledger)
+-- direction: contribution | withdrawal
+-- =========================================================
+CREATE TABLE IF NOT EXISTS capital_transactions (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  member_id   UUID NOT NULL REFERENCES shop_members(id) ON DELETE CASCADE,
+  amount      NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  direction   VARCHAR(20) NOT NULL
+              CHECK (direction IN ('contribution', 'withdrawal')),
+  note        VARCHAR(255),
+  entry_date  DATE NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_capital_tx_user_date
+  ON capital_transactions (user_id, entry_date);
+
+CREATE INDEX IF NOT EXISTS idx_capital_tx_member
+  ON capital_transactions (member_id, entry_date);
 
 -- =========================================================
 -- Cost & Pricing (computed costs never stored)
