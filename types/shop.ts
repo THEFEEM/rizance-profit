@@ -16,3 +16,22 @@ export type ShopMember = {
   investmentAmount: string;
   createdAt: string;
 };
+
+export const CAPITAL_DIRECTIONS = ["contribution", "withdrawal"] as const;
+export type CapitalDirection = (typeof CAPITAL_DIRECTIONS)[number];
+
+export const CAPITAL_DIRECTION_LABELS: Record<CapitalDirection, string> = {
+  contribution: "เพิ่มทุน",
+  withdrawal: "ถอนทุน",
+};
+
+export type CapitalTransaction = {
+  id: string;
+  userId: string;
+  memberId: string;
+  amount: string;
+  direction: CapitalDirection;
+  note: string | null;
+  entryDate: string;
+  createdAt: string;
+};
