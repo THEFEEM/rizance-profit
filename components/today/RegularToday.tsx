@@ -15,6 +15,7 @@ import { TodayStatCards } from "@/components/TodayStatCards";
 import { TodayCategoryMiniList } from "@/components/today/TodayCategoryMiniList";
 import { EntryList, type EntryRow } from "@/components/EntryList";
 import { SplitProfitCard } from "@/components/shared/SplitProfitCard";
+import { ShopProfitWithdrawalSection } from "@/components/shop/ShopProfitWithdrawalSection";
 import { ViewFullSummaryButton } from "@/components/shared/ViewFullSummaryButton";
 import { buildTodayCategoryGroups } from "@/lib/today-category-groups";
 import type { User } from "@/types";
@@ -94,6 +95,12 @@ export async function RegularToday({ user }: { user: User }) {
           variant="compact"
         />
       )}
+
+      <ShopProfitWithdrawalSection
+        userId={user.id}
+        currency={user.currency}
+        variant="compact"
+      />
 
       {hasEntries && (
         <TodayCategoryMiniList groups={categoryGroups} currency={user.currency} />

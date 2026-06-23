@@ -35,3 +35,23 @@ export type CapitalTransaction = {
   entryDate: string;
   createdAt: string;
 };
+
+export type ProfitWithdrawal = {
+  id: string;
+  userId: string;
+  memberId: string;
+  amount: string;
+  note: string | null;
+  entryDate: string;
+  createdAt: string;
+};
+
+export type MemberProfitWithdrawable = {
+  memberId: string;
+  name: string;
+  role: ShopMemberRole;
+  investmentAmount: string;
+  accumulatedShare: string;
+  withdrawn: string;
+  available: string;
+};
