@@ -156,10 +156,10 @@ export async function RegularStatsSummary({
         </div>
         <p className="mt-2 text-center">
           <Link
-            href={`/summary/monthly?month=${currentMonth()}`}
+            href={`/summary/monthly?mode=monthly&month=${currentMonth()}`}
             className="text-sm font-medium text-rz-green"
           >
-            ดูรายวันในเดือน →
+            สรุปรายเดือน →
           </Link>
         </p>
       </section>

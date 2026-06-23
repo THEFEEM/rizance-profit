@@ -1,24 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { addDays, type PeriodKey } from "@/lib/date";
+import { addDays } from "@/lib/date";
 
 export function DateNav({
   date,
   label,
-  period,
   maxDate,
   minDate,
-  basePath = "/summary",
+  basePath = "/summary/monthly",
   accent = "green",
 }: {
   date: string;
   label: string;
-  /** Preserved in URL when changing close-out date. */
-  period: PeriodKey;
-  /** If set, forward navigation is disabled when date >= maxDate. */
   maxDate?: string;
-  /** If set, backward navigation is disabled when date <= minDate. */
   minDate?: string;
   basePath?: string;
   accent?: "green" | "amber";
@@ -34,8 +29,7 @@ export function DateNav({
       : "text-rz-green active:bg-rz-elevated";
 
   function href(targetDate: string) {
-    const qs = new URLSearchParams({ period, date: targetDate });
-    return `${basePath}?${qs}`;
+    return `${basePath}?mode=daily&date=${targetDate}`;
   }
 
   const navBtn =
@@ -44,9 +38,9 @@ export function DateNav({
     "flex h-12 w-12 items-center justify-center rounded-full text-xl font-medium text-rz-border";
 
   return (
-    <div className="flex items-center justify-between gap-2 px-4 py-3">
+    <div className="mx-4 mt-2 flex items-center justify-between gap-2 rounded-[14px] border-[0.5px] border-rz-border bg-rz-card px-2 py-1">
       {canGoPrev ? (
-        <Link href={href(prev)} className={`${navBtn} ${activeNav}`} aria-label="Previous day">
+        <Link href={href(prev)} className={`${navBtn} ${activeNav}`} aria-label="วันก่อนหน้า">
           ◀
         </Link>
       ) : (
@@ -56,7 +50,7 @@ export function DateNav({
       )}
       <p className="min-w-0 flex-1 text-center text-base font-medium text-rz-text">{label}</p>
       {canGoNext ? (
-        <Link href={href(next)} className={`${navBtn} ${activeNav}`} aria-label="Next day">
+        <Link href={href(next)} className={`${navBtn} ${activeNav}`} aria-label="วันถัดไป">
           ▶
         </Link>
       ) : (

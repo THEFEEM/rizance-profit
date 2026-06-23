@@ -16,6 +16,7 @@ import type {
   MoneyTransfer,
   MonthlyDay,
   MonthlySummary,
+  MonthActivity,
   PeriodKey,
   PeriodSummary,
   User,
@@ -783,4 +784,36 @@ export async function monthlySummary(userId: string, month: string): Promise<Mon
     profit: computeProfit(income, expense),
     days,
   };
+}
+
+/** Recent months with income/expense activity — for month history list. */
+export async function monthsWithActivity(
+  userId: string,
+  limit = 12,
+): Promise<MonthActivity[]> {
+  const { rows } = await query<{ month: string; income: string; expense: string }>(
+    `WITH combined AS (
+       SELECT to_char(entry_date, 'YYYY-MM') AS month, amount, 'income' AS type
+       FROM income_entries WHERE user_id = $1
+       UNION ALL
+       SELECT to_char(entry_date, 'YYYY-MM'), amount, 'expense'
+       FROM expense_entries WHERE user_id = $1
+     )
+     SELECT
+       month,
+       COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0)::text AS income,
+       COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0)::text AS expense
+     FROM combined
+     GROUP BY month
+     ORDER BY month DESC
+     LIMIT $2`,
+    [userId, limit],
+  );
+
+  return rows.map((r) => ({
+    month: r.month,
+    income: r.income,
+    expense: r.expense,
+    profit: computeProfit(r.income, r.expense),
+  }));
 }
