@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { SHOP_MEMBER_ROLES } from "@/types/shop";
+import { PAYMENT_METHODS } from "@/types/booth";
 import { isValidDate } from "@/lib/date";
 
 const moneyPositive = z
@@ -64,6 +65,7 @@ export type CapitalTxInput = z.infer<typeof capitalTxSchema>;
 export const profitWithdrawalSchema = z.object({
   memberId: z.string().uuid("Invalid member id"),
   amount: moneyPositive,
+  paymentMethod: z.enum(PAYMENT_METHODS).default("cash"),
   note,
   entryDate,
 });

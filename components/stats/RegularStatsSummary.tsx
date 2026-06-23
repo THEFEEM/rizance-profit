@@ -18,6 +18,8 @@ import {
 } from "@/lib/date";
 import { formatMoney, toCents } from "@/lib/money";
 import { shopSplitProfit } from "@/lib/shop-split";
+import { computeShopOnHand } from "@/lib/shop-on-hand";
+import { shopMemberProfitWithdrawable } from "@/lib/shop-profit-withdrawable";
 import { StatsPeriodSelector, type StatsPeriodKey } from "@/components/stats/StatsPeriodSelector";
 import { StatsSummaryCards } from "@/components/stats/StatsSummaryCards";
 import { DailyProfitChart } from "@/components/stats/DailyProfitChart";
@@ -98,6 +100,8 @@ export async function RegularStatsSummary({
     periodExpenses,
     dailySeries,
     shopSplit,
+    shopWithdrawals,
+    onHand,
   ] = await Promise.all([
     periodSummary(user.id, period),
     periodIncomeByCashTransfer(user.id, start, end),
@@ -107,6 +111,8 @@ export async function RegularStatsSummary({
     listExpenseInPeriod(user.id, start, end),
     dailyProfitSeries(user.id, start, end),
     shopSplitProfit(user.id, start, end),
+    shopMemberProfitWithdrawable(user.id),
+    computeShopOnHand(user.id),
   ]);
 
   const totalIncome = periodData.income;
@@ -223,8 +229,14 @@ export async function RegularStatsSummary({
             currency={user.currency}
             accent="green"
             periodLabel={PERIOD_LABELS[period]}
+            shopWithdrawals={shopWithdrawals}
           />
-          <ShopProfitWithdrawalSection userId={user.id} currency={user.currency} />
+          <ShopProfitWithdrawalSection
+            userId={user.id}
+            currency={user.currency}
+            onHand={onHand}
+            members={shopWithdrawals}
+          />
           <ShopAdvanceCreditorsSection userId={user.id} currency={user.currency} />
         </>
       )}
