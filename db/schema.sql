@@ -129,14 +129,16 @@ CREATE INDEX IF NOT EXISTS idx_capital_tx_member
   ON capital_transactions (member_id, entry_date);
 
 -- =========================================================
--- profit_withdrawals — shop profit share withdrawals (W1)
--- Tracks paper-profit withdrawals per member; no payment_method in W1.
+-- profit_withdrawals — shop profit share withdrawals (W1+W2)
+-- W1: paper-profit per member. W2: payment_method links to cash/transfer on-hand.
 -- =========================================================
 CREATE TABLE IF NOT EXISTS profit_withdrawals (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   member_id   UUID NOT NULL REFERENCES shop_members(id) ON DELETE CASCADE,
   amount      NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  payment_method VARCHAR(20) NOT NULL DEFAULT 'cash'
+              CHECK (payment_method IN ('cash', 'transfer')),
   note        VARCHAR(255),
   entry_date  DATE NOT NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()

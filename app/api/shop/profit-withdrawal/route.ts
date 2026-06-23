@@ -5,9 +5,11 @@ import { profitWithdrawalSchema } from "@/lib/shop-validation";
 import { getMemberProfitWithdrawable } from "@/lib/shop-profit-withdrawable";
 import {
   ProfitWithdrawalLimitError,
+  ShopOnHandInsufficientError,
   createProfitWithdrawal,
   listProfitWithdrawalsByMember,
   profitWithdrawalLimitMessage,
+  shopOnHandInsufficientMessage,
 } from "@/lib/shop-profit-withdrawal-queries";
 import { getShopMember } from "@/lib/shop-member-queries";
 
@@ -46,6 +48,12 @@ export async function POST(req: NextRequest) {
     if (err instanceof ProfitWithdrawalLimitError) {
       return NextResponse.json(
         { error: { message: profitWithdrawalLimitMessage(err.maxAmount) } },
+        { status: 400 },
+      );
+    }
+    if (err instanceof ShopOnHandInsufficientError) {
+      return NextResponse.json(
+        { error: { message: shopOnHandInsufficientMessage(err.paymentMethod) } },
         { status: 400 },
       );
     }

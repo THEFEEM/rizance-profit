@@ -1,14 +1,12 @@
 import {
   monthToDateSummary,
   dailySummary,
-  allTimeIncomeByCashTransfer,
-  allTimeExpenseByCashTransfer,
-  allTimeTransfersByDirection,
   listIncomeByDate,
   listExpenseByDate,
 } from "@/lib/queries";
 import { today } from "@/lib/date";
-import { computeProfit, sumDecimals } from "@/lib/money";
+import { computeShopOnHand } from "@/lib/shop-on-hand";
+import { shopMemberProfitWithdrawable } from "@/lib/shop-profit-withdrawable";
 import { shopSplitProfit } from "@/lib/shop-split";
 import { TodayBalanceCard } from "@/components/TodayBalanceCard";
 import { TodayStatCards } from "@/components/TodayStatCards";
@@ -23,27 +21,18 @@ import type { User } from "@/types";
 /** Regular-shop Today — total sales hero + today's breakdown + partner split. */
 export async function RegularToday({ user }: { user: User }) {
   const date = today();
-  const [monthly, summary, incomes, expenses, incomeByMethod, expenseByMethod, transfersByDirection, split] =
+  const [monthly, summary, incomes, expenses, onHand, split, shopWithdrawals] =
     await Promise.all([
     monthToDateSummary(user.id),
     dailySummary(user.id, date),
     listIncomeByDate(user.id, date),
     listExpenseByDate(user.id, date),
-    allTimeIncomeByCashTransfer(user.id),
-    allTimeExpenseByCashTransfer(user.id),
-    allTimeTransfersByDirection(user.id),
+    computeShopOnHand(user.id),
     shopSplitProfit(user.id, date, date),
+    shopMemberProfitWithdrawable(user.id),
   ]);
 
-  const cashOnHand = computeProfit(
-    sumDecimals(incomeByMethod.cashIncome, transfersByDirection.transferToCash),
-    sumDecimals(expenseByMethod.cashExpense, transfersByDirection.cashToTransfer),
-  );
-  const transferOnHand = computeProfit(
-    sumDecimals(incomeByMethod.transferIncome, transfersByDirection.cashToTransfer),
-    sumDecimals(expenseByMethod.transferExpense, transfersByDirection.transferToCash),
-  );
-  const totalOnHand = sumDecimals(cashOnHand, transferOnHand);
+  const { cashOnHand, transferOnHand, totalOnHand } = onHand;
 
   const entries: EntryRow[] = [
     ...incomes.map((i) => ({
@@ -93,6 +82,7 @@ export async function RegularToday({ user }: { user: User }) {
           accent="green"
           periodLabel="ทั้งหมด"
           variant="compact"
+          shopWithdrawals={shopWithdrawals}
         />
       )}
 
@@ -100,6 +90,8 @@ export async function RegularToday({ user }: { user: User }) {
         userId={user.id}
         currency={user.currency}
         variant="compact"
+        onHand={onHand}
+        members={shopWithdrawals}
       />
 
       {hasEntries && (

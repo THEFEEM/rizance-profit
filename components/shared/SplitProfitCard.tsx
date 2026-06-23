@@ -2,6 +2,7 @@ import { RoleBadge } from "@/components/booth/summary/role-styles";
 import { splitPercents } from "@/components/booth/summary/split-percents";
 import { formatMoney, moneySign, toCents } from "@/lib/money";
 import type { SplitProfitResult } from "@/lib/booth-split";
+import type { MemberProfitWithdrawable } from "@/types/shop";
 import { MEMBER_ROLE_LABELS } from "@/types/booth";
 
 function shareAmountColor(isLoss: boolean, amount: string) {
@@ -69,7 +70,26 @@ export type SplitProfitCardProps = {
   emptyHint?: string;
   variant?: "full" | "compact";
   className?: string;
+  shopWithdrawals?: MemberProfitWithdrawable[];
 };
+
+function withdrawalLines(
+  memberId: string,
+  shopWithdrawals: MemberProfitWithdrawable[] | undefined,
+  currency: string,
+) {
+  const w = shopWithdrawals?.find((r) => r.memberId === memberId);
+  if (!w) return null;
+  return (
+    <div className="mt-1 space-y-0.5 text-xs text-rz-hint">
+      <p>ส่วนแบ่งสะสม {formatMoney(w.accumulatedShare, currency)}</p>
+      <p>ถอนแล้ว {formatMoney(w.withdrawn, currency)}</p>
+      <p className="font-medium text-rz-green">
+        เหลือถอนได้ {formatMoney(w.available, currency)}
+      </p>
+    </div>
+  );
+}
 
 export function SplitProfitCard({
   split,
@@ -79,6 +99,7 @@ export function SplitProfitCard({
   emptyHint = "ยังไม่มีผู้ลงทุน — เพิ่มหุ้นส่วนเพื่อแบ่งกำไร",
   variant = "full",
   className = "",
+  shopWithdrawals,
 }: SplitProfitCardProps) {
   const percents = splitPercents(split);
   const titleAccent = accent === "amber" ? "text-rz-amber" : "text-rz-green";
@@ -117,17 +138,20 @@ export function SplitProfitCard({
                   key={s.memberId}
                   className="flex items-center justify-between gap-3 px-4 py-3 text-sm"
                 >
-                  <span className="min-w-0 font-medium text-rz-text">
-                    {s.name}
-                    {showProfitSplit && hasEquity && (
-                      <span className="font-normal text-rz-hint"> ({pct})</span>
-                    )}
+                  <div className="min-w-0 flex-1">
+                    <span className="font-medium text-rz-text">
+                      {s.name}
+                      {showProfitSplit && hasEquity && (
+                        <span className="font-normal text-rz-hint"> ({pct})</span>
+                      )}
+                    </span>
                     {!showProfitSplit && hasEquity && (
                       <span className="mt-0.5 block text-xs font-normal text-rz-hint">
                         ลงทุน {formatMoney(s.investmentAmount, currency)}
                       </span>
                     )}
-                  </span>
+                    {withdrawalLines(s.memberId, shopWithdrawals, currency)}
+                  </div>
                   <span className={`rz-tabular shrink-0 font-medium ${shareColor}`}>
                     {formatMoney(displayAmount, currency)}
                   </span>
@@ -219,6 +243,7 @@ export function SplitProfitCard({
                   {showProfitSplit && s.eventDays !== null && s.eventDays > 0 && (
                     <p className="mt-0.5 text-xs text-rz-placeholder">รายวัน × {s.eventDays} วัน</p>
                   )}
+                  {withdrawalLines(s.memberId, shopWithdrawals, currency)}
                 </li>
               );
             })}

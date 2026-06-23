@@ -41,6 +41,7 @@ export type ProfitWithdrawal = {
   userId: string;
   memberId: string;
   amount: string;
+  paymentMethod: "cash" | "transfer";
   note: string | null;
   entryDate: string;
   createdAt: string;

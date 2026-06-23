@@ -3,12 +3,19 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { EntryField } from "@/components/entry/EntryField";
+import { EntryOptionButton } from "@/components/entry/EntryOptionButton";
 import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
 import { SetupPrimaryButton } from "@/components/booth/setup/SetupField";
 import { ROLE_STYLES } from "@/components/booth/summary/role-styles";
 import { apiFetch } from "@/lib/api-client";
 import { today } from "@/lib/date";
 import { formatMoney } from "@/lib/money";
+import type { ShopOnHand } from "@/lib/shop-on-hand";
+import {
+  PAYMENT_METHOD_LABELS,
+  PAYMENT_METHODS,
+  type PaymentMethod,
+} from "@/types/booth";
 import {
   SHOP_MEMBER_ROLE_LABELS,
   type MemberProfitWithdrawable,
@@ -17,10 +24,12 @@ import {
 
 export function ShopProfitWithdrawalCard({
   members: initialMembers,
+  onHand,
   currency = "THB",
   variant = "full",
 }: {
   members: MemberProfitWithdrawable[];
+  onHand: ShopOnHand;
   currency?: string;
   variant?: "full" | "compact";
 }) {
@@ -29,6 +38,7 @@ export function ShopProfitWithdrawalCard({
   const [panel, setPanel] = useState<MemberProfitWithdrawable | null>(null);
   const [amountRaw, setAmountRaw] = useState("");
   const [padOpen, setPadOpen] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [note, setNote] = useState("");
   const [entryDate, setEntryDate] = useState(today());
   const [saving, setSaving] = useState(false);
@@ -42,6 +52,7 @@ export function ShopProfitWithdrawalCard({
     setPanel(m);
     setAmountRaw("");
     setPadOpen(false);
+    setPaymentMethod("cash");
     setNote("");
     setEntryDate(today());
     setError(null);
@@ -73,6 +84,7 @@ export function ShopProfitWithdrawalCard({
       body: JSON.stringify({
         memberId: panel.memberId,
         amount,
+        paymentMethod,
         note: note.trim() || undefined,
         entryDate,
       }),
@@ -89,6 +101,8 @@ export function ShopProfitWithdrawalCard({
   }
 
   const sectionClass = variant === "compact" ? "px-4 pt-3" : "mt-6 px-4";
+  const selectedOnHand =
+    paymentMethod === "cash" ? onHand.cashOnHand : onHand.transferOnHand;
 
   return (
     <section className={sectionClass}>
@@ -130,7 +144,7 @@ export function ShopProfitWithdrawalCard({
               {panel?.memberId === m.memberId && (
                 <div className="mt-3 rounded-[10px] border-[0.5px] border-rz-border bg-rz-elevated p-3">
                   <p className="mb-2 text-xs text-rz-hint">
-                    ถอนส่วนแบ่งกำไร (กำไรบนกระดาษ — ยังไม่หักเงินคงเหลือ)
+                    ถอนส่วนแบ่งกำไร (หักจากเงินคงเหลือ)
                   </p>
                   <p className="rz-tabular mb-2 text-lg font-medium text-rz-text">
                     {formatTyped(amountRaw) || "0"}
@@ -153,6 +167,25 @@ export function ShopProfitWithdrawalCard({
                       ใส่จำนวน →
                     </button>
                   )}
+                  <div>
+                    <p className="mb-1.5 text-xs text-rz-muted">ถอนจาก</p>
+                    <div className="flex flex-wrap gap-2">
+                      {PAYMENT_METHODS.map((method) => (
+                        <EntryOptionButton
+                          key={method}
+                          selected={paymentMethod === method}
+                          onClick={() => setPaymentMethod(method)}
+                          accent="green"
+                        >
+                          {PAYMENT_METHOD_LABELS[method]}
+                        </EntryOptionButton>
+                      ))}
+                    </div>
+                    <p className="rz-tabular mt-2 text-xs text-rz-hint">
+                      {PAYMENT_METHOD_LABELS[paymentMethod]}คงเหลือ{" "}
+                      {formatMoney(selectedOnHand, currency)}
+                    </p>
+                  </div>
                   <EntryField
                     label="บันทึกเพิ่มเติม (ไม่บังคับ)"
                     value={note}

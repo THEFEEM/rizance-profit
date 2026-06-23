@@ -1,3 +1,4 @@
+import type { PoolClient } from "pg";
 import { query } from "@/lib/db";
 import { isUndefinedColumnError } from "@/lib/db-migration-guard";
 import { computeProfit, sumDecimals, toCents } from "@/lib/money";
@@ -422,11 +423,21 @@ export async function listTransfersInPeriod(
   return rows.map(mapTransfer);
 }
 
+function balanceQuery<T extends Record<string, unknown>>(
+  client: PoolClient | undefined,
+  text: string,
+  params: unknown[],
+) {
+  return client ? client.query<T>(text, params as never[]) : query<T>(text, params);
+}
+
 /** All-time transfer totals by direction — for cash/transfer on-hand balance. */
 export async function allTimeTransfersByDirection(
   userId: string,
+  client?: PoolClient,
 ): Promise<{ cashToTransfer: string; transferToCash: string }> {
-  const { rows } = await query<{ cash_to_transfer: string; transfer_to_cash: string }>(
+  const { rows } = await balanceQuery<{ cash_to_transfer: string; transfer_to_cash: string }>(
+    client,
     `SELECT
        COALESCE(SUM(CASE WHEN direction = 'cash_to_transfer' THEN amount ELSE 0 END), 0)::text AS cash_to_transfer,
        COALESCE(SUM(CASE WHEN direction = 'transfer_to_cash' THEN amount ELSE 0 END), 0)::text AS transfer_to_cash
@@ -595,8 +606,10 @@ export async function periodIncomeByCashTransfer(
 /** All-time cash vs transfer income — regular shop only. */
 export async function allTimeIncomeByCashTransfer(
   userId: string,
+  client?: PoolClient,
 ): Promise<{ cashIncome: string; transferIncome: string }> {
-  const { rows } = await query<{ cash_income: string; transfer_income: string }>(
+  const { rows } = await balanceQuery<{ cash_income: string; transfer_income: string }>(
+    client,
     `SELECT
        COALESCE(SUM(CASE WHEN payment_method = 'cash' THEN amount ELSE 0 END), 0)::text AS cash_income,
        COALESCE(SUM(CASE WHEN payment_method = 'transfer' THEN amount ELSE 0 END), 0)::text AS transfer_income
@@ -629,8 +642,10 @@ export async function periodExpenseByCashTransfer(
 /** All-time cash vs transfer expense — regular shop only. */
 export async function allTimeExpenseByCashTransfer(
   userId: string,
+  client?: PoolClient,
 ): Promise<{ cashExpense: string; transferExpense: string }> {
-  const { rows } = await query<{ cash_expense: string; transfer_expense: string }>(
+  const { rows } = await balanceQuery<{ cash_expense: string; transfer_expense: string }>(
+    client,
     `SELECT
        COALESCE(SUM(CASE WHEN payment_method = 'cash' THEN amount ELSE 0 END), 0)::text AS cash_expense,
        COALESCE(SUM(CASE WHEN payment_method = 'transfer' THEN amount ELSE 0 END), 0)::text AS transfer_expense
