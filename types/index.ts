@@ -172,6 +172,14 @@ export type MonthlySummary = {
   days: MonthlyDay[];
 };
 
+/** Month rollup for history list — months with at least one entry. */
+export type MonthActivity = {
+  month: string;
+  income: string;
+  expense: string;
+  profit: string;
+};
+
 // Standard API envelopes.
 export type ApiSuccess<T> = { data: T };
 export type ApiError = { error: { message: string; fields?: Record<string, string[] | undefined> } };
