@@ -1,4 +1,5 @@
 // Runs db/schema.sql then db/migrations/*.sql (sorted) against DATABASE_URL.
+// Tracks applied migrations in schema_migrations — each file runs at most once.
 //
 // DATABASE_URL resolution (first wins):
 //   1. Shell environment (e.g. DATABASE_URL=... npm run db:migrate) — use for prod
@@ -41,6 +42,10 @@ if (!connectionString) {
   process.exit(1);
 }
 
+// Safety: print which host we're about to migrate (mask password).
+const masked = connectionString.replace(/:([^:@/]+)@/, ":****@");
+console.log(`→ Target: ${masked}`);
+
 const migrationFiles = readdirSync(join(root, "db", "migrations"))
   .filter((f) => f.endsWith(".sql"))
   .sort();
@@ -50,17 +55,48 @@ const client = new pg.Client(pgClientOptions(connectionString));
 try {
   await client.connect();
 
+  // schema.sql is idempotent (IF NOT EXISTS) — always safe to run.
   const schema = readFileSync(join(root, "db", "schema.sql"), "utf8");
   await client.query(schema);
   console.log("✓ schema.sql applied");
 
+  // Ensure tracking table exists.
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      version     TEXT PRIMARY KEY,
+      applied_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+
+  // Load already-applied versions.
+  const { rows } = await client.query("SELECT version FROM schema_migrations");
+  const applied = new Set(rows.map((r) => r.version));
+
+  let ran = 0;
+  let skipped = 0;
   for (const file of migrationFiles) {
+    if (applied.has(file)) {
+      console.log(`↷ ${file} skipped (already applied)`);
+      skipped++;
+      continue;
+    }
     const sql = readFileSync(join(root, "db", "migrations", file), "utf8");
-    await client.query(sql);
-    console.log(`✓ ${file} applied`);
+    // Run SQL + record version atomically. If the migration already manages its
+    // own BEGIN/COMMIT, the outer transaction still records the version only on success.
+    await client.query("BEGIN");
+    try {
+      await client.query(sql);
+      await client.query("INSERT INTO schema_migrations (version) VALUES ($1)", [file]);
+      await client.query("COMMIT");
+      console.log(`✓ ${file} applied`);
+      ran++;
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    }
   }
 
-  console.log("✓ All migrations complete.");
+  console.log(`✓ Done. ${ran} applied, ${skipped} skipped, ${migrationFiles.length} total.`);
 } catch (err) {
   console.error("✗ Migration failed:", err.message);
   process.exitCode = 1;

@@ -647,7 +647,7 @@ export async function periodExpenseByCashTransfer(
   return { cashExpense: r.cash_expense, transferExpense: r.transfer_expense };
 }
 
-/** All-time cash vs transfer expense — regular shop only. */
+/** All-time cash vs transfer expense — EXCLUDING advance (paid by others, not shop cash). */
 export async function allTimeExpenseByCashTransfer(
   userId: string,
   client?: PoolClient,
@@ -658,7 +658,8 @@ export async function allTimeExpenseByCashTransfer(
        COALESCE(SUM(CASE WHEN payment_method = 'cash' THEN amount ELSE 0 END), 0)::text AS cash_expense,
        COALESCE(SUM(CASE WHEN payment_method = 'transfer' THEN amount ELSE 0 END), 0)::text AS transfer_expense
      FROM expense_entries
-     WHERE user_id = $1`,
+     WHERE user_id = $1
+       AND (is_advance = false OR is_advance IS NULL)`,
     [userId],
   );
   const r = rows[0];

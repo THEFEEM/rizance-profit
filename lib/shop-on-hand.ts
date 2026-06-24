@@ -1,11 +1,11 @@
 import type { PoolClient } from "pg";
-import { pool } from "@/lib/db";
 import { computeProfit, sumDecimals } from "@/lib/money";
 import {
   allTimeExpenseByCashTransfer,
   allTimeIncomeByCashTransfer,
   allTimeTransfersByDirection,
 } from "@/lib/queries";
+import { allTimeRepaymentsByMethod } from "@/lib/creditor-repayment-queries";
 import { allTimeProfitWithdrawalsByMethod } from "@/lib/shop-profit-withdrawal-queries";
 
 export type ShopOnHand = {
@@ -14,16 +14,17 @@ export type ShopOnHand = {
   totalOnHand: string;
 };
 
-/** All-time cash/transfer on-hand — income + transfers − expense − profit withdrawals. */
+/** All-time cash/transfer on-hand — income + transfers − expense − profit withdrawals − repayments. */
 export async function computeShopOnHand(
   userId: string,
   client?: PoolClient,
 ): Promise<ShopOnHand> {
-  const [income, expense, transfers, profitWd] = await Promise.all([
+  const [income, expense, transfers, profitWd, repay] = await Promise.all([
     allTimeIncomeByCashTransfer(userId, client),
     allTimeExpenseByCashTransfer(userId, client),
     allTimeTransfersByDirection(userId, client),
     allTimeProfitWithdrawalsByMethod(userId, client),
+    allTimeRepaymentsByMethod(userId, client),
   ]);
 
   const cashOnHand = computeProfit(
@@ -32,6 +33,7 @@ export async function computeShopOnHand(
       expense.cashExpense,
       transfers.cashToTransfer,
       profitWd.cashWithdrawals,
+      repay.cashRepayments,
     ),
   );
   const transferOnHand = computeProfit(
@@ -40,6 +42,7 @@ export async function computeShopOnHand(
       expense.transferExpense,
       transfers.transferToCash,
       profitWd.transferWithdrawals,
+      repay.transferRepayments,
     ),
   );
 

@@ -71,7 +71,7 @@ export function shopOnHandInsufficientMessage(paymentMethod: PaymentMethod): str
   return paymentMethod === "cash" ? "เงินสดไม่พอ" : "เงินโอนไม่พอ";
 }
 
-async function lockShopUser(client: PoolClient, userId: string): Promise<void> {
+export async function lockShopUser(client: PoolClient, userId: string): Promise<void> {
   const { rows } = await client.query<{ id: string }>(
     `SELECT id FROM users WHERE id = $1 FOR UPDATE`,
     [userId],
