@@ -215,7 +215,7 @@ export function ProfilePageContent({
               className="h-[22px] w-[22px] shrink-0 rounded-full object-cover"
               unoptimized
             />
-            <span>เกี่ยวกับแอป {getAppVersionLabel()}</span>
+            <span>{getAppVersionLabel()}</span>
           </p>
         </section>
 

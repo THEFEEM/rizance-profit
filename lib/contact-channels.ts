@@ -12,7 +12,7 @@ export type ContactChannel = {
 export const CONTACT_CHANNELS: readonly ContactChannel[] = [
   {
     id: "tiktok-ig",
-    label: "TikTok / Instagram",
+    label: "TikTok",
     value: "@thefeem",
     href: "https://www.tiktok.com/@thefeem",
     icon: Share2,
