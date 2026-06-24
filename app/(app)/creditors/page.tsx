@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { ShopAdvanceCreditorsSection } from "@/components/shop/ShopAdvanceCreditorsSection";
+import { ShopCreditorsSection } from "@/components/shop/ShopCreditorsSection";
 import { getCurrentUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ export default async function CreditorsPage() {
         <h1 className="text-lg font-medium text-rz-text">เจ้าหนี้</h1>
         <p className="mt-1 text-sm text-rz-muted">เงินที่สมาชิกหรือบุคคลภายนอกออกแทนร้าน</p>
       </div>
-      <ShopAdvanceCreditorsSection userId={user.id} currency={user.currency} />
+      <ShopCreditorsSection userId={user.id} currency={user.currency} />
     </div>
   );
 }

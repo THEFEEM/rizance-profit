@@ -153,6 +153,27 @@ CREATE INDEX IF NOT EXISTS idx_profit_withdrawals_member
   ON profit_withdrawals (member_id, entry_date);
 
 -- =========================================================
+-- creditor_repayments — shop advance creditor repayments (1B)
+-- =========================================================
+CREATE TABLE IF NOT EXISTS creditor_repayments (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  payer_kind      VARCHAR(20) NOT NULL CHECK (payer_kind IN ('member', 'external')),
+  payer_name      VARCHAR(160) NOT NULL,
+  amount          NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  payment_method  VARCHAR(20) NOT NULL CHECK (payment_method IN ('cash', 'transfer')),
+  note            VARCHAR(255),
+  entry_date      DATE NOT NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_creditor_repayments_user
+  ON creditor_repayments (user_id, entry_date);
+
+CREATE INDEX IF NOT EXISTS idx_creditor_repayments_creditor
+  ON creditor_repayments (user_id, payer_kind, payer_name);
+
+-- =========================================================
 -- Cost & Pricing (computed costs never stored)
 -- =========================================================
 CREATE TABLE IF NOT EXISTS ingredients (

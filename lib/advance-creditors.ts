@@ -1,7 +1,11 @@
 import { query } from "@/lib/db";
 import { isUndefinedColumnError } from "@/lib/db-migration-guard";
-import { sumDecimals, toCents } from "@/lib/money";
+import { listRepaymentsByCreditor } from "@/lib/creditor-repayment-queries";
+import { computeProfit, sumDecimals, toCents } from "@/lib/money";
+import type { CreditorWithRepayment } from "@/types/shop";
 import type { PayerKind } from "@/types";
+
+export type { CreditorWithRepayment };
 
 export type AdvanceCreditorRow = {
   name: string;
@@ -51,6 +55,62 @@ export function advanceCreditorsByKind(
   kind: PayerKind,
 ): AdvanceCreditorRow[] {
   return rows.filter((r) => (r.payerKind ?? "external") === kind);
+}
+
+export function mergeCreditorsWithRepayments(
+  advances: AdvanceCreditorRow[],
+  repayments: { payerKind: string; name: string; repaid: string }[],
+): CreditorWithRepayment[] {
+  const repaidMap = new Map<string, string>();
+  for (const r of repayments) {
+    repaidMap.set(`${r.payerKind}:${r.name}`, r.repaid);
+  }
+  return advances.map((a) => {
+    const payerKind = a.payerKind ?? "external";
+    const repaid = repaidMap.get(`${payerKind}:${a.name}`) ?? "0.00";
+    const remaining = computeProfit(a.amount, repaid);
+    return {
+      name: a.name,
+      payerKind,
+      owed: a.amount,
+      repaid,
+      remaining: toCents(remaining) < 0 ? "0.00" : remaining,
+      count: a.count ?? 0,
+    };
+  });
+}
+
+export async function listCreditorsWithRepayments(
+  userId: string,
+): Promise<CreditorWithRepayment[]> {
+  const [advances, repayments] = await Promise.all([
+    listShopAdvanceCreditors(userId),
+    listRepaymentsByCreditor(userId),
+  ]);
+  return mergeCreditorsWithRepayments(advances, repayments);
+}
+
+export function creditorsRemainingTotal(rows: CreditorWithRepayment[]): string {
+  return sumDecimals(...rows.map((r) => r.remaining), "0.00");
+}
+
+export async function getShopCreditorOwed(
+  userId: string,
+  payerKind: PayerKind,
+  payerName: string,
+): Promise<string | null> {
+  const advances = await listShopAdvanceCreditors(userId);
+  const row = advances.find(
+    (a) => (a.payerKind ?? "external") === payerKind && a.name === payerName,
+  );
+  return row?.amount ?? null;
+}
+
+export function creditorsByKind(
+  rows: CreditorWithRepayment[],
+  kind: PayerKind,
+): CreditorWithRepayment[] {
+  return rows.filter((r) => r.payerKind === kind);
 }
 
 export function boothOutstandingCreditors(

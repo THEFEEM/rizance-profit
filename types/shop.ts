@@ -56,3 +56,25 @@ export type MemberProfitWithdrawable = {
   withdrawn: string;
   available: string;
 };
+
+export type CreditorRepayment = {
+  id: string;
+  userId: string;
+  payerKind: "member" | "external";
+  payerName: string;
+  amount: string;
+  paymentMethod: "cash" | "transfer";
+  note: string | null;
+  entryDate: string;
+  createdAt: string;
+};
+
+/** Shop creditor with advance vs repayment breakdown (1B display). */
+export type CreditorWithRepayment = {
+  name: string;
+  payerKind: "member" | "external";
+  owed: string;
+  repaid: string;
+  remaining: string;
+  count: number;
+};
