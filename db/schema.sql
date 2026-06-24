@@ -62,6 +62,8 @@ CREATE TABLE IF NOT EXISTS expense_entries (
   entry_date DATE NOT NULL,
   is_advance BOOLEAN NOT NULL DEFAULT false,
   payer_name VARCHAR(120),
+  payer_kind VARCHAR(20) DEFAULT 'external'
+    CHECK (payer_kind IS NULL OR payer_kind IN ('member', 'external')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

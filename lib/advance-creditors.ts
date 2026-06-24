@@ -1,26 +1,41 @@
 import { query } from "@/lib/db";
 import { isUndefinedColumnError } from "@/lib/db-migration-guard";
 import { sumDecimals, toCents } from "@/lib/money";
+import type { PayerKind } from "@/types";
 
 export type AdvanceCreditorRow = {
   name: string;
   amount: string;
+  count?: number;
+  payerKind?: PayerKind;
 };
 
-/** Shop expense entries flagged as advance — grouped by payer_name. */
+/** Shop expense entries flagged as advance — grouped by payer_kind + payer_name. */
 export async function listShopAdvanceCreditors(userId: string): Promise<AdvanceCreditorRow[]> {
   try {
-    const { rows } = await query<{ name: string; amount: string }>(
+    const { rows } = await query<{
+      name: string;
+      payer_kind: string;
+      amount: string;
+      count: string;
+    }>(
       `SELECT COALESCE(NULLIF(btrim(payer_name), ''), 'ไม่ระบุ') AS name,
-              COALESCE(SUM(amount), 0)::text AS amount
+              COALESCE(payer_kind, 'external') AS payer_kind,
+              COALESCE(SUM(amount), 0)::text AS amount,
+              COUNT(*)::text AS count
        FROM expense_entries
        WHERE user_id = $1 AND is_advance = true
-       GROUP BY 1
+       GROUP BY payer_kind, COALESCE(NULLIF(btrim(payer_name), ''), 'ไม่ระบุ')
        HAVING COALESCE(SUM(amount), 0) > 0
-       ORDER BY SUM(amount) DESC`,
+       ORDER BY payer_kind, SUM(amount) DESC`,
       [userId],
     );
-    return rows;
+    return rows.map((r) => ({
+      name: r.name,
+      amount: r.amount,
+      count: Number(r.count),
+      payerKind: r.payer_kind === "member" ? "member" : "external",
+    }));
   } catch (err) {
     if (isUndefinedColumnError(err)) return [];
     throw err;
@@ -29,6 +44,13 @@ export async function listShopAdvanceCreditors(userId: string): Promise<AdvanceC
 
 export function advanceCreditorsTotal(rows: AdvanceCreditorRow[]): string {
   return sumDecimals(...rows.map((r) => r.amount), "0.00");
+}
+
+export function advanceCreditorsByKind(
+  rows: AdvanceCreditorRow[],
+  kind: PayerKind,
+): AdvanceCreditorRow[] {
+  return rows.filter((r) => (r.payerKind ?? "external") === kind);
 }
 
 export function boothOutstandingCreditors(

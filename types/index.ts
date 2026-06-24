@@ -71,6 +71,8 @@ export type Income = {
   createdAt: string;
 };
 
+export type PayerKind = "member" | "external";
+
 export type Expense = {
   id: string;
   amount: string;
@@ -81,6 +83,7 @@ export type Expense = {
   createdAt: string;
   isAdvance?: boolean;
   payerName?: string | null;
+  payerKind?: PayerKind | null;
 };
 
 export const TRANSFER_DIRECTIONS = ["cash_to_transfer", "transfer_to_cash"] as const;

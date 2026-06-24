@@ -25,7 +25,7 @@ import { StatsSummaryCards } from "@/components/stats/StatsSummaryCards";
 import { DailyProfitChart } from "@/components/stats/DailyProfitChart";
 import { BreakdownSection, ProgressBarRow } from "@/components/stats/BreakdownSection";
 import { SplitProfitCard } from "@/components/shared/SplitProfitCard";
-import { ShopAdvanceCreditorsSection } from "@/components/shop/ShopAdvanceCreditorsSection";
+import { ShopAdvanceCreditorsTeaser } from "@/components/shop/ShopAdvanceCreditorsTeaser";
 import { ShopProfitWithdrawalSection } from "@/components/shop/ShopProfitWithdrawalSection";
 import {
   CategoryProgressList,
@@ -237,7 +237,7 @@ export async function RegularStatsSummary({
             onHand={onHand}
             members={shopWithdrawals}
           />
-          <ShopAdvanceCreditorsSection userId={user.id} currency={user.currency} />
+          <ShopAdvanceCreditorsTeaser userId={user.id} currency={user.currency} />
         </>
       )}
     </>
