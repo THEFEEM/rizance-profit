@@ -103,10 +103,15 @@ export const expenseSchema = z
     note,
     entryDate,
     isAdvance: z.boolean().optional(),
+    payerKind: z.enum(["member", "external"]).optional(),
     payerName: z.preprocess(
       (v) => (typeof v === "string" && v.trim() !== "" ? v.trim() : undefined),
       z.string().max(120).optional(),
     ),
+  })
+  .refine((d) => !d.isAdvance || d.payerKind, {
+    message: "กรุณาเลือกประเภทผู้สำรองจ่าย",
+    path: ["payerKind"],
   })
   .refine((d) => !d.isAdvance || d.payerName, {
     message: "กรุณาระบุชื่อผู้จ่ายล่วงหน้า",

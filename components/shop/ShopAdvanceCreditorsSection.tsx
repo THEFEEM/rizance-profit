@@ -14,6 +14,7 @@ export async function ShopAdvanceCreditorsSection({
       rows={rows}
       total={advanceCreditorsTotal(rows)}
       currency={currency}
+      title=""
     />
   );
 }

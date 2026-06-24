@@ -7,6 +7,7 @@ import {
   PAYMENT_METHODS,
   type ExpenseCategoryKey,
   type PaymentMethod,
+  type PayerKind,
 } from "@/types";
 
 export function RegularExpenseFields({
@@ -22,6 +23,8 @@ export function RegularExpenseFields({
   disabled = false,
   isAdvance = false,
   onAdvanceChange,
+  payerKind = "external",
+  onPayerKindChange,
   payerName = "",
   onPayerNameChange,
 }: {
@@ -37,6 +40,8 @@ export function RegularExpenseFields({
   disabled?: boolean;
   isAdvance?: boolean;
   onAdvanceChange?: (v: boolean) => void;
+  payerKind?: PayerKind;
+  onPayerKindChange?: (v: PayerKind) => void;
   payerName?: string;
   onPayerNameChange?: (v: string) => void;
 }) {
@@ -81,6 +86,34 @@ export function RegularExpenseFields({
           />
           ออกเงินก่อน (เจ้าหนี้)
         </label>
+      )}
+
+      {isAdvance && onPayerKindChange && (
+        <div>
+          <p className="mb-1.5 text-xs text-rz-muted">ผู้สำรองจ่าย</p>
+          <div className="flex gap-2">
+            <EntryOptionButton
+              selected={payerKind === "member"}
+              disabled={disabled}
+              onClick={() => onPayerKindChange("member")}
+              accent="green"
+              layout="row"
+              className="flex-1"
+            >
+              สมาชิก
+            </EntryOptionButton>
+            <EntryOptionButton
+              selected={payerKind === "external"}
+              disabled={disabled}
+              onClick={() => onPayerKindChange("external")}
+              accent="green"
+              layout="row"
+              className="flex-1"
+            >
+              บุคคลภายนอก
+            </EntryOptionButton>
+          </div>
+        </div>
       )}
 
       {isAdvance && onPayerNameChange && (

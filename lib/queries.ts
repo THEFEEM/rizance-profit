@@ -89,9 +89,12 @@ type ExpenseRow = IncomeRow & {
   category: string;
   is_advance?: boolean;
   payer_name?: string | null;
+  payer_kind?: string | null;
 };
 
 function mapExpense(r: ExpenseRow): Expense {
+  const payerKind =
+    r.payer_kind === "member" || r.payer_kind === "external" ? r.payer_kind : null;
   return {
     id: r.id,
     amount: r.amount,
@@ -102,6 +105,7 @@ function mapExpense(r: ExpenseRow): Expense {
     createdAt: toIso(r.created_at),
     isAdvance: r.is_advance,
     payerName: r.payer_name ?? null,
+    payerKind,
   };
 }
 
@@ -287,14 +291,15 @@ export async function createExpense(userId: string, input: ExpenseInput): Promis
   const category = input.category ?? "expense_misc";
   const isAdvance = input.isAdvance === true;
   const payerName = isAdvance ? (input.payerName ?? null) : null;
+  const payerKind = isAdvance ? (input.payerKind ?? "external") : null;
   const paymentMethod = input.paymentMethod ?? "cash";
 
   try {
     const { rows } = await query<ExpenseRow>(
-      `INSERT INTO expense_entries (user_id, amount, category, payment_method, note, entry_date, is_advance, payer_name)
-       VALUES ($1, $2, $3, $4, $5, $6::date, $7, $8)
+      `INSERT INTO expense_entries (user_id, amount, category, payment_method, note, entry_date, is_advance, payer_name, payer_kind)
+       VALUES ($1, $2, $3, $4, $5, $6::date, $7, $8, $9)
        RETURNING id, amount, category, payment_method, note, entry_date::text AS entry_date, created_at,
-         is_advance, payer_name`,
+         is_advance, payer_name, payer_kind`,
       [
         userId,
         input.amount.toFixed(2),
@@ -304,6 +309,7 @@ export async function createExpense(userId: string, input: ExpenseInput): Promis
         entryDate,
         isAdvance,
         payerName,
+        payerKind,
       ],
     );
     return mapExpense(rows[0]);

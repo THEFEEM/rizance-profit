@@ -21,6 +21,7 @@ import type {
   IncomeCategoryKey,
   MoneyTransfer,
   PaymentMethod,
+  PayerKind,
   TransferDirection,
 } from "@/types";
 
@@ -74,6 +75,7 @@ export function ShopEntryForm({
   const [expenseNote, setExpenseNote] = useState("");
   const [expenseDate, setExpenseDate] = useState(today());
   const [expenseAdvance, setExpenseAdvance] = useState(false);
+  const [expensePayerKind, setExpensePayerKind] = useState<PayerKind>("external");
   const [expensePayerName, setExpensePayerName] = useState("");
 
   const [transferDirection, setTransferDirection] =
@@ -131,6 +133,7 @@ export function ShopEntryForm({
           note: expenseNote.trim() || undefined,
           entryDate: expenseDate,
           isAdvance: expenseAdvance || undefined,
+          payerKind: expenseAdvance ? expensePayerKind : undefined,
           payerName: expenseAdvance ? expensePayerName.trim() : undefined,
         }),
       });
@@ -230,6 +233,8 @@ export function ShopEntryForm({
             disabled={saving}
             isAdvance={expenseAdvance}
             onAdvanceChange={setExpenseAdvance}
+            payerKind={expensePayerKind}
+            onPayerKindChange={setExpensePayerKind}
             payerName={expensePayerName}
             onPayerNameChange={setExpensePayerName}
           />
