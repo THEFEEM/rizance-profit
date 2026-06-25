@@ -1,7 +1,12 @@
 import { query } from "@/lib/db";
 import { isUndefinedColumnError } from "@/lib/db-migration-guard";
 import { listRepaymentsByCreditor } from "@/lib/creditor-repayment-queries";
-import { computeProfit, sumDecimals, toCents } from "@/lib/money";
+import {
+  centsToDecimalString,
+  computeProfit,
+  sumDecimals,
+  toCents,
+} from "@/lib/money";
 import type { CreditorWithRepayment } from "@/types/shop";
 import type { PayerKind } from "@/types";
 
@@ -12,6 +17,14 @@ export type AdvanceCreditorRow = {
   amount: string;
   count?: number;
   payerKind?: PayerKind;
+};
+
+export type BoothCreditorRow = {
+  name: string;
+  owed: string;
+  paid: string;
+  remaining: string;
+  isExternal: boolean;
 };
 
 /** Shop expense entries flagged as advance — grouped by payer_kind + payer_name. */
@@ -55,6 +68,43 @@ export function advanceCreditorsByKind(
   kind: PayerKind,
 ): AdvanceCreditorRow[] {
   return rows.filter((r) => (r.payerKind ?? "external") === kind);
+}
+
+/** Booth creditors with owed/paid/remaining — keeps fully-paid rows for history. */
+export function boothCreditorsWithRepayment(
+  advances: { creditorName: string; amount: string; isExternal: boolean }[],
+  repayments: { name: string; amount: string }[],
+): BoothCreditorRow[] {
+  const owedMap = new Map<string, { cents: number; isExternal: boolean }>();
+
+  for (const a of advances) {
+    const name = a.creditorName.trim() || "ไม่ระบุ";
+    const prev = owedMap.get(name);
+    owedMap.set(name, {
+      cents: (prev?.cents ?? 0) + toCents(a.amount),
+      isExternal: a.isExternal,
+    });
+  }
+
+  const paidMap = new Map<string, number>();
+  for (const r of repayments) {
+    const name = r.name.trim() || "ไม่ระบุ";
+    paidMap.set(name, (paidMap.get(name) ?? 0) + toCents(r.amount));
+  }
+
+  return [...owedMap.entries()]
+    .map(([name, { cents: owedCents, isExternal }]) => {
+      const paidCents = Math.min(paidMap.get(name) ?? 0, owedCents);
+      const remainingCents = owedCents - paidCents;
+      return {
+        name,
+        owed: centsToDecimalString(owedCents),
+        paid: centsToDecimalString(paidCents),
+        remaining: centsToDecimalString(remainingCents),
+        isExternal,
+      };
+    })
+    .sort((a, b) => toCents(b.remaining) - toCents(a.remaining));
 }
 
 export function mergeCreditorsWithRepayments(
