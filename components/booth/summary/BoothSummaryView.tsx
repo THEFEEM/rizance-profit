@@ -6,7 +6,7 @@ import { BoothSummaryNetCard } from "@/components/booth/summary/BoothSummaryNetC
 import { BoothSummaryPLCard } from "@/components/booth/summary/BoothSummaryPLCard";
 import { BoothSummarySplitCard } from "@/components/booth/summary/BoothSummarySplitCard";
 import { BoothSummaryCategorySection } from "@/components/booth/summary/BoothSummaryCategorySection";
-import { BoothAdvanceCreditorsSection } from "@/components/booth/summary/BoothAdvanceCreditorsSection";
+import { BoothCreditorsCardSection } from "@/components/booth/summary/BoothCreditorsCard";
 import type { BoothSummary, SplitProfitResult } from "@/types/booth";
 
 /** Full booth summary page layout — presentation only, spec §1 order. */
@@ -40,7 +40,7 @@ export function BoothSummaryView({
         <>
           <BoothSummarySplitCard split={split} currency={currency} />
           <BoothSummaryEmployeeCards split={split} currency={currency} />
-          <BoothAdvanceCreditorsSection
+          <BoothCreditorsCardSection
             userId={userId}
             boothId={boothId}
             split={split}
