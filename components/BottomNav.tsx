@@ -3,20 +3,39 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Home, LayoutGrid, Plus, Settings } from "lucide-react";
+import { BarChart3, Home, LayoutGrid, Plus, Settings, Sparkles } from "lucide-react";
 import { ModePicker } from "@/components/ModePicker";
 
 const NAV_ICON_SIZE = 22;
 const FAB_ICON_SIZE = 24;
 const ICON_STROKE = 2;
 
-const NAV_ITEMS = [
+const CHAT_HREF = "/chat";
+
+const BASE_NAV_ITEMS = [
   { key: "today", label: "หน้าหลัก", Icon: Home, kind: "link" as const },
   { key: "stats", label: "สถิติ", Icon: BarChart3, kind: "link" as const },
   { key: "entry", label: "+", Icon: Plus, kind: "link" as const, prominent: true },
-  { key: "mode", label: "โหมด", Icon: LayoutGrid, kind: "action" as const },
   { key: "profile", label: "ตั้งค่า", Icon: Settings, kind: "link" as const },
 ] as const;
+
+function fourthNavItem(mode: "regular" | "booth" | "project" | "personal") {
+  if (mode === "regular") {
+    return {
+      key: "ai",
+      label: "AI",
+      Icon: Sparkles,
+      kind: "link" as const,
+      href: CHAT_HREF,
+    };
+  }
+  return {
+    key: "mode",
+    label: "โหมด",
+    Icon: LayoutGrid,
+    kind: "action" as const,
+  };
+}
 
 function isNavActive(
   pathname: string,
@@ -30,7 +49,11 @@ function isNavActive(
     return pathname === statsHref || pathname.startsWith(`${statsHref}/`);
   }
   if (key === "entry") {
+    if (pathname === CHAT_HREF || pathname.startsWith(`${CHAT_HREF}/`)) return false;
     return pathname === href || pathname.startsWith(`${href}/`);
+  }
+  if (key === "ai") {
+    return pathname === CHAT_HREF || pathname.startsWith(`${CHAT_HREF}/`);
   }
   if (key === "profile") {
     return pathname === href || pathname.startsWith(`${href}/`);
@@ -79,13 +102,20 @@ export function BottomNav({
     entry: entryHref,
     stats: statsHref,
     profile: profileHref,
+    ai: CHAT_HREF,
   };
+
+  const navItems = [
+    ...BASE_NAV_ITEMS.slice(0, 3),
+    fourthNavItem(mode),
+    ...BASE_NAV_ITEMS.slice(3),
+  ];
 
   return (
     <>
       <nav className="sticky bottom-0 z-10 border-t-[0.5px] border-rz-border bg-rz-nav">
         <div className="mx-auto flex max-w-md items-end justify-around px-1 pb-[env(safe-area-inset-bottom)] pt-1">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             if (item.kind === "action") {
               return (
                 <button
