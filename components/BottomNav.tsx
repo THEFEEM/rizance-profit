@@ -23,7 +23,7 @@ function fourthNavItem(mode: "regular" | "booth" | "project" | "personal") {
   if (mode === "regular") {
     return {
       key: "ai",
-      label: "AI",
+      label: "Rizq",
       Icon: Sparkles,
       kind: "link" as const,
       href: CHAT_HREF,

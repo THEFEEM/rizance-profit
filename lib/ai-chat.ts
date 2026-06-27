@@ -127,7 +127,10 @@ function buildModel(client: GoogleGenerativeAI, todayDate: string) {
                 category: {
                   type: SchemaType.STRING,
                   nullable: true,
-                  description: `ถ้า income เลือก key จาก: ${incomeList}\nถ้า expense เลือก key จาก: ${expenseList}`,
+                  description:
+                    `ถ้า income เลือก key จาก: ${incomeList}\n` +
+                    `ถ้า expense เลือก key จาก: ${expenseList}\n` +
+                    "ถ้าผู้ใช้ระบุหมวดมาด้วย (เช่น 'ค่าไฟ สาธารณูปโภค', 'กาแฟ วัตถุดิบ') ให้ใช้ key ที่ตรงกับที่ผู้ใช้บอกก่อน",
                 },
                 payment_method: {
                   type: SchemaType.STRING,
@@ -205,7 +208,8 @@ function buildPrompt(text: string, todayDate: string): string {
     "- ถ้าถามสรุปการเงิน กำไร รายรับ รายจ่าย เงินคงเหลือ หรือหมวดค่าใช้จ่าย → เรียก get_financial_summary\n" +
     "- ถ้าทักทาย คุยทั่วไป หรือไม่ใช่ทั้งสองอย่าง → ตอบเป็นข้อความภาษาไทยโดยไม่เรียก tool\n" +
     "สำหรับ record_entry: ถ้าข้อมูลไม่พอ (ไม่มีจำนวนเงิน) ใส่ reply ถามกลับ ห้ามเดา amount\n" +
-    "สำหรับ record_entry: หมวดหมู่เลือก key จาก list เท่านั้น"
+    "สำหรับ record_entry: หมวดหมู่เลือก key จาก list เท่านั้น\n" +
+    "สำหรับ record_entry: ถ้าผู้ใช้ระบุหมวดหมู่มาด้วย เช่น 'ค่าไฟ 850 สาธารณูปโภค' หรือ 'กาแฟ 100 วัตถุดิบ' ให้ใช้หมวดที่ผู้ใช้ระบุ (map เป็น key ที่ตรง)"
   );
 }
 
@@ -215,7 +219,7 @@ export async function parseUserMessage(
 ): Promise<RizqAction> {
   const client = getClient();
   if (!client) {
-    return { type: "error", reply: "ระบบ AI ยังไม่พร้อม" };
+    return { type: "error", reply: "Rizq ยังไม่พร้อม" };
   }
 
   try {

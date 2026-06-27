@@ -132,7 +132,7 @@ export function ChatView({
         />
       }
     >
-      <EntryPageHeader title="ผู้ช่วย AI" backLabel="← กลับ" />
+      <EntryPageHeader title="Rizq" backLabel="← กลับ" />
 
       <div className="flex flex-col gap-3 px-4 py-4">
         {messages.length === 0 && <ChatEmptyState />}
