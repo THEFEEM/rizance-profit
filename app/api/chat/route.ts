@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
         action.period,
         action.metric,
       );
-      const answer = formatFinancialAnswer(context, action.period, action.metric);
+      const answer = formatFinancialAnswer(context, action.period);
       return replyAssistant(user.id, answer);
     }
   }

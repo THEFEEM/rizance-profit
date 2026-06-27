@@ -1,4 +1,5 @@
-import { formatMoney } from "@/lib/money";
+import { formatMoney } from "@/lib/format";
+import { currencySymbol } from "@/lib/money";
 import type { ChatCardData } from "@/lib/chat-queries";
 
 export function ChatEntryCard({
@@ -43,7 +44,8 @@ export function ChatEntryCard({
               isIncome ? "text-rz-green" : "text-rz-red"
             }`}
           >
-            {formatMoney(card.amount, currency)}
+            {currencySymbol(currency)}
+            {formatMoney(card.amount)}
           </span>
         </div>
 
@@ -52,7 +54,7 @@ export function ChatEntryCard({
         </p>
 
         {card.confidence === "low" && (
-          <p className="mt-2 text-xs text-rz-red">AI ไม่แน่ใจ ตรวจสอบด้วยนะคะ</p>
+          <p className="mt-2 text-xs text-rz-red">Rizq ไม่แน่ใจ ตรวจสอบด้วยนะคะ</p>
         )}
       </div>
 
