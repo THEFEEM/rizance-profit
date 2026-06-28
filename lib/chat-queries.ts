@@ -19,6 +19,92 @@ export type ChatCardData = {
   confidence: "low" | "medium" | "high";
 };
 
+export type ReceiptLineItem = {
+  id: string;
+  note: string;
+  amount: string;
+  category: string;
+  categoryLabel: string;
+  confidence: "low" | "medium" | "high";
+  selected: boolean;
+};
+
+export type ChatReceiptCardData = {
+  cardType: "receipt_split";
+  kind: "expense";
+  merchantName: string | null;
+  entryDate: string;
+  paymentMethod: "cash" | "transfer";
+  totalAmount: string;
+  itemsSum: string;
+  status: "pending" | "confirmed" | "cancelled";
+  items: ReceiptLineItem[];
+  entryIds?: string[];
+  confidence: "low" | "medium" | "high";
+};
+
+export type ChatCardPayload = ChatCardData | ChatReceiptCardData;
+
+const CATEGORY_LABELS: Record<string, string> = {
+  materials: "วัตถุดิบ",
+  equipment: "อุปกรณ์",
+  beverages: "เครื่องดื่ม",
+  packaging: "บรรจุภัณฑ์",
+  utilities: "สาธารณูปโภค",
+  other: "อื่นๆ",
+  food: "อาหาร",
+  salary: "เงินเดือน",
+  marketing: "การตลาด",
+  rent: "ค่าเช่า",
+  transport: "ขนส่ง",
+};
+
+export function parseCardPayload(raw: unknown): ChatCardPayload | null {
+  if (!raw || typeof raw !== "object") return null;
+  const data = raw as Record<string, unknown>;
+
+  if (data.cardType === "receipt_split") {
+    return data as ChatReceiptCardData;
+  }
+
+  return data as ChatCardData;
+}
+
+export function buildReceiptCardData(
+  result: import("./ai-slip").ReceiptScanResult,
+  fallbackDate: string,
+): ChatReceiptCardData {
+  const items: ReceiptLineItem[] = result.items.map((item) => {
+    const category = item.category ?? "other";
+    return {
+      id: item.id,
+      note: item.note,
+      amount: item.amount.toFixed(2),
+      category,
+      categoryLabel: CATEGORY_LABELS[category] ?? "อื่นๆ",
+      confidence: item.confidence,
+      selected: true,
+    };
+  });
+
+  const itemsSum = items
+    .reduce((sum, item) => sum + parseFloat(item.amount), 0)
+    .toFixed(2);
+
+  return {
+    cardType: "receipt_split",
+    kind: "expense",
+    merchantName: result.merchantName,
+    entryDate: result.entryDate ?? fallbackDate,
+    paymentMethod: result.paymentMethod ?? "cash",
+    totalAmount: result.totalAmount?.toFixed(2) ?? itemsSum,
+    itemsSum,
+    status: "pending",
+    items,
+    confidence: result.confidence,
+  };
+}
+
 export type ChatMessageRow = {
   id: string;
   role: "user" | "assistant";
