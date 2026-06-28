@@ -1,4 +1,4 @@
-import type { ChatMessageRow } from "@/lib/chat-queries";
+import { isReceiptSplitCard, type ChatMessageRow } from "@/lib/chat-queries";
 import { ChatEntryCard } from "@/components/chat/ChatEntryCard";
 
 export function ChatMessage({
@@ -40,14 +40,20 @@ export function ChatMessage({
   return (
     <div className="flex justify-start">
       {message.cardData ? (
-        <ChatEntryCard
-          card={message.cardData}
-          messageId={message.id}
-          entryId={message.entryId}
-          onDelete={onDelete}
-          onCategoryChange={onCategoryChange}
-          currency={currency}
-        />
+        isReceiptSplitCard(message.cardData) ? (
+          <div className="max-w-[80%] rounded-2xl rounded-bl-md border-[0.5px] border-rz-border bg-rz-card px-4 py-2.5 text-sm text-rz-text">
+            ใบเสร็จ {message.cardData.items.length} รายการ — รอยืนยัน
+          </div>
+        ) : (
+          <ChatEntryCard
+            card={message.cardData}
+            messageId={message.id}
+            entryId={message.entryId}
+            onDelete={onDelete}
+            onCategoryChange={onCategoryChange}
+            currency={currency}
+          />
+        )
       ) : (
         <div className="max-w-[80%] rounded-2xl rounded-bl-md border-[0.5px] border-rz-border bg-rz-card px-4 py-2.5 text-sm text-rz-text">
           {message.content}

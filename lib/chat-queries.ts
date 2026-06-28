@@ -45,7 +45,18 @@ export type ChatReceiptCardData = {
 
 export type ChatCardPayload = ChatCardData | ChatReceiptCardData;
 
-const CATEGORY_LABELS: Record<string, string> = {
+export const RECEIPT_ITEM_CATEGORY_KEYS = [
+  "materials",
+  "equipment",
+  "beverages",
+  "packaging",
+  "utilities",
+  "other",
+] as const;
+
+export type ReceiptItemCategoryKey = (typeof RECEIPT_ITEM_CATEGORY_KEYS)[number];
+
+export const CATEGORY_LABELS: Record<string, string> = {
   materials: "วัตถุดิบ",
   equipment: "อุปกรณ์",
   beverages: "เครื่องดื่ม",
@@ -112,7 +123,7 @@ export type ChatMessageRow = {
   imageThumb: string | null;
   entryId: string | null;
   entryKind: "income" | "expense" | null;
-  cardData: ChatCardData | null;
+  cardData: ChatCardPayload | null;
   createdAt: string;
 };
 
@@ -174,6 +185,28 @@ function parseCardData(raw: unknown): ChatCardData | null {
   };
 }
 
+function mapCardData(raw: unknown): ChatCardPayload | null {
+  if (raw == null) return null;
+
+  let obj: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      obj = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  if (typeof obj !== "object" || obj === null) return null;
+  const record = obj as Record<string, unknown>;
+
+  if (record.cardType === "receipt_split") {
+    return record as ChatReceiptCardData;
+  }
+
+  return parseCardData(obj);
+}
+
 function mapRow(row: ChatMessageDbRow): ChatMessageRow {
   const role = row.role === "assistant" ? "assistant" : "user";
   const entryKind =
@@ -188,7 +221,7 @@ function mapRow(row: ChatMessageDbRow): ChatMessageRow {
     imageThumb: row.image_thumb,
     entryId: row.entry_id,
     entryKind,
-    cardData: parseCardData(row.card_data),
+    cardData: mapCardData(row.card_data),
     createdAt: toIso(row.created_at),
   };
 }
@@ -201,7 +234,7 @@ export async function insertChatMessage(
     imageThumb?: string | null;
     entryId?: string | null;
     entryKind?: "income" | "expense" | null;
-    cardData?: ChatCardData | null;
+    cardData?: ChatCardPayload | null;
   },
 ): Promise<ChatMessageRow> {
   const { rows } = await query<ChatMessageDbRow>(
@@ -276,6 +309,51 @@ export async function updateChatCardCategory(
      WHERE id = $1 AND user_id = $2`,
     [messageId, userId, JSON.stringify(category), JSON.stringify(categoryLabel)],
   );
+}
+
+export async function updateChatMessageCardData(
+  userId: string,
+  messageId: string,
+  cardData: ChatCardPayload,
+): Promise<void> {
+  await query(
+    `UPDATE chat_messages SET card_data = $1::jsonb WHERE id = $2 AND user_id = $3`,
+    [JSON.stringify(cardData), messageId, userId],
+  );
+}
+
+export async function deleteChatMessage(
+  userId: string,
+  messageId: string,
+): Promise<boolean> {
+  const { rowCount } = await query(
+    `DELETE FROM chat_messages WHERE id = $1 AND user_id = $2`,
+    [messageId, userId],
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+export function isReceiptSplitCard(
+  card: ChatCardPayload | null,
+): card is ChatReceiptCardData {
+  return card != null && "cardType" in card && card.cardType === "receipt_split";
+}
+
+export function mapReceiptLineToExpenseCategory(category: string): ExpenseCategoryKey {
+  const map: Record<string, ExpenseCategoryKey> = {
+    materials: "materials",
+    equipment: "equipment",
+    utilities: "utilities",
+    beverages: "materials",
+    packaging: "materials",
+    food: "materials",
+    other: "expense_misc",
+    salary: "wage",
+    marketing: "marketing",
+    rent: "rent",
+    transport: "shipping",
+  };
+  return map[category] ?? "expense_misc";
 }
 
 export function categoryLabelOf(

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { scanSlip } from "@/lib/ai-slip";
+import { scanReceipt, scanSlip } from "@/lib/ai-slip";
 import {
+  buildReceiptCardData,
   categoryLabelOf,
   insertChatMessage,
   type ChatCardData,
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
   }
 
   const scanKind = kind === "income" ? "income" : "expense";
-  const scanSlipType = slipType === "receipt" ? "receipt" : "transfer";
+  const scanSlipType = slipType === "transfer" ? "transfer" : "receipt";
   const resolvedMediaType = isSupportedMediaType(mediaType) ? mediaType : "image/jpeg";
 
   const userContent =
@@ -67,6 +68,26 @@ export async function POST(req: NextRequest) {
     content: userContent,
     imageThumb,
   });
+
+  if (scanSlipType === "receipt" && scanKind === "expense") {
+    const receiptResult = await scanReceipt(
+      imageBase64,
+      resolvedMediaType,
+      scanKind,
+      scanCaption,
+    );
+
+    if (receiptResult.items.length >= 2) {
+      const cardData = buildReceiptCardData(receiptResult, today());
+      const aiMsg = await insertChatMessage(user.id, {
+        role: "assistant",
+        entryId: null,
+        entryKind: "expense",
+        cardData,
+      });
+      return NextResponse.json({ data: { messages: [userMsg, aiMsg] } });
+    }
+  }
 
   const result = await scanSlip(
     imageBase64,
