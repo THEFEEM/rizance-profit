@@ -2,7 +2,7 @@
 
 import { useState, type CSSProperties } from "react";
 import { formatMoney } from "@/lib/format";
-import type { ChatReceiptCardData } from "@/lib/chat-queries";
+import type { ChatReceiptCardData } from "@/lib/chat-types";
 
 const STATUS_COLORS = {
   pending: "#FCD34D",
@@ -39,15 +39,23 @@ export function ChatReceiptCard({
   onConfirm,
   onCancel,
   onUpdateItem: _onUpdateItem,
+  onReceiptMetaChange,
 }: {
   messageId: string;
   card: ChatReceiptCardData;
   onConfirm: (messageId: string) => Promise<void>;
   onCancel: (messageId: string) => Promise<void>;
   onUpdateItem: (messageId: string, itemId: string, category: string) => Promise<void>;
+  onReceiptMetaChange: (
+    messageId: string,
+    meta: { paymentMethod: "cash" | "transfer" },
+  ) => Promise<void>;
 }) {
   const [loading, setLoading] = useState(false);
+  const [savingPayment, setSavingPayment] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const busy = loading || savingPayment;
 
   const selectedCount = card.items.filter((item) => item.selected).length;
   const itemsMismatch =
@@ -77,6 +85,20 @@ export function ChatReceiptCard({
     }
   }
 
+  async function handlePaymentChange(next: "cash" | "transfer") {
+    if (next === card.paymentMethod) return;
+
+    setSavingPayment(true);
+    setError(null);
+    try {
+      await onReceiptMetaChange(messageId, { paymentMethod: next });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ");
+    } finally {
+      setSavingPayment(false);
+    }
+  }
+
   return (
     <div className="max-w-[85%] overflow-hidden rounded-[14px] border-[0.5px] border-rz-border bg-rz-card">
       <div className="border-b-[0.5px] border-rz-border px-4 py-2.5">
@@ -94,9 +116,35 @@ export function ChatReceiptCard({
             {STATUS_LABELS[card.status]}
           </span>
         </div>
-        <p className="mt-1 text-xs text-rz-hint">
-          {card.entryDate} · {card.paymentMethod === "cash" ? "เงินสด" : "เงินโอน"}
-        </p>
+        <p className="mt-1 text-xs text-rz-hint">{card.entryDate}</p>
+        {card.status === "pending" ? (
+          <div className="mt-2 flex items-center gap-2">
+            <div className="flex rounded-lg border-[0.5px] border-[#243049] p-0.5">
+              {(["cash", "transfer"] as const).map((method) => (
+                <button
+                  key={method}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void handlePaymentChange(method)}
+                  className={`rounded-md px-2.5 py-1 text-xs ${
+                    card.paymentMethod === method
+                      ? "bg-[#243049] text-[#E8F0FA]"
+                      : "bg-transparent text-[#5A7499]"
+                  } ${busy ? "opacity-60" : ""}`}
+                >
+                  {method === "cash" ? "เงินสด" : "โอน"}
+                </button>
+              ))}
+            </div>
+            {savingPayment && (
+              <span className="text-xs text-rz-hint">กำลังบันทึก…</span>
+            )}
+          </div>
+        ) : (
+          <p className="mt-1 text-xs text-rz-hint">
+            {card.paymentMethod === "cash" ? "เงินสด" : "เงินโอน"}
+          </p>
+        )}
         <div className="mt-2 flex items-baseline justify-between gap-3">
           <span className="text-xs text-rz-muted">{card.items.length} รายการ</span>
           <span className="rz-tabular text-lg font-medium text-rz-text">
@@ -147,11 +195,11 @@ export function ChatReceiptCard({
 
       <div className="border-t-[0.5px] border-rz-border px-4 py-2.5">
         {card.status === "pending" ? (
-          <div className={`flex items-center justify-end gap-2 ${loading ? "opacity-60" : ""}`}>
+          <div className={`flex items-center justify-end gap-2 ${busy ? "opacity-60" : ""}`}>
             <button
               type="button"
               onClick={() => void handleCancel()}
-              disabled={loading}
+              disabled={busy}
               className="tap-target rounded-lg border-[0.5px] border-rz-border px-3 py-1.5 text-xs text-rz-muted"
             >
               ยกเลิก
@@ -159,7 +207,7 @@ export function ChatReceiptCard({
             <button
               type="button"
               onClick={() => void handleConfirm()}
-              disabled={loading || selectedCount === 0}
+              disabled={busy || selectedCount === 0}
               className="tap-target rounded-lg bg-rz-green px-3 py-1.5 text-xs font-medium text-rz-bg"
             >
               บันทึก {selectedCount} รายการ

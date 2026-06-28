@@ -15,7 +15,7 @@ import {
   CATEGORY_LABELS,
   isReceiptSplitCard,
   type ChatMessageRow,
-} from "@/lib/chat-queries";
+} from "@/lib/chat-types";
 import { downscaleImage, generateThumbnail } from "@/lib/image-utils";
 
 type ChatPostResponse = {
@@ -35,6 +35,11 @@ type ConfirmReceiptResponse = {
 
 type CancelReceiptResponse = {
   ok: true;
+};
+
+type UpdatePaymentResponse = {
+  ok: true;
+  paymentMethod: "cash" | "transfer";
 };
 
 export function ChatView({
@@ -258,6 +263,71 @@ export function ChatView({
     throw new Error(res.ok ? "แก้หมวดไม่สำเร็จ" : res.message);
   }
 
+  async function handlePaymentMethodChange(
+    messageId: string,
+    paymentMethod: "cash" | "transfer",
+  ) {
+    const res = await apiFetch<UpdatePaymentResponse>(
+      `/api/chat/${messageId}/update-payment`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ paymentMethod }),
+      },
+    );
+
+    if (res.ok && res.data) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId && m.cardData && !isReceiptSplitCard(m.cardData)
+            ? {
+                ...m,
+                cardData: {
+                  ...m.cardData,
+                  paymentMethod: res.data.paymentMethod,
+                },
+              }
+            : m,
+        ),
+      );
+      router.refresh();
+      return;
+    }
+
+    throw new Error(res.ok ? "บันทึกไม่สำเร็จ" : res.message);
+  }
+
+  async function handleReceiptMetaChange(
+    messageId: string,
+    meta: { paymentMethod: "cash" | "transfer" },
+  ) {
+    const res = await apiFetch<UpdatePaymentResponse>(
+      `/api/chat/${messageId}/update-receipt-meta`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(meta),
+      },
+    );
+
+    if (res.ok && res.data) {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== messageId || !isReceiptSplitCard(m.cardData)) return m;
+          return {
+            ...m,
+            cardData: {
+              ...m.cardData,
+              paymentMethod: res.data.paymentMethod,
+            },
+          };
+        }),
+      );
+      router.refresh();
+      return;
+    }
+
+    throw new Error(res.ok ? "บันทึกไม่สำเร็จ" : res.message);
+  }
+
   async function handleDelete(messageId: string) {
     const target = messages.find((m) => m.id === messageId);
     const isReceipt =
@@ -311,6 +381,8 @@ export function ChatView({
             onConfirmReceipt={handleConfirmReceipt}
             onCancelReceipt={handleCancelReceipt}
             onUpdateReceiptItem={handleUpdateReceiptItem}
+            onPaymentMethodChange={handlePaymentMethodChange}
+            onReceiptMetaChange={handleReceiptMetaChange}
           />
         ))}
         {error && (

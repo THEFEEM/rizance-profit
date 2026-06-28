@@ -1,4 +1,4 @@
-import { isReceiptSplitCard, type ChatMessageRow } from "@/lib/chat-queries";
+import { isReceiptSplitCard, type ChatMessageRow } from "@/lib/chat-types";
 import { ChatEntryCard } from "@/components/chat/ChatEntryCard";
 import { ChatReceiptCard } from "@/components/chat/ChatReceiptCard";
 
@@ -10,6 +10,8 @@ export function ChatMessage({
   onConfirmReceipt,
   onCancelReceipt,
   onUpdateReceiptItem,
+  onPaymentMethodChange,
+  onReceiptMetaChange,
 }: {
   message: ChatMessageRow;
   currency: string;
@@ -21,6 +23,14 @@ export function ChatMessage({
     messageId: string,
     itemId: string,
     category: string,
+  ) => Promise<void>;
+  onPaymentMethodChange: (
+    messageId: string,
+    paymentMethod: "cash" | "transfer",
+  ) => Promise<void>;
+  onReceiptMetaChange: (
+    messageId: string,
+    meta: { paymentMethod: "cash" | "transfer" },
   ) => Promise<void>;
 }) {
   if (message.role === "user") {
@@ -58,6 +68,7 @@ export function ChatMessage({
             onConfirm={onConfirmReceipt}
             onCancel={onCancelReceipt}
             onUpdateItem={onUpdateReceiptItem}
+            onReceiptMetaChange={onReceiptMetaChange}
           />
         ) : (
           <ChatEntryCard
@@ -66,6 +77,7 @@ export function ChatMessage({
             entryId={message.entryId}
             onDelete={onDelete}
             onCategoryChange={onCategoryChange}
+            onPaymentMethodChange={onPaymentMethodChange}
             currency={currency}
           />
         )
