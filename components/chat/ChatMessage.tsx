@@ -82,7 +82,7 @@ export function ChatMessage({
           />
         )
       ) : (
-        <div className="max-w-[80%] rounded-2xl rounded-bl-md border-[0.5px] border-rz-border bg-rz-card px-4 py-2.5 text-sm text-rz-text">
+        <div className="max-w-[80%] whitespace-pre-line rounded-2xl rounded-bl-md border-[0.5px] border-rz-border bg-rz-card px-4 py-2.5 text-sm text-rz-text">
           {message.content}
         </div>
       )}
