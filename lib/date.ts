@@ -43,6 +43,21 @@ export function isValidDate(s: string): boolean {
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
 }
 
+/** Prompt hint: Thai B.E. (พ.ศ.) → C.E. (ค.ศ.) for AI date extraction. */
+export const THAI_BE_DATE_PROMPT =
+  "วันที่ในสลิปไทยใช้ปี พ.ศ. (พุทธศักราช) ต้องแปลงเป็น ค.ศ. โดยลบ 543\n" +
+  "เช่น พ.ศ. 2569 = ค.ศ. 2026, พ.ศ. 2568 = ค.ศ. 2025\n" +
+  "คืนค่าเป็น YYYY-MM-DD แบบ ค.ศ. เท่านั้น";
+
+/** Safety net: if year looks like พ.ศ. (>2500), subtract 543. */
+export function fixThaiYear(dateStr: string): string {
+  const year = parseInt(dateStr.substring(0, 4), 10);
+  if (year > 2500) {
+    return `${year - 543}${dateStr.substring(4)}`;
+  }
+  return dateStr;
+}
+
 /** True if `s` is a valid month in "YYYY-MM" form. */
 export function isValidMonth(s: string): boolean {
   if (!MONTH_RE.test(s)) return false;

@@ -23,6 +23,7 @@ export type ChatMessageRow = {
   id: string;
   role: "user" | "assistant";
   content: string | null;
+  imageThumb: string | null;
   entryId: string | null;
   entryKind: "income" | "expense" | null;
   cardData: ChatCardData | null;
@@ -33,6 +34,7 @@ type ChatMessageDbRow = {
   id: string;
   role: string;
   content: string | null;
+  image_thumb: string | null;
   entry_id: string | null;
   entry_kind: string | null;
   card_data: unknown;
@@ -97,6 +99,7 @@ function mapRow(row: ChatMessageDbRow): ChatMessageRow {
     id: row.id,
     role,
     content: row.content,
+    imageThumb: row.image_thumb,
     entryId: row.entry_id,
     entryKind,
     cardData: parseCardData(row.card_data),
@@ -109,19 +112,21 @@ export async function insertChatMessage(
   input: {
     role: "user" | "assistant";
     content?: string | null;
+    imageThumb?: string | null;
     entryId?: string | null;
     entryKind?: "income" | "expense" | null;
     cardData?: ChatCardData | null;
   },
 ): Promise<ChatMessageRow> {
   const { rows } = await query<ChatMessageDbRow>(
-    `INSERT INTO chat_messages (user_id, role, content, entry_id, entry_kind, card_data)
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb)
-     RETURNING id, role, content, entry_id, entry_kind, card_data, created_at`,
+    `INSERT INTO chat_messages (user_id, role, content, image_thumb, entry_id, entry_kind, card_data)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+     RETURNING id, role, content, image_thumb, entry_id, entry_kind, card_data, created_at`,
     [
       userId,
       input.role,
       input.content ?? null,
+      input.imageThumb ?? null,
       input.entryId ?? null,
       input.entryKind ?? null,
       input.cardData ? JSON.stringify(input.cardData) : null,
@@ -135,7 +140,7 @@ export async function listChatMessages(
   limit = 50,
 ): Promise<ChatMessageRow[]> {
   const { rows } = await query<ChatMessageDbRow>(
-    `SELECT id, role, content, entry_id, entry_kind, card_data, created_at
+    `SELECT id, role, content, image_thumb, entry_id, entry_kind, card_data, created_at
      FROM chat_messages
      WHERE user_id = $1
      ORDER BY created_at DESC
@@ -150,7 +155,7 @@ export async function getChatMessage(
   messageId: string,
 ): Promise<ChatMessageRow | null> {
   const { rows } = await query<ChatMessageDbRow>(
-    `SELECT id, role, content, entry_id, entry_kind, card_data, created_at
+    `SELECT id, role, content, image_thumb, entry_id, entry_kind, card_data, created_at
      FROM chat_messages
      WHERE id = $1 AND user_id = $2`,
     [messageId, userId],
@@ -167,6 +172,23 @@ export async function markChatEntryDeleted(
      SET entry_id = NULL
      WHERE id = $1 AND user_id = $2`,
     [messageId, userId],
+  );
+}
+
+export async function updateChatCardCategory(
+  userId: string,
+  messageId: string,
+  category: string,
+  categoryLabel: string,
+): Promise<void> {
+  await query(
+    `UPDATE chat_messages
+     SET card_data = jsonb_set(
+       jsonb_set(card_data, '{category}', $3::jsonb),
+       '{categoryLabel}', $4::jsonb
+     )
+     WHERE id = $1 AND user_id = $2`,
+    [messageId, userId, JSON.stringify(category), JSON.stringify(categoryLabel)],
   );
 }
 

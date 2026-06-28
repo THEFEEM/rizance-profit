@@ -284,6 +284,19 @@ export async function deleteIncome(userId: string, id: string): Promise<boolean>
   return (rowCount ?? 0) > 0;
 }
 
+export async function updateIncomeCategory(
+  userId: string,
+  id: string,
+  category: string,
+): Promise<boolean> {
+  const { rowCount } = await query(
+    `UPDATE income_entries SET category = $3
+     WHERE id = $1 AND user_id = $2`,
+    [id, userId, category],
+  );
+  return (rowCount ?? 0) > 0;
+}
+
 // ---- expense --------------------------------------------------------------
 
 export async function createExpense(userId: string, input: ExpenseInput): Promise<Expense> {
@@ -371,6 +384,19 @@ export async function deleteExpense(userId: string, id: string): Promise<boolean
   const { rowCount } = await query(
     `DELETE FROM expense_entries WHERE id = $1 AND user_id = $2`,
     [id, userId],
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+export async function updateExpenseCategory(
+  userId: string,
+  id: string,
+  category: string,
+): Promise<boolean> {
+  const { rowCount } = await query(
+    `UPDATE expense_entries SET category = $3
+     WHERE id = $1 AND user_id = $2`,
+    [id, userId, category],
   );
   return (rowCount ?? 0) > 0;
 }

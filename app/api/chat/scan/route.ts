@@ -34,11 +34,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: { message: "Invalid JSON body" } }, { status: 400 });
   }
 
-  const { imageBase64, mediaType, kind, slipType } = body as {
+  const { imageBase64, mediaType, kind, slipType, thumbnail, caption } = body as {
     imageBase64?: unknown;
     mediaType?: unknown;
     kind?: unknown;
     slipType?: unknown;
+    thumbnail?: unknown;
+    caption?: unknown;
   };
 
   if (typeof imageBase64 !== "string" || imageBase64.trim() === "") {
@@ -53,13 +55,25 @@ export async function POST(req: NextRequest) {
   const scanSlipType = slipType === "receipt" ? "receipt" : "transfer";
   const resolvedMediaType = isSupportedMediaType(mediaType) ? mediaType : "image/jpeg";
 
-  await insertChatMessage(user.id, { role: "user", content: "📷 สลิป" });
+  const userContent =
+    typeof caption === "string" && caption.trim() !== "" ? caption.trim() : "📷 สลิป";
+  const scanCaption =
+    typeof caption === "string" && caption.trim() !== "" ? caption.trim() : undefined;
+  const imageThumb =
+    typeof thumbnail === "string" && thumbnail.trim() !== "" ? thumbnail.trim() : null;
+
+  const userMsg = await insertChatMessage(user.id, {
+    role: "user",
+    content: userContent,
+    imageThumb,
+  });
 
   const result = await scanSlip(
     imageBase64,
     resolvedMediaType,
     scanKind,
     scanSlipType,
+    scanCaption,
   );
 
   if (result.amount == null || result.confidence === "low") {
@@ -67,7 +81,7 @@ export async function POST(req: NextRequest) {
       role: "assistant",
       content: UNCLEAR_SLIP_MESSAGE,
     });
-    return NextResponse.json({ data: { messages: [aiMsg] } });
+    return NextResponse.json({ data: { messages: [userMsg, aiMsg] } });
   }
 
   const paymentMethod: PaymentMethod = result.paymentMethod ?? "transfer";
@@ -101,7 +115,7 @@ export async function POST(req: NextRequest) {
       cardData,
     });
 
-    return NextResponse.json({ data: { messages: [aiMsg] } });
+    return NextResponse.json({ data: { messages: [userMsg, aiMsg] } });
   }
 
   const category = normalizeExpenseCategory(result.category, "expense_misc");
@@ -131,5 +145,5 @@ export async function POST(req: NextRequest) {
     cardData,
   });
 
-  return NextResponse.json({ data: { messages: [aiMsg] } });
+  return NextResponse.json({ data: { messages: [userMsg, aiMsg] } });
 }
