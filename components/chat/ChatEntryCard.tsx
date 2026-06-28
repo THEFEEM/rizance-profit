@@ -4,7 +4,7 @@ import { useState } from "react";
 import { CategoryGrid } from "@/components/CategoryGrid";
 import { formatMoney } from "@/lib/format";
 import { currencySymbol } from "@/lib/money";
-import type { ChatCardData } from "@/lib/chat-queries";
+import type { ChatCardData } from "@/lib/chat-types";
 import {
   EXPENSE_CATEGORY_GRID_OPTIONS,
   INCOME_CATEGORY_GRID_OPTIONS,
@@ -19,6 +19,7 @@ export function ChatEntryCard({
   entryId,
   onDelete,
   onCategoryChange,
+  onPaymentMethodChange,
 }: {
   card: ChatCardData;
   currency: string;
@@ -26,9 +27,14 @@ export function ChatEntryCard({
   entryId: string | null;
   onDelete: (messageId: string) => void;
   onCategoryChange: (messageId: string, category: string) => Promise<void>;
+  onPaymentMethodChange: (
+    messageId: string,
+    paymentMethod: "cash" | "transfer",
+  ) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingPayment, setSavingPayment] = useState(false);
   const isIncome = card.kind === "income";
 
   async function handleCategoryChange(next: string) {
@@ -45,6 +51,19 @@ export function ChatEntryCard({
       // keep editing open on failure
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handlePaymentMethodChange(next: "cash" | "transfer") {
+    if (next === card.paymentMethod) return;
+
+    setSavingPayment(true);
+    try {
+      await onPaymentMethodChange(messageId, next);
+    } catch {
+      // keep current selection on failure
+    } finally {
+      setSavingPayment(false);
     }
   }
 
@@ -80,9 +99,7 @@ export function ChatEntryCard({
           </span>
         </div>
 
-        <p className="mt-1 text-xs text-rz-hint">
-          {card.entryDate} · {card.paymentMethod === "cash" ? "เงินสด" : "เงินโอน"}
-        </p>
+        <p className="mt-1 text-xs text-rz-hint">{card.entryDate}</p>
 
         {card.confidence === "low" && (
           <p className="mt-2 text-xs text-rz-red">Rizq ไม่แน่ใจ ตรวจสอบด้วยนะคะ</p>
@@ -103,6 +120,33 @@ export function ChatEntryCard({
           {saving && (
             <p className="mt-2 text-center text-xs text-rz-hint">กำลังบันทึก…</p>
           )}
+        </div>
+      )}
+
+      {entryId && (
+        <div className="border-t-[0.5px] border-rz-border px-4 py-3">
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-lg border-[0.5px] border-[#243049] p-0.5">
+              {(["cash", "transfer"] as const).map((method) => (
+                <button
+                  key={method}
+                  type="button"
+                  disabled={savingPayment}
+                  onClick={() => void handlePaymentMethodChange(method)}
+                  className={`rounded-md px-2.5 py-1 text-xs ${
+                    card.paymentMethod === method
+                      ? "bg-[#243049] text-[#E8F0FA]"
+                      : "bg-transparent text-[#5A7499]"
+                  } ${savingPayment ? "opacity-60" : ""}`}
+                >
+                  {method === "cash" ? "เงินสด" : "โอน"}
+                </button>
+              ))}
+            </div>
+            {savingPayment && (
+              <span className="text-xs text-rz-hint">กำลังบันทึก…</span>
+            )}
+          </div>
         </div>
       )}
 

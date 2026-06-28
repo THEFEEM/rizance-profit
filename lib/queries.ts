@@ -297,6 +297,19 @@ export async function updateIncomeCategory(
   return (rowCount ?? 0) > 0;
 }
 
+export async function updateIncomePaymentMethod(
+  userId: string,
+  id: string,
+  paymentMethod: string,
+): Promise<boolean> {
+  const { rowCount } = await query(
+    `UPDATE income_entries SET payment_method = $3
+     WHERE id = $1 AND user_id = $2`,
+    [id, userId, paymentMethod],
+  );
+  return (rowCount ?? 0) > 0;
+}
+
 // ---- expense --------------------------------------------------------------
 
 export async function createExpense(userId: string, input: ExpenseInput): Promise<Expense> {
@@ -397,6 +410,19 @@ export async function updateExpenseCategory(
     `UPDATE expense_entries SET category = $3
      WHERE id = $1 AND user_id = $2`,
     [id, userId, category],
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+export async function updateExpensePaymentMethod(
+  userId: string,
+  id: string,
+  paymentMethod: string,
+): Promise<boolean> {
+  const { rowCount } = await query(
+    `UPDATE expense_entries SET payment_method = $3
+     WHERE id = $1 AND user_id = $2`,
+    [id, userId, paymentMethod],
   );
   return (rowCount ?? 0) > 0;
 }

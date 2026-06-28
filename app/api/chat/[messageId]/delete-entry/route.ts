@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getChatMessage, markChatEntryDeleted } from "@/lib/chat-queries";
+import {
+  deleteChatMessage,
+  getChatMessage,
+  isReceiptSplitCard,
+  markChatEntryDeleted,
+} from "@/lib/chat-queries";
 import { deleteExpense, deleteIncome } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/session";
 
@@ -15,7 +20,22 @@ export async function POST(
   const { messageId } = await ctx.params;
   const msg = await getChatMessage(user.id, messageId);
 
-  if (!msg || !msg.entryId || !msg.entryKind) {
+  if (!msg) {
+    return NextResponse.json({ error: { message: "Not found" } }, { status: 404 });
+  }
+
+  if (isReceiptSplitCard(msg.cardData)) {
+    const card = msg.cardData;
+    if (card.entryIds?.length) {
+      for (const entryId of card.entryIds) {
+        await deleteExpense(user.id, entryId);
+      }
+    }
+    await deleteChatMessage(user.id, messageId);
+    return NextResponse.json({ data: { ok: true } });
+  }
+
+  if (!msg.entryId || !msg.entryKind) {
     return NextResponse.json({ error: { message: "Not found" } }, { status: 404 });
   }
 

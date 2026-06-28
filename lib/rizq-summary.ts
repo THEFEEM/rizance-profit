@@ -34,7 +34,7 @@ export type RizqSummaryData = {
 export type RizqFinancialContext =
   | { metric: "summary"; data: RizqSummaryData }
   | { metric: "on_hand"; data: ShopOnHand }
-  | { metric: "category"; data: CategoryBreakdown };
+  | { metric: "category"; data: CategoryBreakdown; summary: RizqSummaryData };
 
 const PERIOD_LABELS: Record<RizqSummaryPeriod, string> = {
   today: "วันนี้",
@@ -43,6 +43,10 @@ const PERIOD_LABELS: Record<RizqSummaryPeriod, string> = {
   last_30: "30 วันที่ผ่านมา",
   all: "ทั้งหมด",
 };
+
+const MONEY_LABEL_WIDTH = 12;
+const CATEGORY_LABEL_WIDTH = 10;
+const DIVIDER = "──────────────";
 
 function normalizePeriod(period: string): RizqSummaryPeriod {
   if (
@@ -115,55 +119,70 @@ async function fetchSummaryData(
   };
 }
 
+function fmtBaht(amount: string): string {
+  return `฿${formatMoney(amount)}`;
+}
+
+function moneyLine(label: string, amount: string): string {
+  return `${label.padEnd(MONEY_LABEL_WIDTH)}${fmtBaht(amount)}`;
+}
+
+function formatProfitLossBlock(data: RizqSummaryData): string {
+  return [
+    moneyLine("รายรับ", data.income),
+    moneyLine("รายจ่าย", data.expense),
+    DIVIDER,
+    moneyLine("กำไร", data.profit),
+  ].join("\n");
+}
+
 function formatSummaryAnswer(data: RizqSummaryData, period: RizqSummaryPeriod): string {
   const periodLabel = PERIOD_LABELS[period];
-  const profit = parseFloat(data.profit);
-  const profitEmoji = profit > 0 ? "📈" : profit < 0 ? "📉" : "➖";
-
-  return (
-    `${periodLabel}\n` +
-    `💰 รายรับ: ${formatMoney(data.income)} บาท\n` +
-    `💸 รายจ่าย: ${formatMoney(data.expense)} บาท\n` +
-    `${profitEmoji} กำไรสุทธิ: ${formatMoney(data.profit)} บาท`
-  );
+  return `📊 สรุปการเงิน — ${periodLabel}\n\n${formatProfitLossBlock(data)}`;
 }
 
 function formatOnHandAnswer(onHand: ShopOnHand): string {
-  return (
-    `💵 เงินคงเหลือ\n` +
-    `เงินสด: ${formatMoney(onHand.cashOnHand)} บาท\n` +
-    `เงินโอน: ${formatMoney(onHand.transferOnHand)} บาท\n` +
-    `รวม: ${formatMoney(onHand.totalOnHand)} บาท`
-  );
+  return [
+    "💵 เงินคงเหลือ",
+    "",
+    moneyLine("เงินสด", onHand.cashOnHand),
+    moneyLine("เงินโอน", onHand.transferOnHand),
+    DIVIDER,
+    moneyLine("รวม", onHand.totalOnHand),
+  ].join("\n");
+}
+
+function categoryLine(label: string, amount: string, count: number): string {
+  return `- ${label.padEnd(CATEGORY_LABEL_WIDTH)} ${fmtBaht(amount)} (${count} รายการ)`;
 }
 
 function formatCategoryAnswer(
   breakdown: CategoryBreakdown,
   period: RizqSummaryPeriod,
+  summary: RizqSummaryData,
 ): string {
   const periodLabel = PERIOD_LABELS[period];
-  let text = `${periodLabel} — แยกตามหมวด\n\n`;
+  const lines: string[] = [`📊 สรุปการเงิน — ${periodLabel}`, "", formatProfitLossBlock(summary)];
 
   if (breakdown.expense.length > 0) {
-    text += "💸 รายจ่าย\n";
+    lines.push("", "💸 รายจ่ายแยกหมวด");
     for (const item of breakdown.expense) {
-      text += `  • ${expenseCategoryLabel(item.category)}: ${formatMoney(item.amount)} บาท (${item.count} รายการ)\n`;
+      lines.push(categoryLine(expenseCategoryLabel(item.category), item.amount, item.count));
     }
   }
 
   if (breakdown.income.length > 0) {
-    text += breakdown.expense.length > 0 ? "\n" : "";
-    text += "💰 รายรับ\n";
+    lines.push("", "💰 รายรับแยกหมวด");
     for (const item of breakdown.income) {
-      text += `  • ${incomeCategoryLabel(item.category)}: ${formatMoney(item.amount)} บาท (${item.count} รายการ)\n`;
+      lines.push(categoryLine(incomeCategoryLabel(item.category), item.amount, item.count));
     }
   }
 
   if (breakdown.expense.length === 0 && breakdown.income.length === 0) {
-    text += "ยังไม่มีรายการในช่วงนี้";
+    lines.push("", "ยังไม่มีรายการแยกหมวดในช่วงนี้");
   }
 
-  return text.trim();
+  return lines.join("\n");
 }
 
 export async function getFinancialContext(
@@ -181,8 +200,11 @@ export async function getFinancialContext(
 
   if (resolvedMetric === "category") {
     const { start, end } = resolveDateRange(resolvedPeriod);
-    const breakdown = await categoryBreakdown(userId, start, end);
-    return { metric: "category", data: breakdown };
+    const [breakdown, summary] = await Promise.all([
+      categoryBreakdown(userId, start, end),
+      fetchSummaryData(userId, resolvedPeriod),
+    ]);
+    return { metric: "category", data: breakdown, summary };
   }
 
   const data = await fetchSummaryData(userId, resolvedPeriod);
@@ -200,7 +222,7 @@ export function formatFinancialAnswer(
   }
 
   if (context.metric === "category") {
-    return formatCategoryAnswer(context.data, resolvedPeriod);
+    return formatCategoryAnswer(context.data, resolvedPeriod, context.summary);
   }
 
   return formatSummaryAnswer(context.data, resolvedPeriod);
