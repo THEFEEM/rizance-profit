@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
     imageBase64,
     resolvedMediaType,
     scanKind,
-    scanSlipType,
+    "transfer",
     scanCaption,
   );
 
