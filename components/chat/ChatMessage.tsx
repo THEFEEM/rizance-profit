@@ -1,16 +1,27 @@
 import { isReceiptSplitCard, type ChatMessageRow } from "@/lib/chat-queries";
 import { ChatEntryCard } from "@/components/chat/ChatEntryCard";
+import { ChatReceiptCard } from "@/components/chat/ChatReceiptCard";
 
 export function ChatMessage({
   message,
   currency,
   onDelete,
   onCategoryChange,
+  onConfirmReceipt,
+  onCancelReceipt,
+  onUpdateReceiptItem,
 }: {
   message: ChatMessageRow;
   currency: string;
   onDelete: (messageId: string) => void;
   onCategoryChange: (messageId: string, category: string) => Promise<void>;
+  onConfirmReceipt: (messageId: string) => Promise<void>;
+  onCancelReceipt: (messageId: string) => Promise<void>;
+  onUpdateReceiptItem: (
+    messageId: string,
+    itemId: string,
+    category: string,
+  ) => Promise<void>;
 }) {
   if (message.role === "user") {
     return (
@@ -41,9 +52,13 @@ export function ChatMessage({
     <div className="flex justify-start">
       {message.cardData ? (
         isReceiptSplitCard(message.cardData) ? (
-          <div className="max-w-[80%] rounded-2xl rounded-bl-md border-[0.5px] border-rz-border bg-rz-card px-4 py-2.5 text-sm text-rz-text">
-            ใบเสร็จ {message.cardData.items.length} รายการ — รอยืนยัน
-          </div>
+          <ChatReceiptCard
+            messageId={message.id}
+            card={message.cardData}
+            onConfirm={onConfirmReceipt}
+            onCancel={onCancelReceipt}
+            onUpdateItem={onUpdateReceiptItem}
+          />
         ) : (
           <ChatEntryCard
             card={message.cardData}
