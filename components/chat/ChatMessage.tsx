@@ -1,4 +1,4 @@
-import { isReceiptSplitCard, type ChatMessageRow } from "@/lib/chat-types";
+import { isReceiptSplitCard, type ChatMessageRow, type ReceiptItemChanges } from "@/lib/chat-types";
 import { ChatEntryCard } from "@/components/chat/ChatEntryCard";
 import { ChatReceiptCard } from "@/components/chat/ChatReceiptCard";
 
@@ -22,7 +22,7 @@ export function ChatMessage({
   onUpdateReceiptItem: (
     messageId: string,
     itemId: string,
-    category: string,
+    changes: ReceiptItemChanges,
   ) => Promise<void>;
   onPaymentMethodChange: (
     messageId: string,
@@ -60,7 +60,14 @@ export function ChatMessage({
 
   return (
     <div className="flex justify-start">
-      {message.cardData ? (
+      {message.isLoading ? (
+        <div className="max-w-[80%] rounded-2xl rounded-bl-md border-[0.5px] border-rz-border bg-rz-card px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 animate-pulse rounded-full bg-[#4ADE9E]" />
+            <span className="text-[12px] text-[#5A7499]">{message.content}</span>
+          </div>
+        </div>
+      ) : message.cardData ? (
         isReceiptSplitCard(message.cardData) ? (
           <ChatReceiptCard
             messageId={message.id}

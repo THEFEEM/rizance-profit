@@ -1,8 +1,15 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { formatMoney } from "@/lib/format";
-import type { ChatReceiptCardData } from "@/lib/chat-types";
+import {
+  CATEGORY_LABELS,
+  RECEIPT_ITEM_CATEGORY_KEYS,
+  type ChatReceiptCardData,
+  type ReceiptItemChanges,
+  type ReceiptItemCategoryKey,
+  type ReceiptLineItem,
+} from "@/lib/chat-types";
 
 const STATUS_COLORS = {
   pending: "#FCD34D",
@@ -25,6 +32,9 @@ const CATEGORY_BADGE_COLORS: Record<string, string> = {
   other: "#8A9AB5",
 };
 
+const INPUT_CLASS =
+  "w-full rounded-lg border border-[#243049] bg-[#0E1525] px-2 py-1.5 text-sm text-rz-text focus:border-[#4ADE9E] focus:outline-none";
+
 function categoryBadgeStyle(category: string): CSSProperties {
   const color = CATEGORY_BADGE_COLORS[category] ?? CATEGORY_BADGE_COLORS.other;
   return {
@@ -33,19 +43,209 @@ function categoryBadgeStyle(category: string): CSSProperties {
   };
 }
 
+function CategoryDropdown({
+  currentCategory,
+  disabled,
+  onSelect,
+}: {
+  currentCategory: string;
+  disabled: boolean;
+  onSelect: (category: ReceiptItemCategoryKey) => void;
+}) {
+  return (
+    <div className="mt-1.5 rounded-lg border border-[#243049] bg-[#0E1525] p-2">
+      <div className="grid grid-cols-2 gap-1.5">
+        {RECEIPT_ITEM_CATEGORY_KEYS.map((key) => (
+          <button
+            key={key}
+            type="button"
+            disabled={disabled}
+            onClick={() => onSelect(key)}
+            className={`rounded-md px-2 py-1 text-[10px] disabled:opacity-60 ${
+              key === currentCategory ? "ring-1 ring-[#4ADE9E]" : ""
+            }`}
+            style={categoryBadgeStyle(key)}
+          >
+            {CATEGORY_LABELS[key]}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ReadItemRow({
+  index,
+  item,
+  editable,
+  disabled,
+  categoryDropdownOpen,
+  dropdownRef,
+  onEdit,
+  onCategoryBadgeClick,
+  onSelectCategory,
+  savingCategory,
+}: {
+  index: number;
+  item: ReceiptLineItem;
+  editable: boolean;
+  disabled: boolean;
+  categoryDropdownOpen: boolean;
+  dropdownRef: RefObject<HTMLDivElement | null>;
+  onEdit: () => void;
+  onCategoryBadgeClick: () => void;
+  onSelectCategory: (category: ReceiptItemCategoryKey) => void;
+  savingCategory: boolean;
+}) {
+  return (
+    <li className="flex items-start gap-2">
+      <span className="mt-0.5 w-4 shrink-0 text-xs text-rz-hint">{index + 1}.</span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            {editable ? (
+              <button
+                type="button"
+                onClick={onEdit}
+                disabled={disabled}
+                className="w-full truncate text-left text-sm text-rz-text disabled:opacity-60"
+              >
+                {item.note}
+              </button>
+            ) : (
+              <p className="truncate text-sm text-rz-text">{item.note}</p>
+            )}
+            <div ref={categoryDropdownOpen ? dropdownRef : undefined} className="relative mt-1">
+              {editable ? (
+                <button
+                  type="button"
+                  onClick={onCategoryBadgeClick}
+                  disabled={disabled}
+                  className="inline-block rounded-full px-2 py-0.5 text-[10px] disabled:opacity-60"
+                  style={categoryBadgeStyle(item.category)}
+                >
+                  {item.categoryLabel}
+                </button>
+              ) : (
+                <span
+                  className="inline-block rounded-full px-2 py-0.5 text-[10px]"
+                  style={categoryBadgeStyle(item.category)}
+                >
+                  {item.categoryLabel}
+                </span>
+              )}
+              {categoryDropdownOpen && (
+                <CategoryDropdown
+                  currentCategory={item.category}
+                  disabled={savingCategory}
+                  onSelect={onSelectCategory}
+                />
+              )}
+            </div>
+          </div>
+          <span className="rz-tabular shrink-0 text-sm text-rz-text">
+            {formatMoney(item.amount)}
+          </span>
+          {editable && (
+            <button
+              type="button"
+              onClick={onEdit}
+              disabled={disabled}
+              className="mt-0.5 shrink-0 text-xs text-rz-muted disabled:opacity-60"
+              aria-label="แก้รายการ"
+            >
+              ✎
+            </button>
+          )}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function EditItemRow({
+  index,
+  editNote,
+  editAmount,
+  saving,
+  onNoteChange,
+  onAmountChange,
+  onCancel,
+  onSave,
+}: {
+  index: number;
+  editNote: string;
+  editAmount: string;
+  saving: boolean;
+  onNoteChange: (value: string) => void;
+  onAmountChange: (value: string) => void;
+  onCancel: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <li className="flex items-start gap-2">
+      <span className="mt-2 w-4 shrink-0 text-xs text-rz-hint">{index + 1}.</span>
+      <div className="min-w-0 flex-1 space-y-2">
+        <input
+          type="text"
+          value={editNote}
+          onChange={(e) => onNoteChange(e.target.value)}
+          autoFocus
+          disabled={saving}
+          className={INPUT_CLASS}
+          placeholder="รายการ"
+        />
+        <input
+          type="number"
+          inputMode="decimal"
+          step="0.01"
+          min="0.01"
+          value={editAmount}
+          onChange={(e) => onAmountChange(e.target.value)}
+          disabled={saving}
+          className={`${INPUT_CLASS} rz-tabular`}
+          placeholder="จำนวนเงิน"
+        />
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={saving}
+            className="tap-target text-xs text-rz-muted disabled:opacity-60"
+          >
+            ยกเลิก
+          </button>
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={saving}
+            className="tap-target rounded-lg bg-rz-green px-2.5 py-1 text-xs font-medium text-rz-bg disabled:opacity-60"
+          >
+            บันทึก
+          </button>
+        </div>
+      </div>
+    </li>
+  );
+}
+
 export function ChatReceiptCard({
   messageId,
   card,
   onConfirm,
   onCancel,
-  onUpdateItem: _onUpdateItem,
+  onUpdateItem,
   onReceiptMetaChange,
 }: {
   messageId: string;
   card: ChatReceiptCardData;
   onConfirm: (messageId: string) => Promise<void>;
   onCancel: (messageId: string) => Promise<void>;
-  onUpdateItem: (messageId: string, itemId: string, category: string) => Promise<void>;
+  onUpdateItem: (
+    messageId: string,
+    itemId: string,
+    changes: ReceiptItemChanges,
+  ) => Promise<void>;
   onReceiptMetaChange: (
     messageId: string,
     meta: { paymentMethod: "cash" | "transfer" },
@@ -53,19 +253,123 @@ export function ChatReceiptCard({
 }) {
   const [loading, setLoading] = useState(false);
   const [savingPayment, setSavingPayment] = useState(false);
+  const [savingItem, setSavingItem] = useState(false);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingCategoryItemId, setEditingCategoryItemId] = useState<string | null>(null);
+  const [editNote, setEditNote] = useState("");
+  const [editAmount, setEditAmount] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const categoryDropdownRef = useRef<HTMLDivElement>(null);
 
-  const busy = loading || savingPayment;
+  const busy = loading || savingPayment || savingItem;
+  const isPending = card.status === "pending";
+
+  useEffect(() => {
+    setEditingItemId(null);
+    setEditingCategoryItemId(null);
+  }, [card.status]);
+
+  useEffect(() => {
+    if (!editingCategoryItemId) return;
+
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        categoryDropdownRef.current &&
+        !categoryDropdownRef.current.contains(e.target as Node)
+      ) {
+        setEditingCategoryItemId(null);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [editingCategoryItemId]);
 
   const selectedCount = card.items.filter((item) => item.selected).length;
   const itemsMismatch =
     Math.abs(parseFloat(card.itemsSum) - parseFloat(card.totalAmount)) > 0.5;
+
+  function startEdit(item: ReceiptLineItem) {
+    if (!isPending || busy) return;
+    setEditingCategoryItemId(null);
+    setEditingItemId(item.id);
+    setEditNote(item.note);
+    setEditAmount(item.amount);
+    setError(null);
+  }
+
+  function cancelEdit() {
+    setEditingItemId(null);
+    setEditNote("");
+    setEditAmount("");
+  }
+
+  function openCategoryPicker(itemId: string) {
+    if (!isPending || busy) return;
+    setEditingItemId(null);
+    setEditingCategoryItemId((current) => (current === itemId ? null : itemId));
+    setError(null);
+  }
+
+  async function selectCategory(itemId: string, category: ReceiptItemCategoryKey) {
+    const item = card.items.find((i) => i.id === itemId);
+    if (!item || item.category === category) {
+      setEditingCategoryItemId(null);
+      return;
+    }
+
+    setSavingItem(true);
+    setError(null);
+    try {
+      await onUpdateItem(messageId, itemId, { category });
+      setEditingCategoryItemId(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ");
+    } finally {
+      setSavingItem(false);
+    }
+  }
+
+  async function saveEdit(itemId: string) {
+    const note = editNote.trim();
+    const amountNum = parseFloat(editAmount);
+    if (!note || !Number.isFinite(amountNum) || amountNum <= 0) {
+      setError("กรุณากรอกชื่อรายการและจำนวนเงินให้ถูกต้อง");
+      return;
+    }
+
+    const item = card.items.find((i) => i.id === itemId);
+    if (!item) return;
+
+    const changes: ReceiptItemChanges = {};
+    const amountStr = amountNum.toFixed(2);
+    if (note !== item.note) changes.note = note;
+    if (amountStr !== item.amount) changes.amount = amountStr;
+
+    if (Object.keys(changes).length === 0) {
+      cancelEdit();
+      return;
+    }
+
+    setSavingItem(true);
+    setError(null);
+    try {
+      await onUpdateItem(messageId, itemId, changes);
+      cancelEdit();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ");
+    } finally {
+      setSavingItem(false);
+    }
+  }
 
   async function handleConfirm() {
     setLoading(true);
     setError(null);
     try {
       await onConfirm(messageId);
+      setEditingItemId(null);
+      setEditingCategoryItemId(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ");
     } finally {
@@ -78,6 +382,8 @@ export function ChatReceiptCard({
     setError(null);
     try {
       await onCancel(messageId);
+      setEditingItemId(null);
+      setEditingCategoryItemId(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "ยกเลิกไม่สำเร็จ");
     } finally {
@@ -117,7 +423,7 @@ export function ChatReceiptCard({
           </span>
         </div>
         <p className="mt-1 text-xs text-rz-hint">{card.entryDate}</p>
-        {card.status === "pending" ? (
+        {isPending ? (
           <div className="mt-2 flex items-center gap-2">
             <div className="flex rounded-lg border-[0.5px] border-[#243049] p-0.5">
               {(["cash", "transfer"] as const).map((method) => (
@@ -168,23 +474,35 @@ export function ChatReceiptCard({
         className={`px-4 py-3 ${card.items.length > 6 ? "max-h-[220px] overflow-y-auto" : ""}`}
       >
         <ul className="flex flex-col gap-2.5">
-          {card.items.map((item, index) => (
-            <li key={item.id} className="flex items-start gap-2">
-              <span className="mt-0.5 w-4 shrink-0 text-xs text-rz-hint">{index + 1}.</span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm text-rz-text">{item.note}</p>
-                <span
-                  className="mt-1 inline-block rounded-full px-2 py-0.5 text-[10px]"
-                  style={categoryBadgeStyle(item.category)}
-                >
-                  {item.categoryLabel}
-                </span>
-              </div>
-              <span className="rz-tabular shrink-0 text-sm text-rz-text">
-                {formatMoney(item.amount)}
-              </span>
-            </li>
-          ))}
+          {card.items.map((item, index) =>
+            editingItemId === item.id ? (
+              <EditItemRow
+                key={item.id}
+                index={index}
+                editNote={editNote}
+                editAmount={editAmount}
+                saving={savingItem}
+                onNoteChange={setEditNote}
+                onAmountChange={setEditAmount}
+                onCancel={cancelEdit}
+                onSave={() => void saveEdit(item.id)}
+              />
+            ) : (
+              <ReadItemRow
+                key={item.id}
+                index={index}
+                item={item}
+                editable={isPending}
+                disabled={busy}
+                categoryDropdownOpen={editingCategoryItemId === item.id}
+                dropdownRef={categoryDropdownRef}
+                onEdit={() => startEdit(item)}
+                onCategoryBadgeClick={() => openCategoryPicker(item.id)}
+                onSelectCategory={(category) => void selectCategory(item.id, category)}
+                savingCategory={savingItem}
+              />
+            ),
+          )}
         </ul>
         {error && (
           <p className="mt-3 text-xs" style={{ color: "#F87171" }} role="alert">
@@ -194,7 +512,7 @@ export function ChatReceiptCard({
       </div>
 
       <div className="border-t-[0.5px] border-rz-border px-4 py-2.5">
-        {card.status === "pending" ? (
+        {isPending ? (
           <div className={`flex items-center justify-end gap-2 ${busy ? "opacity-60" : ""}`}>
             <button
               type="button"

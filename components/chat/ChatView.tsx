@@ -15,6 +15,7 @@ import {
   CATEGORY_LABELS,
   isReceiptSplitCard,
   type ChatMessageRow,
+  type ReceiptItemChanges,
 } from "@/lib/chat-types";
 import { downscaleImage, generateThumbnail } from "@/lib/image-utils";
 
@@ -41,6 +42,26 @@ type UpdatePaymentResponse = {
   ok: true;
   paymentMethod: "cash" | "transfer";
 };
+
+const TEMP_LOADING_ID = "temp-loading";
+
+function withoutTempMessages(messages: ChatMessageRow[]): ChatMessageRow[] {
+  return messages.filter((m) => !m.id.startsWith("temp-") && m.id !== TEMP_LOADING_ID);
+}
+
+function makeLoadingMessage(content: string): ChatMessageRow {
+  return {
+    id: TEMP_LOADING_ID,
+    role: "assistant",
+    content,
+    imageThumb: null,
+    entryId: null,
+    entryKind: null,
+    cardData: null,
+    createdAt: new Date().toISOString(),
+    isLoading: true,
+  };
+}
 
 export function ChatView({
   initialMessages,
@@ -71,7 +92,7 @@ export function ChatView({
       createdAt: new Date().toISOString(),
     };
 
-    setMessages((prev) => [...prev, tempUser]);
+    setMessages((prev) => [...prev, tempUser, makeLoadingMessage("กำลังวิเคราะห์...")]);
     setSending(true);
     setError(null);
 
@@ -81,9 +102,10 @@ export function ChatView({
     });
 
     if (res.ok && res.data?.messages) {
-      setMessages((prev) => [...prev, ...res.data.messages]);
+      setMessages((prev) => [...withoutTempMessages(prev), ...res.data.messages]);
       router.refresh();
     } else {
+      setMessages((prev) => withoutTempMessages(prev));
       setError(res.ok ? "ส่งข้อความไม่สำเร็จ" : res.message);
     }
 
@@ -102,7 +124,11 @@ export function ChatView({
       createdAt: new Date().toISOString(),
     };
 
-    setMessages((prev) => [...prev, tempUser]);
+    setMessages((prev) => [
+      ...prev,
+      tempUser,
+      makeLoadingMessage("กำลังอ่านใบเสร็จ..."),
+    ]);
     setSending(true);
     setError(null);
   }
@@ -124,12 +150,10 @@ export function ChatView({
     });
 
     if (res.ok && res.data?.messages) {
-      setMessages((prev) => {
-        const withoutTemp = prev.filter((m) => !m.id.startsWith("temp-"));
-        return [...withoutTemp, ...res.data.messages];
-      });
+      setMessages((prev) => [...withoutTempMessages(prev), ...res.data.messages]);
       router.refresh();
     } else {
+      setMessages((prev) => withoutTempMessages(prev));
       setError(res.ok ? "สแกนสลิปไม่สำเร็จ" : res.message);
       throw new Error("scan_failed");
     }
@@ -226,17 +250,17 @@ export function ChatView({
   async function handleUpdateReceiptItem(
     messageId: string,
     itemId: string,
-    category: string,
+    changes: ReceiptItemChanges,
   ) {
-    const res = await apiFetch<{ ok: true }>(
+    const res = await apiFetch<{ ok: true; itemsSum: string }>(
       `/api/chat/${messageId}/update-receipt-item`,
       {
         method: "PATCH",
-        body: JSON.stringify({ itemId, category }),
+        body: JSON.stringify({ itemId, ...changes }),
       },
     );
 
-    if (res.ok) {
+    if (res.ok && res.data) {
       setMessages((prev) =>
         prev.map((m) => {
           if (m.id !== messageId || !isReceiptSplitCard(m.cardData)) return m;
@@ -244,15 +268,19 @@ export function ChatView({
             ...m,
             cardData: {
               ...m.cardData,
-              items: m.cardData.items.map((item) =>
-                item.id === itemId
-                  ? {
-                      ...item,
-                      category,
-                      categoryLabel: CATEGORY_LABELS[category] ?? "อื่นๆ",
-                    }
-                  : item,
-              ),
+              itemsSum: res.data.itemsSum,
+              items: m.cardData.items.map((item) => {
+                if (item.id !== itemId) return item;
+                const updated = { ...item };
+                if (changes.note !== undefined) updated.note = changes.note;
+                if (changes.amount !== undefined) updated.amount = changes.amount;
+                if (changes.category !== undefined) {
+                  updated.category = changes.category;
+                  updated.categoryLabel =
+                    CATEGORY_LABELS[changes.category] ?? "อื่นๆ";
+                }
+                return updated;
+              }),
             },
           };
         }),
@@ -260,7 +288,7 @@ export function ChatView({
       return;
     }
 
-    throw new Error(res.ok ? "แก้หมวดไม่สำเร็จ" : res.message);
+    throw new Error(res.ok ? "บันทึกไม่สำเร็จ" : res.message);
   }
 
   async function handlePaymentMethodChange(
@@ -360,6 +388,7 @@ export function ChatView({
           onScan={handleScan}
           onScanStart={handleScanStart}
           onScanError={(message) => {
+            setMessages((prev) => withoutTempMessages(prev));
             setError(message);
             setSending(false);
           }}

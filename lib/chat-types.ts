@@ -19,6 +19,12 @@ export type ReceiptLineItem = {
   selected: boolean;
 };
 
+export type ReceiptItemChanges = {
+  category?: string;
+  note?: string;
+  amount?: string;
+};
+
 export type ChatReceiptCardData = {
   cardType: "receipt_split";
   kind: "expense";
@@ -44,6 +50,7 @@ export type ChatMessageRow = {
   entryKind: "income" | "expense" | null;
   cardData: ChatCardPayload | null;
   createdAt: string;
+  isLoading?: boolean;
 };
 
 export const RECEIPT_ITEM_CATEGORY_KEYS = [
