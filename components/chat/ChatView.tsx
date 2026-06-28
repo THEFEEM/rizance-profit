@@ -43,6 +43,14 @@ type UpdatePaymentResponse = {
   paymentMethod: "cash" | "transfer";
 };
 
+type UpdateKindResponse = {
+  ok: true;
+  entryId: string;
+  kind: "income" | "expense";
+  category: string;
+  categoryLabel: string;
+};
+
 const TEMP_LOADING_ID = "temp-loading";
 
 function withoutTempMessages(messages: ChatMessageRow[]): ChatMessageRow[] {
@@ -291,6 +299,40 @@ export function ChatView({
     throw new Error(res.ok ? "บันทึกไม่สำเร็จ" : res.message);
   }
 
+  async function handleKindChange(messageId: string, kind: "income" | "expense") {
+    const res = await apiFetch<UpdateKindResponse>(
+      `/api/chat/${messageId}/update-kind`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ kind }),
+      },
+    );
+
+    if (res.ok && res.data) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId && m.cardData && !isReceiptSplitCard(m.cardData)
+            ? {
+                ...m,
+                entryId: res.data.entryId,
+                entryKind: res.data.kind,
+                cardData: {
+                  ...m.cardData,
+                  kind: res.data.kind,
+                  category: res.data.category,
+                  categoryLabel: res.data.categoryLabel,
+                },
+              }
+            : m,
+        ),
+      );
+      router.refresh();
+      return;
+    }
+
+    throw new Error(res.ok ? "บันทึกไม่สำเร็จ" : res.message);
+  }
+
   async function handlePaymentMethodChange(
     messageId: string,
     paymentMethod: "cash" | "transfer",
@@ -411,6 +453,7 @@ export function ChatView({
             onCancelReceipt={handleCancelReceipt}
             onUpdateReceiptItem={handleUpdateReceiptItem}
             onPaymentMethodChange={handlePaymentMethodChange}
+            onKindChange={handleKindChange}
             onReceiptMetaChange={handleReceiptMetaChange}
           />
         ))}
