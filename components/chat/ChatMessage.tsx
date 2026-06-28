@@ -11,6 +11,7 @@ export function ChatMessage({
   onCancelReceipt,
   onUpdateReceiptItem,
   onPaymentMethodChange,
+  onKindChange,
   onReceiptMetaChange,
 }: {
   message: ChatMessageRow;
@@ -28,6 +29,7 @@ export function ChatMessage({
     messageId: string,
     paymentMethod: "cash" | "transfer",
   ) => Promise<void>;
+  onKindChange: (messageId: string, kind: "income" | "expense") => Promise<void>;
   onReceiptMetaChange: (
     messageId: string,
     meta: { paymentMethod: "cash" | "transfer" },
@@ -85,6 +87,7 @@ export function ChatMessage({
             onDelete={onDelete}
             onCategoryChange={onCategoryChange}
             onPaymentMethodChange={onPaymentMethodChange}
+            onKindChange={onKindChange}
             currency={currency}
           />
         )

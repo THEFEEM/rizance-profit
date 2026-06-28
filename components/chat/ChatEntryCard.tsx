@@ -20,6 +20,7 @@ export function ChatEntryCard({
   onDelete,
   onCategoryChange,
   onPaymentMethodChange,
+  onKindChange,
 }: {
   card: ChatCardData;
   currency: string;
@@ -31,11 +32,14 @@ export function ChatEntryCard({
     messageId: string,
     paymentMethod: "cash" | "transfer",
   ) => Promise<void>;
+  onKindChange: (messageId: string, kind: "income" | "expense") => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savingPayment, setSavingPayment] = useState(false);
+  const [savingKind, setSavingKind] = useState(false);
   const isIncome = card.kind === "income";
+  const kindBusy = savingKind || savingPayment;
 
   async function handleCategoryChange(next: string) {
     if (next === card.category) {
@@ -67,6 +71,20 @@ export function ChatEntryCard({
     }
   }
 
+  async function handleKindChange(next: "income" | "expense") {
+    if (next === card.kind) return;
+
+    setSavingKind(true);
+    try {
+      await onKindChange(messageId, next);
+      setEditing(false);
+    } catch {
+      // keep current selection on failure
+    } finally {
+      setSavingKind(false);
+    }
+  }
+
   return (
     <div className="max-w-[85%] overflow-hidden rounded-[14px] border-[0.5px] border-rz-border bg-rz-card">
       <div className="border-b-[0.5px] border-rz-border px-4 py-2.5">
@@ -75,13 +93,29 @@ export function ChatEntryCard({
 
       <div className="px-4 py-3">
         <div className="flex items-center gap-2">
-          <span
-            className={`rounded-full px-2 py-0.5 text-[10px] ${
-              isIncome ? "bg-rz-green/15 text-rz-green" : "bg-rz-red/15 text-rz-red"
-            }`}
-          >
-            {isIncome ? "รายรับ" : "รายจ่าย"}
-          </span>
+          <div className="flex rounded-lg border-[0.5px] border-[#243049] p-0.5">
+            {(["income", "expense"] as const).map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                disabled={!entryId || kindBusy}
+                onClick={() => void handleKindChange(kind)}
+                className={`rounded-md px-2.5 py-1 text-xs ${
+                  card.kind === kind
+                    ? kind === "income"
+                      ? "bg-[#4ADE9E22] text-[#4ADE9E]"
+                      : "bg-[#F8717122] text-[#F87171]"
+                    : "bg-transparent text-[#5A7499]"
+                } ${kindBusy ? "opacity-60" : ""}`}
+              >
+                {kind === "income" ? "รายรับ" : "รายจ่าย"}
+              </button>
+            ))}
+          </div>
+          {savingKind && <span className="text-xs text-rz-hint">กำลังบันทึก…</span>}
+        </div>
+
+        <div className="mt-2 flex items-center gap-2">
           <span className="text-xs text-rz-muted">{card.categoryLabel}</span>
         </div>
 
@@ -131,19 +165,19 @@ export function ChatEntryCard({
                 <button
                   key={method}
                   type="button"
-                  disabled={savingPayment}
+                  disabled={kindBusy}
                   onClick={() => void handlePaymentMethodChange(method)}
                   className={`rounded-md px-2.5 py-1 text-xs ${
                     card.paymentMethod === method
                       ? "bg-[#243049] text-[#E8F0FA]"
                       : "bg-transparent text-[#5A7499]"
-                  } ${savingPayment ? "opacity-60" : ""}`}
+                  } ${kindBusy ? "opacity-60" : ""}`}
                 >
                   {method === "cash" ? "เงินสด" : "โอน"}
                 </button>
               ))}
             </div>
-            {savingPayment && (
+            {savingPayment && !savingKind && (
               <span className="text-xs text-rz-hint">กำลังบันทึก…</span>
             )}
           </div>
@@ -155,7 +189,7 @@ export function ChatEntryCard({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            disabled={saving}
+            disabled={saving || savingKind}
             className="tap-target text-xs text-rz-muted"
           >
             แก้หมวด
@@ -164,7 +198,7 @@ export function ChatEntryCard({
           <button
             type="button"
             onClick={() => setEditing(false)}
-            disabled={saving}
+            disabled={saving || savingKind}
             className="tap-target text-xs text-rz-muted"
           >
             ยกเลิก
