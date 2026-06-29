@@ -44,6 +44,10 @@ export async function POST(req: NextRequest) {
         `DELETE FROM booth_income_entries WHERE booth_id = $2 AND user_id = $1`,
         [user.id, ctx.boothId],
       );
+      await client.query(
+        `DELETE FROM booth_chat_messages WHERE booth_id = $2 AND user_id = $1`,
+        [user.id, ctx.boothId],
+      );
     } else {
       mode = "project";
       await client.query(

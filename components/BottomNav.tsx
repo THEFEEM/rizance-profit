@@ -20,7 +20,10 @@ const BASE_NAV_ITEMS = [
   { key: "profile", label: "ตั้งค่า", Icon: Settings, kind: "link" as const },
 ] as const;
 
-function fourthNavItem(mode: "regular" | "booth" | "project" | "personal") {
+function fourthNavItem(
+  mode: "regular" | "booth" | "project" | "personal",
+  boothId?: string,
+) {
   if (mode === "regular") {
     return {
       key: "ai",
@@ -37,6 +40,15 @@ function fourthNavItem(mode: "regular" | "booth" | "project" | "personal") {
       Icon: Sparkles,
       kind: "link" as const,
       href: PERSONAL_CHAT_HREF,
+    };
+  }
+  if (mode === "booth" && boothId) {
+    return {
+      key: "ai",
+      label: "Rizq",
+      Icon: Sparkles,
+      kind: "link" as const,
+      href: `/booth/${boothId}/chat`,
     };
   }
   return {
@@ -63,7 +75,8 @@ function isNavActive(
       pathname === CHAT_HREF ||
       pathname.startsWith(`${CHAT_HREF}/`) ||
       pathname === PERSONAL_CHAT_HREF ||
-      pathname.startsWith(`${PERSONAL_CHAT_HREF}/`)
+      pathname.startsWith(`${PERSONAL_CHAT_HREF}/`) ||
+      /^\/booth\/[^/]+\/chat\/?$/.test(pathname)
     ) {
       return false;
     }
@@ -119,12 +132,17 @@ export function BottomNav({
     entry: entryHref,
     stats: statsHref,
     profile: profileHref,
-    ai: mode === "personal" ? PERSONAL_CHAT_HREF : CHAT_HREF,
+    ai:
+      mode === "personal"
+        ? PERSONAL_CHAT_HREF
+        : mode === "booth" && boothId
+          ? `/booth/${boothId}/chat`
+          : CHAT_HREF,
   };
 
   const navItems = [
     ...BASE_NAV_ITEMS.slice(0, 3),
-    fourthNavItem(mode),
+    fourthNavItem(mode, boothId),
     ...BASE_NAV_ITEMS.slice(3),
   ];
 

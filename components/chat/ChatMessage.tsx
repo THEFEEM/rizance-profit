@@ -35,7 +35,7 @@ export function ChatMessage({
     messageId: string,
     meta: { paymentMethod: "cash" | "transfer" },
   ) => Promise<void>;
-  variant?: "shop" | "personal";
+  variant?: "shop" | "personal" | "booth";
 }) {
   if (message.role === "user") {
     return (
