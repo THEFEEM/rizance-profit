@@ -1,5 +1,7 @@
 import { query } from "@/lib/db";
 
+/** @deprecated Count-based quotas — use lib/token-budget.ts instead. */
+
 export type CounterKey = "rizq_chat" | "scan_slip" | "scan_receipt";
 
 export type PlanLimits = {

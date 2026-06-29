@@ -90,11 +90,7 @@ export function ChatView({
   const [messages, setMessages] = useState(initialMessages);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [quotaPrompt, setQuotaPrompt] = useState<{
-    feature: string;
-    limit: number;
-    used: number;
-  } | null>(null);
+  const [quotaPrompt, setQuotaPrompt] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -102,16 +98,11 @@ export function ChatView({
   }, [messages, quotaPrompt]);
 
   function handleQuotaExceeded(
-    res: { status: number; code?: string; limit?: number; used?: number },
-    feature: string,
+    res: { status: number; code?: string; message?: string },
   ): boolean {
     if (res.status === 429 && res.code === "quota_exceeded") {
       setMessages((prev) => withoutTempMessages(prev));
-      setQuotaPrompt({
-        feature,
-        limit: res.limit ?? 0,
-        used: res.used ?? 0,
-      });
+      setQuotaPrompt(res.message ?? "AI credits หมดแล้ว — อัพเกรดเพื่อใช้ต่อ");
       setError(null);
       setSending(false);
       return true;
@@ -144,7 +135,7 @@ export function ChatView({
     if (res.ok && res.data?.messages) {
       setMessages((prev) => [...withoutTempMessages(prev), ...res.data.messages]);
       router.refresh();
-    } else if (!res.ok && handleQuotaExceeded(res, "Rizq AI")) {
+    } else if (!res.ok && handleQuotaExceeded(res)) {
       // quota prompt shown
     } else {
       setMessages((prev) => withoutTempMessages(prev));
@@ -196,7 +187,7 @@ export function ChatView({
     if (res.ok && res.data?.messages) {
       setMessages((prev) => [...withoutTempMessages(prev), ...res.data.messages]);
       router.refresh();
-    } else if (!res.ok && handleQuotaExceeded(res, "สแกนสลิป")) {
+    } else if (!res.ok && handleQuotaExceeded(res)) {
       // quota prompt shown
     } else {
       setMessages((prev) => withoutTempMessages(prev));
@@ -499,9 +490,7 @@ export function ChatView({
         ))}
         {quotaPrompt && (
           <UpgradePrompt
-            feature={quotaPrompt.feature}
-            limit={quotaPrompt.limit}
-            used={quotaPrompt.used}
+            message={quotaPrompt}
             onUpgrade={() => router.push("/pricing")}
           />
         )}

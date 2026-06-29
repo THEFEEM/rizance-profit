@@ -7,10 +7,22 @@ import { apiFetch } from "@/lib/api-client";
 import { PLAN_DISPLAY_NAMES } from "@/lib/subscription-plan";
 import type { SubscriptionPlan } from "@/lib/subscription-plan";
 
+type TokenBudgetSummary = {
+  used: number;
+  total: number;
+  remaining: number;
+  creditsRemaining: {
+    rizq_chat: number;
+    scan_slip: number;
+    scan_receipt: number;
+  };
+};
+
 type SubscriptionStatus = {
   plan: SubscriptionPlan;
   expiresAt: string | null;
   isExpired: boolean;
+  tokenBudget?: TokenBudgetSummary;
 };
 
 export function SubscriptionProfileSection() {
@@ -44,6 +56,7 @@ export function SubscriptionProfileSection() {
 
   const plan = status?.plan ?? "free";
   const planLabel = PLAN_DISPLAY_NAMES[plan] ?? plan;
+  const credits = status?.tokenBudget?.creditsRemaining;
   const statusLabel =
     status == null
       ? "กำลังโหลด..."
@@ -67,6 +80,18 @@ export function SubscriptionProfileSection() {
           <span className="text-rz-muted">สถานะ</span>
           <span className="text-rz-text">{statusLabel}</span>
         </div>
+        {credits && (
+          <>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-rz-muted">Rizq AI</span>
+              <span className="text-rz-text">ใช้ได้อีก {credits.rizq_chat} ครั้ง</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-rz-muted">สแกน</span>
+              <span className="text-rz-text">ใช้ได้อีก {credits.scan_slip} ครั้ง</span>
+            </div>
+          </>
+        )}
         {status?.expiresAt && !status.isExpired && (
           <div className="flex items-center justify-between gap-3">
             <span className="text-rz-muted">หมดอายุ</span>

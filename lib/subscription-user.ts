@@ -1,9 +1,19 @@
 import { query } from "@/lib/db";
 import type { PlanCheckResult } from "@/lib/plan-check";
 import { resolveActivePlan, type SubscriptionPlan } from "@/lib/subscription-plan";
+import {
+  getTokenBudgetSummary,
+  resolveTokenScope,
+  type AppContextMode,
+  type TokenBudgetCheckResult,
+  type TokenBudgetSummary,
+} from "@/lib/token-budget";
 import { NextResponse } from "next/server";
 
 import "server-only";
+
+export type { TokenBudgetSummary };
+export { getTokenBudgetSummary, resolveTokenScope };
 
 type SubscriptionRow = {
   subscription_plan: string;
@@ -57,4 +67,30 @@ export function quotaExceededResponse(
     },
     { status: 429 },
   );
+}
+
+export function tokenQuotaExceededResponse(
+  check: Extract<TokenBudgetCheckResult, { allowed: false }>,
+) {
+  return NextResponse.json(
+    {
+      error: {
+        code: "quota_exceeded",
+        message: check.upgradeMessage,
+        used: check.tokensUsed,
+        total: check.tokensTotal,
+      },
+    },
+    { status: 429 },
+  );
+}
+
+export async function getTokenBudgetForContext(
+  userId: string,
+  mode: AppContextMode,
+  plan: SubscriptionPlan,
+  boothId?: string,
+): Promise<TokenBudgetSummary> {
+  const scope = resolveTokenScope(mode, plan, boothId);
+  return getTokenBudgetSummary(userId, scope);
 }

@@ -1,3 +1,4 @@
+/** @deprecated Use checkAndDeductTokens from lib/token-budget.ts instead. */
 import { getPlanLimits, getUsage, incrementUsage } from "@/lib/usage";
 
 export type PlanCheckResult =

@@ -15,10 +15,10 @@ import {
   formatFinancialAnswer,
   getFinancialContext,
 } from "@/lib/rizq-summary";
-import { checkAndIncrement } from "@/lib/plan-check";
+import { checkAndDeductTokens, resolveTokenScope } from "@/lib/token-budget";
 import {
   getActiveSubscriptionPlan,
-  quotaExceededResponse,
+  tokenQuotaExceededResponse,
 } from "@/lib/subscription-user";
 import { getCurrentUser } from "@/lib/session";
 import type { PaymentMethod } from "@/types";
@@ -139,9 +139,10 @@ export async function POST(req: NextRequest) {
   await insertChatMessage(user.id, { role: "user", content: trimmed });
 
   const activePlan = await getActiveSubscriptionPlan(user.id);
-  const planCheck = await checkAndIncrement(user.id, activePlan, "rizq_chat");
-  if (!planCheck.allowed) {
-    return quotaExceededResponse(planCheck);
+  const scope = resolveTokenScope("regular", activePlan);
+  const check = await checkAndDeductTokens(user.id, scope, "rizq_chat");
+  if (!check.allowed) {
+    return tokenQuotaExceededResponse(check);
   }
 
   const action = await parseUserMessage(trimmed, today());

@@ -3,14 +3,10 @@
 import { useRouter } from "next/navigation";
 
 export function UpgradePrompt({
-  feature,
-  limit,
-  used,
+  message = "AI credits หมดแล้ว — อัพเกรดเพื่อใช้ต่อ",
   onUpgrade,
 }: {
-  feature: string;
-  limit: number;
-  used: number;
+  message?: string;
   onUpgrade?: () => void;
 }) {
   const router = useRouter();
@@ -25,13 +21,7 @@ export function UpgradePrompt({
 
   return (
     <div className="rounded-[14px] border border-amber-500/30 bg-amber-500/10 px-4 py-4">
-      <p className="text-sm font-medium text-rz-text">ถึงขีดจำกัด {feature}</p>
-      <p className="mt-1 text-sm text-rz-muted">
-        ใช้ไป {used} / {limit} ครั้งในรอบนี้แล้ว
-      </p>
-      <p className="mt-2 text-sm text-rz-muted">
-        อัพเกรดแพ็กเกจเพื่อใช้งานต่อได้เต็มรูปแบบ
-      </p>
+      <p className="text-sm font-medium text-rz-text">{message}</p>
       <button
         type="button"
         onClick={handleUpgrade}
