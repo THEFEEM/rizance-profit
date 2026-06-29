@@ -11,6 +11,7 @@ import { ShopMemberEditor } from "@/components/shop/ShopMemberEditor";
 import { UserAvatar } from "@/components/UserAvatar";
 import { apiFetch } from "@/lib/api-client";
 import { CONTACT_CHANNELS } from "@/lib/contact-channels";
+import { SHOW_PARTNERS_SECTION } from "@/lib/feature-flags";
 import { getAppVersionLabel } from "@/lib/app-version";
 import type { AuthProvider } from "@/types";
 import type { ShopMember } from "@/types/shop";
@@ -212,7 +213,7 @@ export function ProfilePageContent({
           projectId={projectId}
         />
 
-        {(mode === "regular" || mode === "booth") && (
+        {SHOW_PARTNERS_SECTION && (mode === "regular" || mode === "booth") && (
           <ShopMemberEditor members={shopMembers} currency={user.currency} />
         )}
 

@@ -14,6 +14,7 @@ import {
 import { BankIcon, CalendarIcon, PieChartIcon, TagIcon } from "@/components/booth/setup/icons";
 import { apiFetch } from "@/lib/api-client";
 import { today } from "@/lib/date";
+import { SHOW_PARTNERS_SECTION } from "@/lib/feature-flags";
 import { computeProfit, formatMoney, moneySign } from "@/lib/money";
 import {
   PROFIT_SPLIT_METHODS,
@@ -60,7 +61,7 @@ export function BoothSetup({
     }
     return sum;
   }, 0);
-  const totalBudget = poolNum + memberEquity;
+  const totalBudget = SHOW_PARTNERS_SECTION ? poolNum + memberEquity : poolNum;
 
   async function persistSettings(): Promise<boolean> {
     if (closed || !name.trim()) return false;
@@ -171,6 +172,7 @@ export function BoothSetup({
                 ))}
             </div>
 
+            {SHOW_PARTNERS_SECTION && (
             <label
               className={`flex items-start gap-3 rounded-[11px] border-[0.5px] px-4 py-3 transition-colors ${
                 poolGetsShare
@@ -192,6 +194,7 @@ export function BoothSetup({
                 </span>
               </span>
             </label>
+            )}
 
             <div className="rounded-[11px] border-[0.5px] border-rz-border bg-rz-elevated/40 px-4 py-3 text-sm">
               <div className="flex justify-between">
@@ -200,13 +203,15 @@ export function BoothSetup({
                   {formatMoney(String(poolNum), currency)}
                 </span>
               </div>
+              {SHOW_PARTNERS_SECTION && (
               <div className="mt-1.5 flex justify-between">
                 <span className="text-rz-blue">สมาชิกลงทุน</span>
                 <span className="rz-tabular font-medium text-rz-muted">
                   {formatMoney(String(memberEquity.toFixed(2)), currency)}
                 </span>
               </div>
-              <div className="mt-2 flex justify-between border-t-[0.5px] border-rz-border pt-2">
+              )}
+              <div className={`flex justify-between ${SHOW_PARTNERS_SECTION ? "mt-2 border-t-[0.5px] border-rz-border pt-2" : "mt-1.5"}`}>
                 <span className="font-medium text-rz-text">งบรวม</span>
                 <span className="rz-tabular text-base font-medium text-rz-green">
                   {formatMoney(String(totalBudget.toFixed(2)), currency)}
@@ -217,6 +222,7 @@ export function BoothSetup({
         </div>
       </section>
 
+      {SHOW_PARTNERS_SECTION && (
       <section className="px-4">
         <label className="mb-2 flex items-center gap-2 text-sm font-medium text-rz-muted">
           <span className="text-rz-hint">
@@ -240,8 +246,9 @@ export function BoothSetup({
           ))}
         </div>
       </section>
+      )}
 
-      {!createMode && booth && (
+      {SHOW_PARTNERS_SECTION && !createMode && booth && (
         <BoothMemberEditor
           boothId={booth.id}
           members={members}
@@ -296,9 +303,11 @@ export function BoothSetup({
               <SetupPrimaryButton onClick={saveSettings} disabled={saving || !name.trim()}>
                 {saving ? "กำลังบันทึก…" : "สร้างงานบูธ"}
               </SetupPrimaryButton>
+              {SHOW_PARTNERS_SECTION && (
               <p className="text-center text-sm text-rz-hint">
                 หลังสร้างงานบูธ จะเพิ่มสมาชิกในหน้านี้ทันที — ไม่ต้องเปลี่ยนหน้า
               </p>
+              )}
             </>
           ) : (
             <>

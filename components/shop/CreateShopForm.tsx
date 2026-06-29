@@ -10,6 +10,7 @@ import { UserIcon } from "@/components/booth/setup/icons";
 import { ROLE_STYLES } from "@/components/booth/summary/role-styles";
 import { apiFetch } from "@/lib/api-client";
 import { today } from "@/lib/date";
+import { SHOW_PARTNERS_SECTION } from "@/lib/feature-flags";
 import { formatMoney } from "@/lib/money";
 import type { AppContext } from "@/types/context";
 import type { User } from "@/types";
@@ -129,6 +130,7 @@ export function CreateShopForm({
     }
 
     for (const m of pending) {
+      if (!SHOW_PARTNERS_SECTION) continue;
       const memberRes = await apiFetch("/api/shop/members", {
         method: "POST",
         body: JSON.stringify({
@@ -163,7 +165,11 @@ export function CreateShopForm({
     <div className="space-y-6 px-4 pb-8 pt-4">
       <div>
         <h1 className="text-lg font-medium text-rz-text">สร้างร้านใหม่</h1>
-        <p className="mt-1 text-sm text-rz-hint">ตั้งชื่อร้านและเพิ่มหุ้นส่วน (ถ้ามี)</p>
+        <p className="mt-1 text-sm text-rz-hint">
+          {SHOW_PARTNERS_SECTION
+            ? "ตั้งชื่อร้านและเพิ่มหุ้นส่วน (ถ้ามี)"
+            : "ตั้งชื่อร้านและเงินตั้งต้น (ถ้ามี)"}
+        </p>
       </div>
 
       <SetupField
@@ -202,6 +208,7 @@ export function CreateShopForm({
         </div>
       </section>
 
+      {SHOW_PARTNERS_SECTION && (
       <section>
         <h2 className="mb-2 text-sm font-medium text-rz-muted">เพิ่มสมาชิก (หุ้นส่วน)</h2>
         <div className="rounded-[14px] border-[0.5px] border-rz-border bg-rz-card p-4">
@@ -263,8 +270,9 @@ export function CreateShopForm({
           </button>
         </div>
       </section>
+      )}
 
-      {pending.length > 0 && (
+      {SHOW_PARTNERS_SECTION && pending.length > 0 && (
         <section>
           <h2 className="mb-2 text-sm font-medium text-rz-muted">สมาชิกที่เพิ่มแล้ว</h2>
           <ul className="space-y-2">
