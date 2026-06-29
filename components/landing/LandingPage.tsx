@@ -1,4 +1,19 @@
 import Link from "next/link";
+import Image from "next/image";
+import {
+  Sparkles,
+  ScanLine,
+  BarChart3,
+  CalendarDays,
+  Smartphone,
+  User,
+  Store,
+  Tent,
+  Users,
+  Mail,
+  Phone,
+} from "lucide-react";
+import { FeedbackForm } from "./FeedbackForm";
 
 const CSS = `
 .lp{--bg:#0E1525;--card:#16203A;--inset:#1A2236;--border:#243049;--text:#E8EDF5;--muted:#9AA6B8;--hint:#5C6679;--green:#4ADE9E;--green-deep:#1D9E75;--blue:#6BB6FF;--amber:#EF9F27;--purple:#B69CE8;background:var(--bg);color:var(--text);line-height:1.6}
@@ -64,6 +79,30 @@ const CSS = `
 .lp footer{border-top:.5px solid var(--border);padding:40px 0 50px}
 .lp .foot-in{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:18px}
 .lp .foot-in .muted{font-size:13px;color:var(--hint)}
+.lp .fb-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+@media(max-width:820px){.lp .fb-grid{grid-template-columns:1fr}}
+.lp .fb-card{background:var(--card);border:.5px solid var(--border);border-radius:18px;padding:28px}
+.lp .fb-card h3{font-size:20px;margin-bottom:6px}
+.lp .fb-sub{font-size:14px;color:var(--muted);margin-bottom:22px}
+.lp .fb-label{display:block;font-size:13px;color:var(--muted);margin-bottom:8px;margin-top:18px}
+.lp .fb-label:first-of-type{margin-top:0}
+.lp .fb-input,.lp .fb-textarea{width:100%;background:var(--inset);border:.5px solid var(--border);border-radius:11px;color:var(--text);font-size:15px;padding:12px 14px;font-family:inherit;outline:none;transition:border-color .2s}
+.lp .fb-input:focus,.lp .fb-textarea:focus{border-color:var(--green)}
+.lp .fb-input::placeholder,.lp .fb-textarea::placeholder{color:var(--hint)}
+.lp .fb-textarea{min-height:120px;resize:vertical;line-height:1.6}
+.lp .fb-stars{display:flex;gap:8px}
+.lp .fb-star{background:none;border:none;cursor:pointer;font-size:28px;line-height:1;color:var(--border);padding:0;transition:color .15s,transform .15s}
+.lp .fb-star:hover{transform:scale(1.12)}
+.lp .fb-star.on{color:var(--amber)}
+.lp .fb-submit{width:100%;justify-content:center;margin-top:26px;padding:14px}
+.lp .contact-row{display:flex;align-items:center;gap:14px;background:var(--inset);border:.5px solid var(--border);border-radius:14px;padding:16px;margin-bottom:14px;transition:border-color .2s}
+.lp .contact-row:hover{border-color:var(--green)}
+.lp .contact-ic{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;flex-shrink:0;background:#15293F;border:.5px solid #1E3A52}
+.lp .contact-ic.g{background:#16352A;border:.5px solid #1D5B43}
+.lp .contact-txt{display:flex;flex-direction:column;gap:2px;font-size:15px;min-width:0}
+.lp .contact-txt small{font-size:12px;color:var(--hint)}
+.lp .contact-txt b{font-weight:600;color:var(--text);word-break:break-all}
+.lp .contact-note{font-size:13px;color:var(--muted);margin-top:6px;line-height:1.6}
 `;
 
 export function LandingPage() {
@@ -74,12 +113,16 @@ export function LandingPage() {
       <nav>
         <div className="wrap nav-in">
           <Link href="/" className="logo">
-            <span className="logo-mark">R</span>Rizance
+            <span className="logo-mark">
+              <Image src="/Logo.png" alt="Rizance" width={26} height={26} priority style={{ objectFit: "contain" }} />
+            </span>
+            Rizance
           </Link>
           <div className="nav-links">
             <a href="#features">ฟีเจอร์</a>
             <a href="#modes">โหมด</a>
             <a href="#pricing">ราคา</a>
+            <a href="#contact">ติดต่อ</a>
             <Link href="/register" className="btn btn-green">เริ่มใช้ฟรี</Link>
           </div>
         </div>
@@ -110,11 +153,11 @@ export function LandingPage() {
             ผู้ช่วย AI ที่บันทึก สแกน และสรุปกำไรให้ — ออกแบบมาเพื่อคนทำธุรกิจจริง ไม่ใช่นักบัญชี
           </p>
           <div className="feat-grid">
-            <div className="fcard"><div className="ic g">💬</div><h3>แชทแล้วบันทึกเลย</h3><p>พิมพ์ &quot;ขายได้ 500&quot; Rizq บันทึกเข้าระบบทันที ไม่ต้องกรอกฟอร์ม</p></div>
-            <div className="fcard"><div className="ic b">📷</div><h3>สแกนใบเสร็จแยกรายการ</h3><p>ถ่ายรูปใบเสร็จ AI แยกทุกรายการอัตโนมัติ แก้ไขและยืนยันได้ในขั้นตอนเดียว</p></div>
-            <div className="fcard"><div className="ic a">📊</div><h3>ถามกำไรได้ทันที</h3><p>ถามว่า &quot;กำไรสัปดาห์นี้เท่าไหร่&quot; Rizq สรุปพร้อมแยกหมวดหมู่ให้เลย</p></div>
-            <div className="fcard"><div className="ic g">🎪</div><h3>บูธและอีเวนต์ — ครบใน 7 วัน</h3><p>Event Pass ฿49 — ใช้ Rizq AI ได้เต็มที่ แยกข้อมูลต่อบูธ ไม่ปนกัน</p></div>
-            <div className="fcard"><div className="ic p">📱</div><h3>ใช้ได้ทุกอุปกรณ์ ไม่ต้องติดตั้ง</h3><p>PWA เปิดบนมือถือได้เลย ข้อมูลซิงค์ทันที</p></div>
+            <div className="fcard"><div className="ic g"><Sparkles size={20} color="#4ADE9E" strokeWidth={2} /></div><h3>แชทแล้วบันทึกเลย</h3><p>พิมพ์ &quot;ขายได้ 500&quot; Rizq บันทึกเข้าระบบทันที ไม่ต้องกรอกฟอร์ม</p></div>
+            <div className="fcard"><div className="ic b"><ScanLine size={20} color="#6BB6FF" strokeWidth={2} /></div><h3>สแกนใบเสร็จแยกรายการ</h3><p>ถ่ายรูปใบเสร็จ AI แยกทุกรายการอัตโนมัติ แก้ไขและยืนยันได้ในขั้นตอนเดียว</p></div>
+            <div className="fcard"><div className="ic a"><BarChart3 size={20} color="#EF9F27" strokeWidth={2} /></div><h3>ถามกำไรได้ทันที</h3><p>ถามว่า &quot;กำไรสัปดาห์นี้เท่าไหร่&quot; Rizq สรุปพร้อมแยกหมวดหมู่ให้เลย</p></div>
+            <div className="fcard"><div className="ic g"><CalendarDays size={20} color="#4ADE9E" strokeWidth={2} /></div><h3>บูธและอีเวนต์ — ครบใน 7 วัน</h3><p>Event Pass ฿49 — ใช้ Rizq AI ได้เต็มที่ แยกข้อมูลต่อบูธ ไม่ปนกัน</p></div>
+            <div className="fcard"><div className="ic p"><Smartphone size={20} color="#B69CE8" strokeWidth={2} /></div><h3>ใช้ได้ทุกอุปกรณ์ ไม่ต้องติดตั้ง</h3><p>PWA เปิดบนมือถือได้เลย ข้อมูลซิงค์ทันที</p></div>
           </div>
         </div>
       </section>
@@ -125,10 +168,10 @@ export function LandingPage() {
           <h2 className="sec-title">เลือกโหมดที่เหมาะกับคุณ</h2>
           <p className="sec-lead">สลับโหมดได้ตามงานที่ทำ — ข้อมูลแต่ละโหมดแยกขาดจากกัน</p>
           <div className="aud-grid">
-            <div className="aud"><span className="ic">👤</span><div><h3>ส่วนตัว</h3><p>บันทึกรายรับ-รายจ่ายส่วนตัว วิเคราะห์การใช้จ่าย</p></div></div>
-            <div className="aud"><span className="ic">🏪</span><div><h3>ร้านค้า</h3><p>ติดตามกำไรร้าน สแกนสลิปและใบเสร็จ</p></div></div>
-            <div className="aud"><span className="ic">🎪</span><div><h3>บูธ</h3><p>จัดการรายรับต่อบูธ Event Pass 7 วัน ฿49</p></div></div>
-            <div className="aud"><span className="ic">🏢</span><div><h3>องค์กร</h3><p>งบประมาณโครงการ รายงานองค์กร (ฟรี)</p></div></div>
+            <div className="aud"><span className="ic"><User size={24} color="#4ADE9E" strokeWidth={2} /></span><div><h3>ส่วนตัว</h3><p>บันทึกรายรับ-รายจ่ายส่วนตัว วิเคราะห์การใช้จ่าย</p></div></div>
+            <div className="aud"><span className="ic"><Store size={24} color="#6BB6FF" strokeWidth={2} /></span><div><h3>ร้านค้า</h3><p>ติดตามกำไรร้าน สแกนสลิปและใบเสร็จ</p></div></div>
+            <div className="aud"><span className="ic"><Tent size={24} color="#EF9F27" strokeWidth={2} /></span><div><h3>บูธ</h3><p>จัดการรายรับต่อบูธ Event Pass 7 วัน ฿49</p></div></div>
+            <div className="aud"><span className="ic"><Users size={24} color="#B69CE8" strokeWidth={2} /></span><div><h3>องค์กร</h3><p>งบประมาณโครงการ รายงานองค์กร (ฟรี)</p></div></div>
           </div>
         </div>
       </section>
@@ -144,8 +187,7 @@ export function LandingPage() {
               <div className="pdesc">ส่วนตัว + ร้านค้า (จำกัด)</div>
               <div className="pamt">฿0</div>
             </div>
-            <div className="price feat">
-              <span className="tagp">แนะนำ</span>
+            <div className="price">
               <div className="pname">Personal Plus</div>
               <div className="pdesc">ส่วนตัวเต็มรูปแบบ + AI ไม่จำกัด*</div>
               <div className="pamt">฿49<small>/เดือน</small></div>
@@ -155,7 +197,8 @@ export function LandingPage() {
               <div className="pdesc">บูธ + AI เต็มที่ 7 วัน</div>
               <div className="pamt">฿49<small>/7 วัน</small></div>
             </div>
-            <div className="price">
+            <div className="price feat">
+              <span className="tagp">แนะนำ</span>
               <div className="pname">Business</div>
               <div className="pdesc">ร้านค้าไม่จำกัด + AI ขั้นสูง</div>
               <div className="pamt">฿99<small>/เดือน</small></div>
@@ -163,6 +206,30 @@ export function LandingPage() {
           </div>
           <p className="price-note">*ใช้ได้ตาม Fair Usage — ประมาณ 100 ครั้ง/เดือน</p>
           <p className="price-link"><Link href="/pricing">ดูรายละเอียดทั้งหมด →</Link></p>
+        </div>
+      </section>
+
+      <section id="contact" style={{ background: "linear-gradient(160deg,#111A2E,#0B111E)", borderTop: ".5px solid #243049", borderBottom: ".5px solid #243049" }}>
+        <div className="wrap">
+          <div className="sec-eyebrow" style={{ textAlign: "center" }}>เสียงของคุณสำคัญ</div>
+          <h2 className="sec-title" style={{ marginLeft: "auto", marginRight: "auto", textAlign: "center" }}>ฟีดแบ็ก &amp; ติดต่อสอบถาม</h2>
+          <p className="sec-lead" style={{ marginLeft: "auto", marginRight: "auto", textAlign: "center" }}>อยากให้ Rizance ดีขึ้นตรงไหน หรือมีคำถาม บอกเราได้เลย</p>
+          <div className="fb-grid">
+            <FeedbackForm />
+            <div className="fb-card">
+              <h3>ติดต่อสอบถาม</h3>
+              <p className="fb-sub">มีคำถามเรื่องการใช้งาน ราคา หรือสนใจแพ็กเทีม ทักได้เลย</p>
+              <a className="contact-row" href="mailto:lutfee7890@gmail.com">
+                <span className="contact-ic"><Mail size={20} color="#6BB6FF" strokeWidth={2} /></span>
+                <span className="contact-txt"><small>อีเมล</small><b>lutfee7890@gmail.com</b></span>
+              </a>
+              <a className="contact-row" href="tel:0967198011">
+                <span className="contact-ic g"><Phone size={20} color="#4ADE9E" strokeWidth={2} /></span>
+                <span className="contact-txt"><small>โทรศัพท์</small><b>096 719 8011</b></span>
+              </a>
+              <p className="contact-note">เราตอบกลับทุกข้อความ ปกติภายใน 1 วันทำการ — ไม่ว่าจะเป็นคำถามการใช้งาน ขอเดโม หรือปรึกษาแพ็กเกจสำหรับนิติบุคคล</p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -178,7 +245,12 @@ export function LandingPage() {
 
       <footer>
         <div className="wrap foot-in">
-          <Link href="/" className="logo"><span className="logo-mark">R</span>Rizance</Link>
+          <Link href="/" className="logo">
+            <span className="logo-mark">
+              <Image src="/Logo.png" alt="Rizance" width={26} height={26} style={{ objectFit: "contain" }} />
+            </span>
+            Rizance
+          </Link>
           <span className="muted">© {new Date().getFullYear()} Rizance</span>
         </div>
       </footer>
