@@ -80,7 +80,7 @@ export function ProfileModeSection({
     setSwitching(false);
     if (res.ok) {
       setBoothPickerOpen(false);
-      if (body.mode === "project" || mode === "project") router.push("/");
+      if (body.mode === "project" || mode === "project") router.push("/home");
       router.refresh();
     } else {
       setError(res.message);

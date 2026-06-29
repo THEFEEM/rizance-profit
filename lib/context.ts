@@ -182,7 +182,7 @@ export type EntryNavRoutes = {
 export function entryNavRoutes(resolved: ResolvedTodayContext): EntryNavRoutes {
   if (resolved.mode === "personal") {
     return {
-      today: "/",
+      today: "/home",
       entry: "/personal/entry",
       stats: "/personal/summary",
       profile: "/profile",
@@ -190,7 +190,7 @@ export function entryNavRoutes(resolved: ResolvedTodayContext): EntryNavRoutes {
   }
   if (resolved.mode === "booth") {
     return {
-      today: "/",
+      today: "/home",
       entry: `/booth/${resolved.boothId}/entry`,
       stats: "/summary",
       profile: "/profile",
@@ -199,14 +199,14 @@ export function entryNavRoutes(resolved: ResolvedTodayContext): EntryNavRoutes {
   if (resolved.mode === "project") {
     const base = `/projects/${resolved.projectId}`;
     return {
-      today: "/",
+      today: "/home",
       entry: `${base}/entry`,
       stats: `${base}/summary`,
       profile: "/profile",
     };
   }
   return {
-    today: "/",
+    today: "/home",
     entry: "/entry",
     stats: "/summary",
     profile: "/profile",

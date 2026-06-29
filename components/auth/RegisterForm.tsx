@@ -48,7 +48,7 @@ export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
       body: JSON.stringify({ shopName, email, password, mode }),
     });
     if (res.ok) {
-      router.replace(res.data.redirect || "/");
+      router.replace(res.data.redirect || "/home");
       router.refresh();
     } else {
       setError(res.message);

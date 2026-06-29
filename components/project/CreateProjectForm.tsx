@@ -61,7 +61,7 @@ export function CreateProjectForm() {
     });
     setSubmitting(false);
     if (ctxRes.ok) {
-      router.push("/");
+      router.push("/home");
       router.refresh();
       return;
     }

@@ -49,10 +49,10 @@ export async function POST(req: NextRequest) {
   const user = await createUser({ email, passwordHash, shopName });
 
   let contextValue = "regular";
-  let redirect = "/";
+  let redirect = "/home";
   if (mode === "personal") {
     contextValue = "personal";
-    redirect = "/";
+    redirect = "/home";
   } else if (mode === "org") {
     contextValue = "regular";
     redirect = "/projects/new";

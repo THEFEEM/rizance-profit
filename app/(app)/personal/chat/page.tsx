@@ -19,7 +19,7 @@ export default async function PersonalChatPage() {
   );
 
   if (ctx.mode !== "personal") {
-    redirect("/");
+    redirect("/home");
   }
 
   const messages = await getPersonalChatMessages(user.id);

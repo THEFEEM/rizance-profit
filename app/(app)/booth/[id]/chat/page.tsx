@@ -21,7 +21,7 @@ export default async function BoothChatPage({ params }: { params: Promise<{ id: 
   );
 
   if (ctx.mode !== "booth" || ctx.boothId !== id) {
-    redirect("/");
+    redirect("/home");
   }
 
   const messages = await getBoothChatMessages(user.id, id);

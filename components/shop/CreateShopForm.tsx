@@ -157,7 +157,7 @@ export function CreateShopForm({
       return;
     }
 
-    router.replace("/");
+    router.replace("/home");
     router.refresh();
   }
 
@@ -314,7 +314,7 @@ export function CreateShopForm({
       </SetupPrimaryButton>
 
       <p className="text-center">
-        <Link href="/" className="text-sm text-rz-hint">
+        <Link href="/home" className="text-sm text-rz-hint">
           ยกเลิก
         </Link>
       </p>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/jwt";
 import { getAppUrl, isVercel } from "@/lib/env";
 
-const PUBLIC_PATHS = ["/login", "/register"];
+const PUBLIC_PATHS = ["/", "/login", "/register", "/pricing"];
 const LEGACY_APP_HOST = "rizance-profit.vercel.app";
 
 function isPublicStaticFile(pathname: string): boolean {
@@ -39,9 +39,13 @@ export async function middleware(req: NextRequest) {
   const token = req.cookies.get(SESSION_COOKIE)?.value;
   const userId = await verifySession(token);
 
-  // Signed-in users shouldn't see login/register — send them to Today.
-  if (userId && isPublic) {
-    return NextResponse.redirect(new URL("/", req.url));
+  // Signed-in users: landing → app home; skip login/register.
+  if (userId && pathname === "/") {
+    return NextResponse.redirect(new URL("/home", req.url));
+  }
+
+  if (userId && (pathname === "/login" || pathname === "/register")) {
+    return NextResponse.redirect(new URL("/home", req.url));
   }
 
   // Unauthenticated users hitting a protected page → login (remember target).

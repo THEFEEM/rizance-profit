@@ -38,7 +38,7 @@ export function RegularExpenseEntry() {
       }),
     });
     if (res.ok) {
-      router.push("/");
+      router.push("/home");
       router.refresh();
     } else {
       setError(res.fields?.amount?.[0] ?? res.message);

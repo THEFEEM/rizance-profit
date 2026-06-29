@@ -28,7 +28,7 @@ export default async function BoothListPage() {
 
   return (
     <div className="pb-6" data-context="booth">
-      <BoothBack href="/" />
+      <BoothBack href="/home" />
       <div className="flex items-center justify-between px-4 pt-1">
         <div>
           <h1 className="text-lg font-medium text-rz-text">งานบูธ</h1>
