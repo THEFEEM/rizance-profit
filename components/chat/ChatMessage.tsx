@@ -1,4 +1,4 @@
-import { isReceiptSplitCard, type ChatMessageRow, type ReceiptItemChanges } from "@/lib/chat-types";
+import { isReceiptSplitCard, type ChatCardData, type ChatMessageRow, type ReceiptItemChanges } from "@/lib/chat-types";
 import { ChatEntryCard } from "@/components/chat/ChatEntryCard";
 import { ChatReceiptCard } from "@/components/chat/ChatReceiptCard";
 
@@ -13,6 +13,7 @@ export function ChatMessage({
   onPaymentMethodChange,
   onKindChange,
   onReceiptMetaChange,
+  variant = "shop",
 }: {
   message: ChatMessageRow;
   currency: string;
@@ -34,6 +35,7 @@ export function ChatMessage({
     messageId: string,
     meta: { paymentMethod: "cash" | "transfer" },
   ) => Promise<void>;
+  variant?: "shop" | "personal";
 }) {
   if (message.role === "user") {
     return (
@@ -77,17 +79,19 @@ export function ChatMessage({
             onConfirm={onConfirmReceipt}
             onCancel={onCancelReceipt}
             onUpdateItem={onUpdateReceiptItem}
-            onReceiptMetaChange={onReceiptMetaChange}
+            onReceiptMetaChange={variant === "shop" ? onReceiptMetaChange : undefined}
+            personal={variant === "personal"}
           />
         ) : (
           <ChatEntryCard
-            card={message.cardData}
+            card={message.cardData as ChatCardData}
             messageId={message.id}
             entryId={message.entryId}
             onDelete={onDelete}
             onCategoryChange={onCategoryChange}
-            onPaymentMethodChange={onPaymentMethodChange}
-            onKindChange={onKindChange}
+            onPaymentMethodChange={variant === "shop" ? onPaymentMethodChange : undefined}
+            onKindChange={variant === "shop" ? onKindChange : undefined}
+            variant={variant}
             currency={currency}
           />
         )

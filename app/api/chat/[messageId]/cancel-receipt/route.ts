@@ -29,7 +29,7 @@ export async function POST(
 
   await updateChatMessageCardData(user.id, messageId, {
     ...card,
-    status: "cancelled",
+    status: "cancelled" as const,
   });
 
   return NextResponse.json({ data: { ok: true } });
