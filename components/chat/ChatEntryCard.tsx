@@ -47,10 +47,12 @@ export function ChatEntryCard({
   const [savingPayment, setSavingPayment] = useState(false);
   const [savingKind, setSavingKind] = useState(false);
   const isPersonal = variant === "personal";
+  const isBooth = variant === "booth";
   const isIncome = card.kind === "income";
   const kindBusy = savingKind || savingPayment;
   const showKindToggle = !isPersonal && onKindChange != null;
-  const showPaymentToggle = !isPersonal && onPaymentMethodChange != null;
+  const showPaymentToggle =
+    !isPersonal && onPaymentMethodChange != null && (!isBooth || isIncome);
 
   async function handleCategoryChange(next: string) {
     if (next === card.category) {

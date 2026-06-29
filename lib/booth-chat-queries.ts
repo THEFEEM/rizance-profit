@@ -1,8 +1,12 @@
 import { query } from "@/lib/db";
-import { parseCardPayload } from "@/lib/chat-queries";
+import {
+  mapReceiptLineToExpenseCategory,
+  parseCardPayload,
+} from "@/lib/chat-queries";
 import {
   expenseCategoryLabel,
   incomeCategoryLabel,
+  isFixed,
   normalizeExpenseCategory,
   normalizeIncomeCategory,
   type ExpenseCategoryKey,
@@ -11,6 +15,8 @@ import {
 import type { ChatCardPayload, ChatMessageRow } from "@/lib/chat-types";
 
 export type BoothChatMessageRow = ChatMessageRow;
+
+export { isReceiptSplitCard } from "@/lib/chat-types";
 
 type BoothChatDbRow = {
   id: string;
@@ -115,3 +121,94 @@ export async function insertBoothChatMessage(
   );
   return mapRow(rows[0]);
 }
+
+export async function getBoothChatMessage(
+  userId: string,
+  boothId: string,
+  messageId: string,
+): Promise<BoothChatMessageRow | null> {
+  const { rows } = await query<BoothChatDbRow>(
+    `SELECT id, role, content, image_thumb, entry_id, entry_kind, card_data, created_at
+     FROM booth_chat_messages
+     WHERE id = $1 AND booth_id = $2 AND user_id = $3`,
+    [messageId, boothId, userId],
+  );
+  return rows[0] ? mapRow(rows[0]) : null;
+}
+
+export async function updateBoothChatMessageCardData(
+  userId: string,
+  boothId: string,
+  messageId: string,
+  cardData: ChatCardPayload,
+): Promise<void> {
+  await query(
+    `UPDATE booth_chat_messages
+     SET card_data = $1::jsonb
+     WHERE id = $2 AND booth_id = $3 AND user_id = $4`,
+    [JSON.stringify(cardData), messageId, boothId, userId],
+  );
+}
+
+export async function updateBoothChatCardCategory(
+  userId: string,
+  boothId: string,
+  messageId: string,
+  category: string,
+  categoryLabel: string,
+): Promise<void> {
+  await query(
+    `UPDATE booth_chat_messages
+     SET card_data = jsonb_set(
+       jsonb_set(card_data, '{category}', $4::jsonb),
+       '{categoryLabel}', $5::jsonb
+     )
+     WHERE id = $1 AND booth_id = $2 AND user_id = $3`,
+    [messageId, boothId, userId, JSON.stringify(category), JSON.stringify(categoryLabel)],
+  );
+}
+
+export async function updateBoothIncomeEntryCategory(
+  userId: string,
+  boothId: string,
+  entryId: string,
+  category: IncomeCategoryKey,
+): Promise<boolean> {
+  const { rowCount } = await query(
+    `UPDATE booth_income_entries SET category = $1
+     WHERE id = $2 AND booth_id = $3 AND user_id = $4`,
+    [category, entryId, boothId, userId],
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+export async function updateBoothExpenseEntryCategory(
+  userId: string,
+  boothId: string,
+  entryId: string,
+  category: ExpenseCategoryKey,
+): Promise<boolean> {
+  const costType = isFixed(category) ? "fixed" : "variable";
+  const { rowCount } = await query(
+    `UPDATE booth_expense_entries SET category = $1, cost_type = $2
+     WHERE id = $3 AND booth_id = $4 AND user_id = $5`,
+    [category, costType, entryId, boothId, userId],
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+export async function updateBoothIncomePaymentMethod(
+  userId: string,
+  boothId: string,
+  entryId: string,
+  paymentMethod: "cash" | "transfer",
+): Promise<boolean> {
+  const { rowCount } = await query(
+    `UPDATE booth_income_entries SET payment_method = $1
+     WHERE id = $2 AND booth_id = $3 AND user_id = $4`,
+    [paymentMethod, entryId, boothId, userId],
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+export { mapReceiptLineToExpenseCategory };

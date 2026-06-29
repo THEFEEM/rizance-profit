@@ -89,8 +89,10 @@ export function ChatMessage({
             entryId={message.entryId}
             onDelete={onDelete}
             onCategoryChange={onCategoryChange}
-            onPaymentMethodChange={variant === "shop" ? onPaymentMethodChange : undefined}
-            onKindChange={variant === "shop" ? onKindChange : undefined}
+            onPaymentMethodChange={
+              variant === "shop" || variant === "booth" ? onPaymentMethodChange : undefined
+            }
+            onKindChange={variant === "shop" || variant === "booth" ? onKindChange : undefined}
             variant={variant}
             currency={currency}
           />
