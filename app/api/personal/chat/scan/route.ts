@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { handlePersonalChatImage } from "@/lib/personal-chat-scan";
-import { checkAndIncrement } from "@/lib/plan-check";
+import { checkAndDeductTokens, resolveTokenScope } from "@/lib/token-budget";
 import {
   getActiveSubscriptionPlan,
-  quotaExceededResponse,
+  tokenQuotaExceededResponse,
 } from "@/lib/subscription-user";
 import { getCurrentUser } from "@/lib/session";
 
@@ -34,9 +34,10 @@ export async function POST(req: NextRequest) {
   }
 
   const activePlan = await getActiveSubscriptionPlan(user.id);
-  const planCheck = await checkAndIncrement(user.id, activePlan, "scan_slip");
-  if (!planCheck.allowed) {
-    return quotaExceededResponse(planCheck);
+  const scope = resolveTokenScope("personal", activePlan);
+  const check = await checkAndDeductTokens(user.id, scope, "scan_slip");
+  if (!check.allowed) {
+    return tokenQuotaExceededResponse(check);
   }
 
   return handlePersonalChatImage(user.id, {

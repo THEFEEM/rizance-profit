@@ -18,10 +18,10 @@ import type { ChatCardData } from "@/lib/chat-types";
 import { BOOTH_ENTRY_REASON_MESSAGES } from "@/lib/booth-errors";
 import type { Booth } from "@/types/booth";
 import { today } from "@/lib/date";
-import { checkAndIncrement } from "@/lib/plan-check";
+import { checkAndDeductTokens, resolveTokenScope } from "@/lib/token-budget";
 import {
   getActiveSubscriptionPlan,
-  quotaExceededResponse,
+  tokenQuotaExceededResponse,
 } from "@/lib/subscription-user";
 import { getCurrentUser } from "@/lib/session";
 
@@ -177,9 +177,10 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
   if (typeof imageBase64 === "string" && imageBase64.trim() !== "") {
     const activePlan = await getActiveSubscriptionPlan(user.id);
-    const planCheck = await checkAndIncrement(user.id, activePlan, "scan_slip");
-    if (!planCheck.allowed) {
-      return quotaExceededResponse(planCheck);
+    const scope = resolveTokenScope("booth", activePlan, boothId);
+    const check = await checkAndDeductTokens(user.id, scope, "scan_slip");
+    if (!check.allowed) {
+      return tokenQuotaExceededResponse(check);
     }
 
     return handleBoothChatImage(user.id, boothId, {
@@ -201,9 +202,10 @@ export async function POST(req: NextRequest, context: RouteContext) {
   await insertBoothChatMessage(user.id, boothId, { role: "user", content: trimmed });
 
   const activePlan = await getActiveSubscriptionPlan(user.id);
-  const planCheck = await checkAndIncrement(user.id, activePlan, "rizq_chat");
-  if (!planCheck.allowed) {
-    return quotaExceededResponse(planCheck);
+  const scope = resolveTokenScope("booth", activePlan, boothId);
+  const check = await checkAndDeductTokens(user.id, scope, "rizq_chat");
+  if (!check.allowed) {
+    return tokenQuotaExceededResponse(check);
   }
 
   const action = await parseBoothUserMessage(user.id, boothId, trimmed, today());

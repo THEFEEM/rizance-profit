@@ -12,10 +12,10 @@ import {
 } from "@/lib/expense-categories";
 import { today } from "@/lib/date";
 import { createExpense, createIncome } from "@/lib/queries";
-import { checkAndIncrement } from "@/lib/plan-check";
+import { checkAndDeductTokens, resolveTokenScope } from "@/lib/token-budget";
 import {
   getActiveSubscriptionPlan,
-  quotaExceededResponse,
+  tokenQuotaExceededResponse,
 } from "@/lib/subscription-user";
 import { getCurrentUser } from "@/lib/session";
 import type { PaymentMethod } from "@/types";
@@ -58,9 +58,10 @@ export async function POST(req: NextRequest) {
   }
 
   const activePlan = await getActiveSubscriptionPlan(user.id);
-  const planCheck = await checkAndIncrement(user.id, activePlan, "scan_slip");
-  if (!planCheck.allowed) {
-    return quotaExceededResponse(planCheck);
+  const scope = resolveTokenScope("regular", activePlan);
+  const check = await checkAndDeductTokens(user.id, scope, "scan_slip");
+  if (!check.allowed) {
+    return tokenQuotaExceededResponse(check);
   }
 
   const scanKind = kind === "income" ? "income" : "expense";

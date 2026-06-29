@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { query } from "@/lib/db";
+import { CONTEXT_COOKIE, resolveTodayContext } from "@/lib/context";
 import { resolveActivePlan } from "@/lib/subscription-plan";
+import {
+  getActiveSubscriptionPlan,
+  getTokenBudgetForContext,
+} from "@/lib/subscription-user";
 import { getUserId } from "@/lib/session";
 
 type SubscriptionRow = {
@@ -24,11 +30,22 @@ export async function GET(req: NextRequest) {
   const isExpired = expiresAt ? new Date(expiresAt) < new Date() : false;
   const plan = resolveActivePlan(storedPlan, expiresAt);
 
+  const rawContext = (await cookies()).get(CONTEXT_COOKIE)?.value;
+  const ctx = await resolveTodayContext(userId, undefined, rawContext);
+  const activePlan = await getActiveSubscriptionPlan(userId);
+  const tokenBudget = await getTokenBudgetForContext(
+    userId,
+    ctx.mode,
+    activePlan,
+    ctx.mode === "booth" ? ctx.boothId : undefined,
+  );
+
   return NextResponse.json({
     data: {
       plan,
       expiresAt,
       isExpired,
+      tokenBudget,
     },
   });
 }

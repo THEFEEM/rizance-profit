@@ -17,10 +17,10 @@ import {
   type PersonalChatMessageRow,
 } from "@/lib/personal-chat-queries";
 import type { ChatCardData } from "@/lib/chat-types";
-import { checkAndIncrement } from "@/lib/plan-check";
+import { checkAndDeductTokens, resolveTokenScope } from "@/lib/token-budget";
 import {
   getActiveSubscriptionPlan,
-  quotaExceededResponse,
+  tokenQuotaExceededResponse,
 } from "@/lib/subscription-user";
 import { getCurrentUser } from "@/lib/session";
 
@@ -147,9 +147,10 @@ export async function POST(req: NextRequest) {
 
   if (typeof imageBase64 === "string" && imageBase64.trim() !== "") {
     const activePlan = await getActiveSubscriptionPlan(user.id);
-    const planCheck = await checkAndIncrement(user.id, activePlan, "scan_slip");
-    if (!planCheck.allowed) {
-      return quotaExceededResponse(planCheck);
+    const scope = resolveTokenScope("personal", activePlan);
+    const check = await checkAndDeductTokens(user.id, scope, "scan_slip");
+    if (!check.allowed) {
+      return tokenQuotaExceededResponse(check);
     }
 
     return handlePersonalChatImage(user.id, {
@@ -171,9 +172,10 @@ export async function POST(req: NextRequest) {
   await insertPersonalChatMessage(user.id, { role: "user", content: trimmed });
 
   const activePlan = await getActiveSubscriptionPlan(user.id);
-  const planCheck = await checkAndIncrement(user.id, activePlan, "rizq_chat");
-  if (!planCheck.allowed) {
-    return quotaExceededResponse(planCheck);
+  const scope = resolveTokenScope("personal", activePlan);
+  const check = await checkAndDeductTokens(user.id, scope, "rizq_chat");
+  if (!check.allowed) {
+    return tokenQuotaExceededResponse(check);
   }
 
   const action = await parsePersonalUserMessage(trimmed, today());
