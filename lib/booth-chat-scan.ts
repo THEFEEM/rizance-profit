@@ -1,7 +1,8 @@
 import "server-only";
 
 import { NextResponse } from "next/server";
-import { scanSlip } from "@/lib/ai-slip";
+import { scanReceipt, scanSlip } from "@/lib/ai-slip";
+import { buildReceiptCardData } from "@/lib/chat-queries";
 import {
   boothCategoryLabelOf,
   insertBoothChatMessage,
@@ -33,13 +34,14 @@ export async function handleBoothChatImage(
   boothId: string,
   input: BoothChatScanInput,
 ): Promise<NextResponse> {
-  const { imageBase64, mediaType, kind, thumbnail, caption } = input;
+  const { imageBase64, mediaType, kind, slipType, thumbnail, caption } = input;
 
   if (mediaType != null && !isSupportedMediaType(mediaType)) {
     return NextResponse.json({ error: { message: "Invalid input" } }, { status: 400 });
   }
 
   const scanKind = kind === "income" ? "income" : "expense";
+  const scanSlipType = slipType === "transfer" ? "transfer" : "receipt";
   const resolvedMediaType = isSupportedMediaType(mediaType) ? mediaType : "image/jpeg";
   const userContent =
     typeof caption === "string" && caption.trim() !== "" ? caption.trim() : "📷 สลิป";
@@ -61,6 +63,27 @@ export async function handleBoothChatImage(
       content: BOOTH_ENTRY_REASON_MESSAGES.booth_not_found,
     });
     return NextResponse.json({ data: { messages: [userMsg, aiMsg] } });
+  }
+
+  if (scanSlipType === "receipt" && scanKind === "expense") {
+    const receiptResult = await scanReceipt(
+      imageBase64,
+      resolvedMediaType,
+      scanKind,
+      scanCaption,
+    );
+
+    if (receiptResult.items.length >= 2) {
+      const entryDate = resolveBoothEntryDate(booth, receiptResult.entryDate ?? undefined);
+      const cardData = buildReceiptCardData(receiptResult, entryDate);
+      const aiMsg = await insertBoothChatMessage(userId, boothId, {
+        role: "assistant",
+        entryId: null,
+        entryKind: "expense",
+        cardData,
+      });
+      return NextResponse.json({ data: { messages: [userMsg, aiMsg] } });
+    }
   }
 
   const result = await scanSlip(
