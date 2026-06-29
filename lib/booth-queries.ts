@@ -347,6 +347,16 @@ async function guardBoothEntry(
   return { ok: true, booth };
 }
 
+/** Pick a valid entry_date for Rizq chat when today or AI date falls outside the event. */
+export function resolveBoothEntryDate(booth: Booth, preferred?: string | null): string {
+  const t = today();
+  const candidate =
+    preferred && /^\d{4}-\d{2}-\d{2}$/.test(preferred) ? preferred : t;
+  if (dateWithinBooth(booth, candidate)) return candidate;
+  if (dateWithinBooth(booth, t)) return t;
+  return booth.endDate;
+}
+
 async function guardBoothMemberWrite(
   userId: string,
   boothId: string,

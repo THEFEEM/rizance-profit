@@ -40,7 +40,7 @@ export function ChatEntryCard({
     paymentMethod: "cash" | "transfer",
   ) => Promise<void>;
   onKindChange?: (messageId: string, kind: "income" | "expense") => Promise<void>;
-  variant?: "shop" | "personal";
+  variant?: "shop" | "personal" | "booth";
 }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);

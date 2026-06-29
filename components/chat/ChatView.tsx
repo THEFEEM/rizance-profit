@@ -82,9 +82,10 @@ export function ChatView({
   initialMessages: ChatMessageRow[];
   currency: string;
   apiBase?: string;
-  variant?: "shop" | "personal";
+  variant?: "shop" | "personal" | "booth";
 }) {
   const isPersonal = variant === "personal";
+  const isBooth = variant === "booth";
   const router = useRouter();
   const [messages, setMessages] = useState(initialMessages);
   const [sending, setSending] = useState(false);
@@ -179,7 +180,7 @@ export function ChatView({
     const imageBase64 = await downscaleImage(file, mediaType);
     const thumbnail = await generateThumbnail(file, mediaType);
 
-    const scanUrl = isPersonal ? apiBase : `${apiBase}/scan`;
+    const scanUrl = isPersonal || isBooth ? apiBase : `${apiBase}/scan`;
     const res = await apiFetch<ChatPostResponse>(scanUrl, {
       method: "POST",
       body: JSON.stringify({
@@ -461,7 +462,7 @@ export function ChatView({
 
   return (
     <EntryFormLayout
-      dataContext={isPersonal ? "personal-ai-chat" : "ai-chat"}
+      dataContext={isPersonal ? "personal-ai-chat" : isBooth ? "booth-ai-chat" : "ai-chat"}
       pad={
         <ChatInputBar
           onSend={handleSend}
