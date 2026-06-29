@@ -11,14 +11,14 @@ import { getCurrentUser } from "@/lib/session";
 
 export async function POST(
   _req: NextRequest,
-  ctx: { params: Promise<{ messageId: string }> },
+  { params }: { params: Promise<{ messageId: string }> },
 ) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
   }
 
-  const { messageId } = await ctx.params;
+  const { messageId } = await params;
   const msg = await getPersonalChatMessage(user.id, messageId);
 
   if (!msg) {

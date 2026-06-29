@@ -23,14 +23,14 @@ function recalculateItemsSum(
 
 export async function PATCH(
   req: NextRequest,
-  ctx: { params: Promise<{ messageId: string }> },
+  { params }: { params: Promise<{ messageId: string }> },
 ) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
   }
 
-  const { messageId } = await ctx.params;
+  const { messageId } = await params;
 
   let body: unknown;
   try {
