@@ -10,8 +10,24 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Rizance",
-  description: "Know your real profit",
+  title: "Rizance — ผู้ช่วยบัญชีอัจฉริยะสำหรับร้านค้าและบูธ",
+  description:
+    "บันทึกรายรับ-รายจ่าย สแกนใบเสร็จ วิเคราะห์กำไร ด้วย Rizq AI — รองรับร้านค้า บูธ และส่วนตัว",
+  keywords: [
+    "บัญชีร้านค้า",
+    "AI บัญชี",
+    "สแกนใบเสร็จ",
+    "บูธขายของ",
+    "บันทึกรายรับรายจ่าย",
+    "rizance",
+    "rizq",
+  ],
+  openGraph: {
+    title: "Rizance — ผู้ช่วยบัญชีอัจฉริยะสำหรับร้านค้าและบูธ",
+    description:
+      "บันทึกรายรับ-รายจ่าย สแกนใบเสร็จ วิเคราะห์กำไร ด้วย Rizq AI — รองรับร้านค้า บูธ และส่วนตัว",
+    type: "website",
+  },
   metadataBase: new URL(getAppUrl()),
   alternates: {
     canonical: "/",
@@ -46,7 +62,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} h-full antialiased`}>
+    <html lang="th" className={`${geistSans.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         <RegisterSW />
         {children}

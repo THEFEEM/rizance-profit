@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
     }
 
     const token = await signSession(user.id);
-    const res = NextResponse.redirect(new URL("/", req.url));
+    const res = NextResponse.redirect(new URL("/home", req.url));
     res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
     if (isNewUser) {
       res.cookies.set(CONTEXT_COOKIE, "personal", contextCookieOptions());

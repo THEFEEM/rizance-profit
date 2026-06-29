@@ -100,7 +100,7 @@ export function ModeSwitcher({
     setSwitching(false);
     if (res.ok) {
       setPicker(null);
-      if (body.mode === "project" || mode === "project") router.push("/");
+      if (body.mode === "project" || mode === "project") router.push("/home");
       router.refresh();
     } else {
       setError(res.message);
@@ -132,7 +132,7 @@ export function ModeSwitcher({
       });
       setSwitching(false);
       if (res.ok) {
-        if (mode === "project") router.push("/");
+        if (mode === "project") router.push("/home");
         router.refresh();
       } else {
         setError(res.message);
@@ -153,7 +153,7 @@ export function ModeSwitcher({
     }
 
     if (mode === "project") {
-      router.push("/");
+      router.push("/home");
       return;
     }
 

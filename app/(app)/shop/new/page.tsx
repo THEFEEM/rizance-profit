@@ -12,7 +12,7 @@ export default async function NewShopPage() {
   return (
     <div>
       <div className="px-4 pt-3">
-        <Link href="/" className="text-sm text-rz-hint active:text-rz-muted">
+        <Link href="/home" className="text-sm text-rz-hint active:text-rz-muted">
           ← กลับ
         </Link>
       </div>

@@ -41,7 +41,7 @@ function googleErrorMessage(error: string | null): string | null {
 function LoginFormInner({ googleEnabled }: { googleEnabled: boolean }) {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get("next") || "/";
+  const next = params.get("next") || "/home";
   const oauthError = params.get("error");
 
   const [email, setEmail] = useState("");

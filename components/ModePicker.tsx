@@ -121,7 +121,7 @@ export function ModePicker({
     setSwitching(false);
     if (res.ok) {
       onClose();
-      if (body.mode === "project" || mode === "project") router.push("/");
+      if (body.mode === "project" || mode === "project") router.push("/home");
       router.refresh();
     } else {
       setError(res.message);
