@@ -8,8 +8,8 @@ import {
   normalizeBoothExpenseCategory,
   normalizeBoothIncomeCategory,
 } from "@/lib/booth-chat-queries";
-import { createBoothExpense, createBoothIncome } from "@/lib/booth-queries";
-import { today } from "@/lib/date";
+import { createBoothExpense, createBoothIncome, getBooth, resolveBoothEntryDate } from "@/lib/booth-queries";
+import { BOOTH_ENTRY_REASON_MESSAGES } from "@/lib/booth-errors";
 import type { ChatCardData } from "@/lib/chat-types";
 
 const UNCLEAR_SLIP_MESSAGE =
@@ -54,6 +54,15 @@ export async function handleBoothChatImage(
     imageThumb,
   });
 
+  const booth = await getBooth(userId, boothId);
+  if (!booth) {
+    const aiMsg = await insertBoothChatMessage(userId, boothId, {
+      role: "assistant",
+      content: BOOTH_ENTRY_REASON_MESSAGES.booth_not_found,
+    });
+    return NextResponse.json({ data: { messages: [userMsg, aiMsg] } });
+  }
+
   const result = await scanSlip(
     imageBase64,
     resolvedMediaType,
@@ -70,7 +79,7 @@ export async function handleBoothChatImage(
     return NextResponse.json({ data: { messages: [userMsg, aiMsg] } });
   }
 
-  const entryDate = result.entryDate ?? today();
+  const entryDate = resolveBoothEntryDate(booth, result.entryDate ?? undefined);
   const paymentMethod = result.paymentMethod ?? "cash";
 
   if (scanKind === "income") {
@@ -86,7 +95,7 @@ export async function handleBoothChatImage(
     if (!created.ok) {
       const aiMsg = await insertBoothChatMessage(userId, boothId, {
         role: "assistant",
-        content: "บันทึกไม่ได้ — ตรวจสอบว่างานบูธยังเปิดอยู่และวันที่ถูกต้อง",
+        content: BOOTH_ENTRY_REASON_MESSAGES[created.reason] ?? "บันทึกไม่ได้ — ลองใหม่อีกครั้ง",
       });
       return NextResponse.json({ data: { messages: [userMsg, aiMsg] } });
     }
@@ -122,7 +131,7 @@ export async function handleBoothChatImage(
   if (!created.ok) {
     const aiMsg = await insertBoothChatMessage(userId, boothId, {
       role: "assistant",
-      content: "บันทึกไม่ได้ — ตรวจสอบว่างานบูธยังเปิดอยู่และวันที่ถูกต้อง",
+      content: BOOTH_ENTRY_REASON_MESSAGES[created.reason] ?? "บันทึกไม่ได้ — ลองใหม่อีกครั้ง",
     });
     return NextResponse.json({ data: { messages: [userMsg, aiMsg] } });
   }

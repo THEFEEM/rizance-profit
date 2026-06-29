@@ -13,8 +13,10 @@ import {
   normalizeBoothIncomeCategory,
   type BoothChatMessageRow,
 } from "@/lib/booth-chat-queries";
-import { createBoothExpense, createBoothIncome, getBooth } from "@/lib/booth-queries";
+import { createBoothExpense, createBoothIncome, getBooth, resolveBoothEntryDate } from "@/lib/booth-queries";
 import type { ChatCardData } from "@/lib/chat-types";
+import { BOOTH_ENTRY_REASON_MESSAGES } from "@/lib/booth-errors";
+import type { Booth } from "@/types/booth";
 import { today } from "@/lib/date";
 import { checkAndIncrement } from "@/lib/plan-check";
 import {
@@ -39,9 +41,10 @@ async function replyAssistant(
 
 async function recordEntry(
   userId: string,
-  boothId: string,
+  booth: Booth,
   parsed: ParsedBoothEntry,
 ): Promise<NextResponse> {
+  const boothId = booth.id;
   if (!parsed.kind || parsed.amount == null || parsed.amount <= 0) {
     return replyAssistant(
       userId,
@@ -59,7 +62,7 @@ async function recordEntry(
   }
 
   const paymentMethod = parsed.paymentMethod ?? "cash";
-  const entryDate = parsed.entryDate ?? today();
+  const entryDate = resolveBoothEntryDate(booth, parsed.entryDate);
 
   if (parsed.kind === "income") {
     const category = normalizeBoothIncomeCategory(parsed.category);
@@ -72,7 +75,10 @@ async function recordEntry(
     });
 
     if (!created.ok) {
-      return replyAssistant(userId, boothId, "บันทึกไม่ได้ — ตรวจสอบว่างานบูธยังเปิดอยู่");
+      const message =
+        BOOTH_ENTRY_REASON_MESSAGES[created.reason] ??
+        "บันทึกไม่ได้ — ลองใหม่อีกครั้ง";
+      return replyAssistant(userId, boothId, message);
     }
 
     const cardData: ChatCardData = {
@@ -105,7 +111,10 @@ async function recordEntry(
   });
 
   if (!created.ok) {
-    return replyAssistant(userId, boothId, "บันทึกไม่ได้ — ตรวจสอบว่างานบูธยังเปิดอยู่");
+    const message =
+      BOOTH_ENTRY_REASON_MESSAGES[created.reason] ??
+      "บันทึกไม่ได้ — ลองใหม่อีกครั้ง";
+    return replyAssistant(userId, boothId, message);
   }
 
   const cardData: ChatCardData = {
@@ -207,7 +216,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
       return replyAssistant(user.id, boothId, action.reply);
 
     case "record":
-      return recordEntry(user.id, boothId, action.entry);
+      return recordEntry(user.id, booth, action.entry);
 
     case "query": {
       const answer = await formatBoothSummaryAnswer(
