@@ -67,6 +67,16 @@ const BUSINESS_FEATURES: PricingFeature[] = [
   { label: "ระบบเจ้าหนี้", included: true },
 ];
 
+const PERSONAL_PLUS_FEATURES: PricingFeature[] = [
+  { label: "บันทึกรายรับ-รายจ่าย ไม่จำกัด", included: true },
+  { label: "สแกนสลิป/ใบเสร็จ 100 ครั้ง/เดือน", included: true },
+  { label: "Rizq AI 100 ข้อความ/เดือน", included: true },
+  { label: "Receipt Split", included: true },
+  { label: "Dashboard เต็มรูปแบบ", included: true },
+  { label: "ดูข้อมูลย้อนหลัง ไม่จำกัด", included: true },
+  { label: "Export", included: false },
+];
+
 function freePlanName(mode: AppContextMode): string {
   if (mode === "personal") return "ส่วนตัว (ฟรี)";
   if (mode === "booth") return "บูธ (ฟรี)";
@@ -93,10 +103,13 @@ export function SubscriptionPricingContent({ mode }: { mode: AppContextMode }) {
   const activeExpiresAt = status?.isExpired ? null : status?.expiresAt ?? null;
 
   const paidPlan: PaidStripePlan | null = useMemo(() => {
+    if (mode === "personal") return "personal_plus";
     if (mode === "booth") return "event_pass";
     if (mode === "regular") return "business";
     return null;
   }, [mode]);
+
+  const showPaidCard = paidPlan != null;
 
   async function handleSubscribe(plan: PaidStripePlan) {
     setLoadingPlan(plan);
@@ -136,7 +149,7 @@ export function SubscriptionPricingContent({ mode }: { mode: AppContextMode }) {
       )}
 
       <div
-        className={`grid gap-4 ${paidPlan ? "md:grid-cols-2" : "grid-cols-1"}`}
+        className={`grid gap-4 ${showPaidCard ? "md:grid-cols-2" : "grid-cols-1"}`}
       >
         <PricingCard
           name={freePlanName(mode)}
@@ -145,6 +158,23 @@ export function SubscriptionPricingContent({ mode }: { mode: AppContextMode }) {
           features={FREE_FEATURES[mode]}
           isActive={activePlan === "free"}
         />
+
+        {paidPlan === "personal_plus" && (
+          <PricingCard
+            name="Personal Plus"
+            price="฿49"
+            period="เดือน"
+            features={PERSONAL_PLUS_FEATURES}
+            isActive={activePlan === "personal_plus"}
+            expiresAt={activePlan === "personal_plus" ? activeExpiresAt : null}
+            recommended
+            loading={loadingPlan === "personal_plus"}
+            subscribeLabel={
+              activePlan === "personal_plus" && status?.isExpired ? "ต่ออายุ ฿49" : undefined
+            }
+            onSubscribe={() => handleSubscribe("personal_plus")}
+          />
+        )}
 
         {paidPlan === "event_pass" && (
           <PricingCard
