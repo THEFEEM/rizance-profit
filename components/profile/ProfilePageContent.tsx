@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { LogOut, Pencil } from "lucide-react";
 import { ProfileModeSection } from "@/components/profile/ProfileModeSection";
+import { ClearDataModal } from "@/components/settings/ClearDataModal";
 import { ShopMemberEditor } from "@/components/shop/ShopMemberEditor";
 import { UserAvatar } from "@/components/UserAvatar";
 import { apiFetch } from "@/lib/api-client";
@@ -44,6 +45,7 @@ export function ProfilePageContent({
   const [saving, setSaving] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
   const [logoutBusy, setLogoutBusy] = useState(false);
+  const [showClearModal, setShowClearModal] = useState(false);
 
   async function saveName() {
     const trimmed = draft.trim();
@@ -175,6 +177,15 @@ export function ProfilePageContent({
               <dt className="text-rz-muted">อีเมล</dt>
               <dd className="truncate text-rz-text">{user.email}</dd>
             </div>
+            <div className="px-4 py-3">
+              <button
+                type="button"
+                onClick={() => setShowClearModal(true)}
+                className="tap-target text-sm font-medium text-[#F87171]"
+              >
+                ล้างข้อมูลทั้งหมด
+              </button>
+            </div>
             {providerBadge && (
               <div className="flex items-center justify-between gap-3 px-4 py-3">
                 <dt className="text-rz-muted">การเข้าสู่ระบบ</dt>
@@ -263,6 +274,16 @@ export function ProfilePageContent({
           {logoutBusy ? "กำลังออก…" : "ออกจากระบบ"}
         </button>
       </div>
+
+      <ClearDataModal
+        open={showClearModal}
+        mode={mode}
+        onClose={() => setShowClearModal(false)}
+        onSuccess={() => {
+          setShowClearModal(false);
+          router.refresh();
+        }}
+      />
     </div>
   );
 }
