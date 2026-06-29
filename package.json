@@ -36,7 +36,8 @@
     "test:fix-pack-i-logic": "node scripts/test-fix-pack-i-logic.mjs",
     "test:subscription": "node scripts/test-subscription.mjs",
     "test:payment": "node scripts/test-payment.mjs",
-    "test:payment-webhook": "node scripts/test-payment-webhook.mjs"
+    "test:payment-webhook": "node scripts/test-payment-webhook.mjs",
+    "test:stripe-flow": "node scripts/test-stripe-flow.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

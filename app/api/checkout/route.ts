@@ -93,42 +93,47 @@ export async function POST(req: NextRequest) {
   }
 
   const config = PLAN_CONFIG[plan];
-  const session = await stripe.checkout.sessions.create({
-    customer: customerId,
-    mode: config.mode,
-    line_items: [
-      {
-        price_data: {
-          currency: "thb",
-          product_data: { name: config.name },
-          unit_amount: config.unitAmount,
-          ...(config.recurring ? { recurring: config.recurring } : {}),
+  try {
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      mode: config.mode,
+      line_items: [
+        {
+          price_data: {
+            currency: "thb",
+            product_data: { name: config.name },
+            unit_amount: config.unitAmount,
+            ...(config.recurring ? { recurring: config.recurring } : {}),
+          },
+          quantity: 1,
         },
-        quantity: 1,
+      ],
+      success_url: `${appUrl()}/pricing?success=true`,
+      cancel_url: `${appUrl()}/pricing?canceled=true`,
+      metadata: {
+        userId: user.id,
+        plan,
       },
-    ],
-    payment_method_types: ["card", "promptpay"],
-    success_url: `${appUrl()}/pricing?success=true`,
-    cancel_url: `${appUrl()}/pricing?canceled=true`,
-    metadata: {
-      userId: user.id,
-      plan,
-    },
-  });
+    });
 
-  if (!session.url) {
-    return NextResponse.json(
-      { error: { message: "Stripe did not return a checkout URL" } },
-      { status: 502 },
+    if (!session.url) {
+      return NextResponse.json(
+        { error: { message: "Stripe did not return a checkout URL" } },
+        { status: 502 },
+      );
+    }
+
+    const expiresAt = planExpiresAt(plan);
+    await query(
+      `INSERT INTO stripe_payments (user_id, stripe_session_id, plan, amount, expires_at)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [user.id, session.id, plan, planAmountSatang(plan), expiresAt.toISOString()],
     );
+
+    return NextResponse.json({ data: { url: session.url } });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Stripe checkout session failed";
+    return NextResponse.json({ error: { message } }, { status: 502 });
   }
-
-  const expiresAt = planExpiresAt(plan);
-  await query(
-    `INSERT INTO stripe_payments (user_id, stripe_session_id, plan, amount, expires_at)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [user.id, session.id, plan, planAmountSatang(plan), expiresAt.toISOString()],
-  );
-
-  return NextResponse.json({ data: { url: session.url } });
 }
