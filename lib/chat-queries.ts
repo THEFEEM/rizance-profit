@@ -116,7 +116,9 @@ function parseCardData(raw: unknown): ChatCardData | null {
   if (typeof record.amount !== "string") return null;
   if (typeof record.category !== "string") return null;
   if (typeof record.categoryLabel !== "string") return null;
-  if (!isPaymentMethod(record.paymentMethod)) return null;
+  const paymentMethod = isPaymentMethod(record.paymentMethod)
+    ? record.paymentMethod
+    : undefined;
   if (typeof record.entryDate !== "string") return null;
   if (!isConfidence(record.confidence)) return null;
 
@@ -125,7 +127,7 @@ function parseCardData(raw: unknown): ChatCardData | null {
     amount: record.amount,
     category: record.category,
     categoryLabel: record.categoryLabel,
-    paymentMethod: record.paymentMethod,
+    paymentMethod,
     note: typeof record.note === "string" ? record.note : null,
     entryDate: record.entryDate,
     confidence: record.confidence,

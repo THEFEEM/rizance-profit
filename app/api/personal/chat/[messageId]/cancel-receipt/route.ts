@@ -1,22 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isReceiptSplitCard } from "@/lib/chat-types";
 import {
-  getChatMessage,
-  isReceiptSplitCard,
-  updateChatMessageCardData,
-} from "@/lib/chat-queries";
+  getPersonalChatMessage,
+  updatePersonalChatMessageCardData,
+} from "@/lib/personal-chat-queries";
 import { getCurrentUser } from "@/lib/session";
 
 export async function POST(
   _req: NextRequest,
-  ctx: { params: Promise<{ messageId: string }> },
+  { params }: { params: Promise<{ messageId: string }> },
 ) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
   }
 
-  const { messageId } = await ctx.params;
-  const msg = await getChatMessage(user.id, messageId);
+  const { messageId } = await params;
+  const msg = await getPersonalChatMessage(user.id, messageId);
 
   if (!msg || !isReceiptSplitCard(msg.cardData)) {
     return NextResponse.json({ error: { message: "Not found" } }, { status: 404 });
@@ -27,7 +27,7 @@ export async function POST(
     return NextResponse.json({ error: { message: "Invalid state" } }, { status: 400 });
   }
 
-  await updateChatMessageCardData(user.id, messageId, {
+  await updatePersonalChatMessageCardData(user.id, messageId, {
     ...card,
     status: "cancelled" as const,
   });

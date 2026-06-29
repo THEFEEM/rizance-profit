@@ -11,6 +11,7 @@ const FAB_ICON_SIZE = 24;
 const ICON_STROKE = 2;
 
 const CHAT_HREF = "/chat";
+const PERSONAL_CHAT_HREF = "/personal/chat";
 
 const BASE_NAV_ITEMS = [
   { key: "today", label: "หน้าหลัก", Icon: Home, kind: "link" as const },
@@ -27,6 +28,15 @@ function fourthNavItem(mode: "regular" | "booth" | "project" | "personal") {
       Icon: Sparkles,
       kind: "link" as const,
       href: CHAT_HREF,
+    };
+  }
+  if (mode === "personal") {
+    return {
+      key: "ai",
+      label: "Rizq",
+      Icon: Sparkles,
+      kind: "link" as const,
+      href: PERSONAL_CHAT_HREF,
     };
   }
   return {
@@ -49,11 +59,18 @@ function isNavActive(
     return pathname === statsHref || pathname.startsWith(`${statsHref}/`);
   }
   if (key === "entry") {
-    if (pathname === CHAT_HREF || pathname.startsWith(`${CHAT_HREF}/`)) return false;
+    if (
+      pathname === CHAT_HREF ||
+      pathname.startsWith(`${CHAT_HREF}/`) ||
+      pathname === PERSONAL_CHAT_HREF ||
+      pathname.startsWith(`${PERSONAL_CHAT_HREF}/`)
+    ) {
+      return false;
+    }
     return pathname === href || pathname.startsWith(`${href}/`);
   }
   if (key === "ai") {
-    return pathname === CHAT_HREF || pathname.startsWith(`${CHAT_HREF}/`);
+    return pathname === href || pathname.startsWith(`${href}/`);
   }
   if (key === "profile") {
     return pathname === href || pathname.startsWith(`${href}/`);
@@ -102,7 +119,7 @@ export function BottomNav({
     entry: entryHref,
     stats: statsHref,
     profile: profileHref,
-    ai: CHAT_HREF,
+    ai: mode === "personal" ? PERSONAL_CHAT_HREF : CHAT_HREF,
   };
 
   const navItems = [

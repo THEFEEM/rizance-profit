@@ -3,7 +3,7 @@ export type ChatCardData = {
   amount: string;
   category: string;
   categoryLabel: string;
-  paymentMethod: "cash" | "transfer";
+  paymentMethod?: "cash" | "transfer";
   note: string | null;
   entryDate: string;
   confidence: "low" | "medium" | "high";

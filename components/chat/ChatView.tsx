@@ -17,6 +17,7 @@ import {
   type ChatMessageRow,
   type ReceiptItemChanges,
 } from "@/lib/chat-types";
+import { personalExpenseLabel } from "@/lib/personal-categories";
 import { downscaleImage, generateThumbnail } from "@/lib/image-utils";
 
 type ChatPostResponse = {
@@ -74,10 +75,15 @@ function makeLoadingMessage(content: string): ChatMessageRow {
 export function ChatView({
   initialMessages,
   currency,
+  apiBase = "/api/chat",
+  variant = "shop",
 }: {
   initialMessages: ChatMessageRow[];
   currency: string;
+  apiBase?: string;
+  variant?: "shop" | "personal";
 }) {
+  const isPersonal = variant === "personal";
   const router = useRouter();
   const [messages, setMessages] = useState(initialMessages);
   const [sending, setSending] = useState(false);
@@ -104,7 +110,7 @@ export function ChatView({
     setSending(true);
     setError(null);
 
-    const res = await apiFetch<ChatPostResponse>("/api/chat", {
+    const res = await apiFetch<ChatPostResponse>(apiBase, {
       method: "POST",
       body: JSON.stringify({ text }),
     });
@@ -145,7 +151,8 @@ export function ChatView({
     const imageBase64 = await downscaleImage(file, mediaType);
     const thumbnail = await generateThumbnail(file, mediaType);
 
-    const res = await apiFetch<ChatPostResponse>("/api/chat/scan", {
+    const scanUrl = isPersonal ? apiBase : `${apiBase}/scan`;
+    const res = await apiFetch<ChatPostResponse>(scanUrl, {
       method: "POST",
       body: JSON.stringify({
         imageBase64,
@@ -171,7 +178,7 @@ export function ChatView({
 
   async function handleCategoryChange(messageId: string, category: string) {
     const res = await apiFetch<UpdateCategoryResponse>(
-      `/api/chat/${messageId}/update-category`,
+      `${apiBase}/${messageId}/update-category`,
       {
         method: "POST",
         body: JSON.stringify({ category }),
@@ -204,7 +211,7 @@ export function ChatView({
 
   async function handleConfirmReceipt(messageId: string) {
     const res = await apiFetch<ConfirmReceiptResponse>(
-      `/api/chat/${messageId}/confirm-receipt`,
+      `${apiBase}/${messageId}/confirm-receipt`,
       { method: "POST" },
     );
 
@@ -231,7 +238,7 @@ export function ChatView({
 
   async function handleCancelReceipt(messageId: string) {
     const res = await apiFetch<CancelReceiptResponse>(
-      `/api/chat/${messageId}/cancel-receipt`,
+      `${apiBase}/${messageId}/cancel-receipt`,
       { method: "POST" },
     );
 
@@ -261,7 +268,7 @@ export function ChatView({
     changes: ReceiptItemChanges,
   ) {
     const res = await apiFetch<{ ok: true; itemsSum: string }>(
-      `/api/chat/${messageId}/update-receipt-item`,
+      `${apiBase}/${messageId}/update-receipt-item`,
       {
         method: "PATCH",
         body: JSON.stringify({ itemId, ...changes }),
@@ -284,8 +291,9 @@ export function ChatView({
                 if (changes.amount !== undefined) updated.amount = changes.amount;
                 if (changes.category !== undefined) {
                   updated.category = changes.category;
-                  updated.categoryLabel =
-                    CATEGORY_LABELS[changes.category] ?? "อื่นๆ";
+                  updated.categoryLabel = isPersonal
+                    ? personalExpenseLabel(changes.category)
+                    : CATEGORY_LABELS[changes.category] ?? "อื่นๆ";
                 }
                 return updated;
               }),
@@ -301,7 +309,7 @@ export function ChatView({
 
   async function handleKindChange(messageId: string, kind: "income" | "expense") {
     const res = await apiFetch<UpdateKindResponse>(
-      `/api/chat/${messageId}/update-kind`,
+      `${apiBase}/${messageId}/update-kind`,
       {
         method: "PATCH",
         body: JSON.stringify({ kind }),
@@ -338,7 +346,7 @@ export function ChatView({
     paymentMethod: "cash" | "transfer",
   ) {
     const res = await apiFetch<UpdatePaymentResponse>(
-      `/api/chat/${messageId}/update-payment`,
+      `${apiBase}/${messageId}/update-payment`,
       {
         method: "PATCH",
         body: JSON.stringify({ paymentMethod }),
@@ -371,7 +379,7 @@ export function ChatView({
     meta: { paymentMethod: "cash" | "transfer" },
   ) {
     const res = await apiFetch<UpdatePaymentResponse>(
-      `/api/chat/${messageId}/update-receipt-meta`,
+      `${apiBase}/${messageId}/update-receipt-meta`,
       {
         method: "PATCH",
         body: JSON.stringify(meta),
@@ -403,12 +411,12 @@ export function ChatView({
     const isReceipt =
       target?.cardData != null && isReceiptSplitCard(target.cardData);
 
-    const res = await apiFetch<{ ok: true }>(`/api/chat/${messageId}/delete-entry`, {
+    const res = await apiFetch<{ ok: true }>(`${apiBase}/${messageId}/delete-entry`, {
       method: "POST",
     });
 
     if (res.ok) {
-      if (isReceipt) {
+      if (isPersonal || isReceipt) {
         setMessages((prev) => prev.filter((m) => m.id !== messageId));
       } else {
         setMessages((prev) =>
@@ -423,7 +431,7 @@ export function ChatView({
 
   return (
     <EntryFormLayout
-      dataContext="ai-chat"
+      dataContext={isPersonal ? "personal-ai-chat" : "ai-chat"}
       pad={
         <ChatInputBar
           onSend={handleSend}
@@ -455,6 +463,7 @@ export function ChatView({
             onPaymentMethodChange={handlePaymentMethodChange}
             onKindChange={handleKindChange}
             onReceiptMetaChange={handleReceiptMetaChange}
+            variant={variant}
           />
         ))}
         {error && (

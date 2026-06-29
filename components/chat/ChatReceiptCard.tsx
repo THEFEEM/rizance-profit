@@ -10,6 +10,9 @@ import {
   type ReceiptItemCategoryKey,
   type ReceiptLineItem,
 } from "@/lib/chat-types";
+import {
+  PERSONAL_EXPENSE_CATEGORIES,
+} from "@/lib/personal-categories";
 
 const STATUS_COLORS = {
   pending: "#FCD34D",
@@ -35,7 +38,35 @@ const CATEGORY_BADGE_COLORS: Record<string, string> = {
 const INPUT_CLASS =
   "w-full rounded-lg border border-[#243049] bg-[#0E1525] px-2 py-1.5 text-sm text-rz-text focus:border-[#4ADE9E] focus:outline-none";
 
-function categoryBadgeStyle(category: string): CSSProperties {
+const PERSONAL_CATEGORY_BADGE_COLORS: Record<string, string> = {
+  food: "#F9A8D4",
+  transport: "#93C5FD",
+  education: "#C4B5FD",
+  rent: "#FCA5A5",
+  water: "#67E8F9",
+  electricity: "#FCD34D",
+  internet: "#86EFAC",
+  phone: "#A5B4FC",
+  health: "#FDA4AF",
+  clothing: "#FDBA74",
+  donation: "#BEF264",
+  installment: "#F0ABFC",
+  social: "#7DD3FC",
+  other_expense: "#8A9AB5",
+};
+
+function personalCategoryBadgeStyle(category: string): CSSProperties {
+  const color = PERSONAL_CATEGORY_BADGE_COLORS[category] ?? PERSONAL_CATEGORY_BADGE_COLORS.other_expense;
+  return {
+    color,
+    backgroundColor: `${color}26`,
+  };
+}
+
+function categoryBadgeStyle(category: string, personal: boolean): CSSProperties {
+  if (personal) {
+    return personalCategoryBadgeStyle(category);
+  }
   const color = CATEGORY_BADGE_COLORS[category] ?? CATEGORY_BADGE_COLORS.other;
   return {
     color,
@@ -47,11 +78,36 @@ function CategoryDropdown({
   currentCategory,
   disabled,
   onSelect,
+  personal = false,
 }: {
   currentCategory: string;
   disabled: boolean;
-  onSelect: (category: ReceiptItemCategoryKey) => void;
+  onSelect: (category: string) => void;
+  personal?: boolean;
 }) {
+  if (personal) {
+    return (
+      <div className="mt-1.5 rounded-lg border border-[#243049] bg-[#0E1525] p-2">
+        <div className="grid grid-cols-2 gap-1.5">
+          {PERSONAL_EXPENSE_CATEGORIES.map(({ key, label }) => (
+            <button
+              key={key}
+              type="button"
+              disabled={disabled}
+              onClick={() => onSelect(key)}
+              className={`rounded-md px-2 py-1 text-[10px] disabled:opacity-60 ${
+                key === currentCategory ? "ring-1 ring-rz-rose" : ""
+              }`}
+              style={personalCategoryBadgeStyle(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mt-1.5 rounded-lg border border-[#243049] bg-[#0E1525] p-2">
       <div className="grid grid-cols-2 gap-1.5">
@@ -64,7 +120,7 @@ function CategoryDropdown({
             className={`rounded-md px-2 py-1 text-[10px] disabled:opacity-60 ${
               key === currentCategory ? "ring-1 ring-[#4ADE9E]" : ""
             }`}
-            style={categoryBadgeStyle(key)}
+            style={categoryBadgeStyle(key, false)}
           >
             {CATEGORY_LABELS[key]}
           </button>
@@ -85,6 +141,7 @@ function ReadItemRow({
   onCategoryBadgeClick,
   onSelectCategory,
   savingCategory,
+  personal = false,
 }: {
   index: number;
   item: ReceiptLineItem;
@@ -94,8 +151,9 @@ function ReadItemRow({
   dropdownRef: RefObject<HTMLDivElement | null>;
   onEdit: () => void;
   onCategoryBadgeClick: () => void;
-  onSelectCategory: (category: ReceiptItemCategoryKey) => void;
+  onSelectCategory: (category: string) => void;
   savingCategory: boolean;
+  personal?: boolean;
 }) {
   return (
     <li className="flex items-start gap-2">
@@ -122,14 +180,14 @@ function ReadItemRow({
                   onClick={onCategoryBadgeClick}
                   disabled={disabled}
                   className="inline-block rounded-full px-2 py-0.5 text-[10px] disabled:opacity-60"
-                  style={categoryBadgeStyle(item.category)}
+                  style={categoryBadgeStyle(item.category, personal)}
                 >
                   {item.categoryLabel}
                 </button>
               ) : (
                 <span
                   className="inline-block rounded-full px-2 py-0.5 text-[10px]"
-                  style={categoryBadgeStyle(item.category)}
+                  style={categoryBadgeStyle(item.category, personal)}
                 >
                   {item.categoryLabel}
                 </span>
@@ -139,6 +197,7 @@ function ReadItemRow({
                   currentCategory={item.category}
                   disabled={savingCategory}
                   onSelect={onSelectCategory}
+                  personal={personal}
                 />
               )}
             </div>
@@ -236,6 +295,7 @@ export function ChatReceiptCard({
   onCancel,
   onUpdateItem,
   onReceiptMetaChange,
+  personal = false,
 }: {
   messageId: string;
   card: ChatReceiptCardData;
@@ -246,11 +306,13 @@ export function ChatReceiptCard({
     itemId: string,
     changes: ReceiptItemChanges,
   ) => Promise<void>;
-  onReceiptMetaChange: (
+  onReceiptMetaChange?: (
     messageId: string,
     meta: { paymentMethod: "cash" | "transfer" },
   ) => Promise<void>;
+  personal?: boolean;
 }) {
+  const showPayment = !personal && onReceiptMetaChange != null;
   const [loading, setLoading] = useState(false);
   const [savingPayment, setSavingPayment] = useState(false);
   const [savingItem, setSavingItem] = useState(false);
@@ -311,7 +373,7 @@ export function ChatReceiptCard({
     setError(null);
   }
 
-  async function selectCategory(itemId: string, category: ReceiptItemCategoryKey) {
+  async function selectCategory(itemId: string, category: string) {
     const item = card.items.find((i) => i.id === itemId);
     if (!item || item.category === category) {
       setEditingCategoryItemId(null);
@@ -392,7 +454,7 @@ export function ChatReceiptCard({
   }
 
   async function handlePaymentChange(next: "cash" | "transfer") {
-    if (next === card.paymentMethod) return;
+    if (!onReceiptMetaChange || next === card.paymentMethod) return;
 
     setSavingPayment(true);
     setError(null);
@@ -423,7 +485,7 @@ export function ChatReceiptCard({
           </span>
         </div>
         <p className="mt-1 text-xs text-rz-hint">{card.entryDate}</p>
-        {isPending ? (
+        {showPayment && isPending ? (
           <div className="mt-2 flex items-center gap-2">
             <div className="flex rounded-lg border-[0.5px] border-[#243049] p-0.5">
               {(["cash", "transfer"] as const).map((method) => (
@@ -446,11 +508,11 @@ export function ChatReceiptCard({
               <span className="text-xs text-rz-hint">กำลังบันทึก…</span>
             )}
           </div>
-        ) : (
+        ) : showPayment ? (
           <p className="mt-1 text-xs text-rz-hint">
             {card.paymentMethod === "cash" ? "เงินสด" : "เงินโอน"}
           </p>
-        )}
+        ) : null}
         <div className="mt-2 flex items-baseline justify-between gap-3">
           <span className="text-xs text-rz-muted">{card.items.length} รายการ</span>
           <span className="rz-tabular text-lg font-medium text-rz-text">
@@ -500,6 +562,7 @@ export function ChatReceiptCard({
                 onCategoryBadgeClick={() => openCategoryPicker(item.id)}
                 onSelectCategory={(category) => void selectCategory(item.id, category)}
                 savingCategory={savingItem}
+                personal={personal}
               />
             ),
           )}

@@ -11,6 +11,12 @@ import {
   type ExpenseCategoryKey,
   type IncomeCategoryKey,
 } from "@/types";
+import {
+  PERSONAL_EXPENSE_GRID_OPTIONS,
+  PERSONAL_INCOME_GRID_OPTIONS,
+  type PersonalExpenseKey,
+  type PersonalIncomeKey,
+} from "@/lib/personal-categories";
 
 export function ChatEntryCard({
   card,
@@ -21,6 +27,7 @@ export function ChatEntryCard({
   onCategoryChange,
   onPaymentMethodChange,
   onKindChange,
+  variant = "shop",
 }: {
   card: ChatCardData;
   currency: string;
@@ -28,18 +35,22 @@ export function ChatEntryCard({
   entryId: string | null;
   onDelete: (messageId: string) => void;
   onCategoryChange: (messageId: string, category: string) => Promise<void>;
-  onPaymentMethodChange: (
+  onPaymentMethodChange?: (
     messageId: string,
     paymentMethod: "cash" | "transfer",
   ) => Promise<void>;
-  onKindChange: (messageId: string, kind: "income" | "expense") => Promise<void>;
+  onKindChange?: (messageId: string, kind: "income" | "expense") => Promise<void>;
+  variant?: "shop" | "personal";
 }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savingPayment, setSavingPayment] = useState(false);
   const [savingKind, setSavingKind] = useState(false);
+  const isPersonal = variant === "personal";
   const isIncome = card.kind === "income";
   const kindBusy = savingKind || savingPayment;
+  const showKindToggle = !isPersonal && onKindChange != null;
+  const showPaymentToggle = !isPersonal && onPaymentMethodChange != null;
 
   async function handleCategoryChange(next: string) {
     if (next === card.category) {
@@ -59,7 +70,7 @@ export function ChatEntryCard({
   }
 
   async function handlePaymentMethodChange(next: "cash" | "transfer") {
-    if (next === card.paymentMethod) return;
+    if (!onPaymentMethodChange || next === card.paymentMethod) return;
 
     setSavingPayment(true);
     try {
@@ -72,7 +83,7 @@ export function ChatEntryCard({
   }
 
   async function handleKindChange(next: "income" | "expense") {
-    if (next === card.kind) return;
+    if (!onKindChange || next === card.kind) return;
 
     setSavingKind(true);
     try {
@@ -92,30 +103,40 @@ export function ChatEntryCard({
       </div>
 
       <div className="px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div className="flex rounded-lg border-[0.5px] border-[#243049] p-0.5">
-            {(["income", "expense"] as const).map((kind) => (
-              <button
-                key={kind}
-                type="button"
-                disabled={!entryId || kindBusy}
-                onClick={() => void handleKindChange(kind)}
-                className={`rounded-md px-2.5 py-1 text-xs ${
-                  card.kind === kind
-                    ? kind === "income"
-                      ? "bg-[#4ADE9E22] text-[#4ADE9E]"
-                      : "bg-[#F8717122] text-[#F87171]"
-                    : "bg-transparent text-[#5A7499]"
-                } ${kindBusy ? "opacity-60" : ""}`}
-              >
-                {kind === "income" ? "รายรับ" : "รายจ่าย"}
-              </button>
-            ))}
+        {showKindToggle ? (
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-lg border-[0.5px] border-[#243049] p-0.5">
+              {(["income", "expense"] as const).map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  disabled={!entryId || kindBusy}
+                  onClick={() => void handleKindChange(kind)}
+                  className={`rounded-md px-2.5 py-1 text-xs ${
+                    card.kind === kind
+                      ? kind === "income"
+                        ? "bg-[#4ADE9E22] text-[#4ADE9E]"
+                        : "bg-[#F8717122] text-[#F87171]"
+                      : "bg-transparent text-[#5A7499]"
+                  } ${kindBusy ? "opacity-60" : ""}`}
+                >
+                  {kind === "income" ? "รายรับ" : "รายจ่าย"}
+                </button>
+              ))}
+            </div>
+            {savingKind && <span className="text-xs text-rz-hint">กำลังบันทึก…</span>}
           </div>
-          {savingKind && <span className="text-xs text-rz-hint">กำลังบันทึก…</span>}
-        </div>
+        ) : (
+          <span
+            className={`inline-block rounded-full px-2 py-0.5 text-[10px] ${
+              isIncome ? "bg-rz-green/15 text-rz-green" : "bg-rz-red/15 text-rz-red"
+            }`}
+          >
+            {isIncome ? "รายรับ" : "รายจ่าย"}
+          </span>
+        )}
 
-        <div className="mt-2 flex items-center gap-2">
+        <div className={`flex items-center gap-2 ${showKindToggle ? "mt-2" : ""}`}>
           <span className="text-xs text-rz-muted">{card.categoryLabel}</span>
         </div>
 
@@ -144,12 +165,22 @@ export function ChatEntryCard({
         <div className="border-t-[0.5px] border-rz-border px-4 py-3">
           <CategoryGrid
             options={
-              isIncome ? INCOME_CATEGORY_GRID_OPTIONS : EXPENSE_CATEGORY_GRID_OPTIONS
+              isPersonal
+                ? isIncome
+                  ? PERSONAL_INCOME_GRID_OPTIONS
+                  : PERSONAL_EXPENSE_GRID_OPTIONS
+                : isIncome
+                  ? INCOME_CATEGORY_GRID_OPTIONS
+                  : EXPENSE_CATEGORY_GRID_OPTIONS
             }
-            value={card.category as IncomeCategoryKey | ExpenseCategoryKey}
+            value={
+              isPersonal
+                ? (card.category as PersonalIncomeKey | PersonalExpenseKey)
+                : (card.category as IncomeCategoryKey | ExpenseCategoryKey)
+            }
             onChange={(next) => void handleCategoryChange(next)}
             columns={isIncome ? 3 : 2}
-            accent="green"
+            accent={isPersonal ? "rose" : "green"}
           />
           {saving && (
             <p className="mt-2 text-center text-xs text-rz-hint">กำลังบันทึก…</p>
@@ -157,7 +188,7 @@ export function ChatEntryCard({
         </div>
       )}
 
-      {entryId && (
+      {entryId && showPaymentToggle && (
         <div className="border-t-[0.5px] border-rz-border px-4 py-3">
           <div className="flex items-center gap-2">
             <div className="flex rounded-lg border-[0.5px] border-[#243049] p-0.5">
