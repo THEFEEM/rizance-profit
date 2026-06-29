@@ -17,6 +17,11 @@ import {
   type PersonalChatMessageRow,
 } from "@/lib/personal-chat-queries";
 import type { ChatCardData } from "@/lib/chat-types";
+import { checkAndIncrement } from "@/lib/plan-check";
+import {
+  getActiveSubscriptionPlan,
+  quotaExceededResponse,
+} from "@/lib/subscription-user";
 import { getCurrentUser } from "@/lib/session";
 
 async function replyAssistant(
@@ -141,6 +146,12 @@ export async function POST(req: NextRequest) {
   };
 
   if (typeof imageBase64 === "string" && imageBase64.trim() !== "") {
+    const activePlan = await getActiveSubscriptionPlan(user.id);
+    const planCheck = await checkAndIncrement(user.id, activePlan, "scan_slip");
+    if (!planCheck.allowed) {
+      return quotaExceededResponse(planCheck);
+    }
+
     return handlePersonalChatImage(user.id, {
       imageBase64,
       mediaType,
@@ -158,6 +169,12 @@ export async function POST(req: NextRequest) {
   const trimmed = text.trim();
 
   await insertPersonalChatMessage(user.id, { role: "user", content: trimmed });
+
+  const activePlan = await getActiveSubscriptionPlan(user.id);
+  const planCheck = await checkAndIncrement(user.id, activePlan, "rizq_chat");
+  if (!planCheck.allowed) {
+    return quotaExceededResponse(planCheck);
+  }
 
   const action = await parsePersonalUserMessage(trimmed, today());
 

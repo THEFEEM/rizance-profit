@@ -10,6 +10,7 @@ import {
 import { ChatMessage } from "@/components/chat/ChatMessage";
 import { EntryFormLayout } from "@/components/entry/EntryFormLayout";
 import { EntryPageHeader } from "@/components/entry/EntryPageHeader";
+import { UpgradePrompt } from "@/components/chat/UpgradePrompt";
 import { apiFetch } from "@/lib/api-client";
 import {
   CATEGORY_LABELS,
@@ -88,11 +89,34 @@ export function ChatView({
   const [messages, setMessages] = useState(initialMessages);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [quotaPrompt, setQuotaPrompt] = useState<{
+    feature: string;
+    limit: number;
+    used: number;
+  } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, quotaPrompt]);
+
+  function handleQuotaExceeded(
+    res: { status: number; code?: string; limit?: number; used?: number },
+    feature: string,
+  ): boolean {
+    if (res.status === 429 && res.code === "quota_exceeded") {
+      setMessages((prev) => withoutTempMessages(prev));
+      setQuotaPrompt({
+        feature,
+        limit: res.limit ?? 0,
+        used: res.used ?? 0,
+      });
+      setError(null);
+      setSending(false);
+      return true;
+    }
+    return false;
+  }
 
   async function handleSend(text: string) {
     const tempUser: ChatMessageRow = {
@@ -109,6 +133,7 @@ export function ChatView({
     setMessages((prev) => [...prev, tempUser, makeLoadingMessage("กำลังวิเคราะห์...")]);
     setSending(true);
     setError(null);
+    setQuotaPrompt(null);
 
     const res = await apiFetch<ChatPostResponse>(apiBase, {
       method: "POST",
@@ -118,6 +143,8 @@ export function ChatView({
     if (res.ok && res.data?.messages) {
       setMessages((prev) => [...withoutTempMessages(prev), ...res.data.messages]);
       router.refresh();
+    } else if (!res.ok && handleQuotaExceeded(res, "Rizq AI")) {
+      // quota prompt shown
     } else {
       setMessages((prev) => withoutTempMessages(prev));
       setError(res.ok ? "ส่งข้อความไม่สำเร็จ" : res.message);
@@ -145,6 +172,7 @@ export function ChatView({
     ]);
     setSending(true);
     setError(null);
+    setQuotaPrompt(null);
   }
 
   async function handleScan({ file, mediaType, caption }: ChatScanPayload) {
@@ -167,6 +195,8 @@ export function ChatView({
     if (res.ok && res.data?.messages) {
       setMessages((prev) => [...withoutTempMessages(prev), ...res.data.messages]);
       router.refresh();
+    } else if (!res.ok && handleQuotaExceeded(res, "สแกนสลิป")) {
+      // quota prompt shown
     } else {
       setMessages((prev) => withoutTempMessages(prev));
       setError(res.ok ? "สแกนสลิปไม่สำเร็จ" : res.message);
@@ -466,6 +496,14 @@ export function ChatView({
             variant={variant}
           />
         ))}
+        {quotaPrompt && (
+          <UpgradePrompt
+            feature={quotaPrompt.feature}
+            limit={quotaPrompt.limit}
+            used={quotaPrompt.used}
+            onUpgrade={() => router.push("/pricing")}
+          />
+        )}
         {error && (
           <p className="text-center text-xs text-rz-red" role="alert">
             {error}

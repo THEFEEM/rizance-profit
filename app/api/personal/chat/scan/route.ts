@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { handlePersonalChatImage } from "@/lib/personal-chat-scan";
+import { checkAndIncrement } from "@/lib/plan-check";
+import {
+  getActiveSubscriptionPlan,
+  quotaExceededResponse,
+} from "@/lib/subscription-user";
 import { getCurrentUser } from "@/lib/session";
 
 export async function POST(req: NextRequest) {
@@ -26,6 +31,12 @@ export async function POST(req: NextRequest) {
 
   if (typeof imageBase64 !== "string" || imageBase64.trim() === "") {
     return NextResponse.json({ error: { message: "Invalid input" } }, { status: 400 });
+  }
+
+  const activePlan = await getActiveSubscriptionPlan(user.id);
+  const planCheck = await checkAndIncrement(user.id, activePlan, "scan_slip");
+  if (!planCheck.allowed) {
+    return quotaExceededResponse(planCheck);
   }
 
   return handlePersonalChatImage(user.id, {

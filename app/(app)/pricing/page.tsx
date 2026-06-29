@@ -1,13 +1,22 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { PricingHub } from "@/components/pricing/PricingHub";
-import { getPricingSummary } from "@/lib/pricing-queries";
+import { Suspense } from "react";
+import { SubscriptionPricingContent } from "@/components/pricing/SubscriptionPricingContent";
+import { CONTEXT_COOKIE, resolveTodayContext } from "@/lib/context";
 import { getCurrentUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
-export default async function PricingPage() {
+export default async function SubscriptionPricingPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  const summary = await getPricingSummary(user.id);
-  return <PricingHub summary={summary} />;
+
+  const rawContext = (await cookies()).get(CONTEXT_COOKIE)?.value;
+  const ctx = await resolveTodayContext(user.id, undefined, rawContext);
+
+  return (
+    <Suspense fallback={<div className="px-4 py-8 text-sm text-rz-muted">กำลังโหลด...</div>}>
+      <SubscriptionPricingContent mode={ctx.mode} />
+    </Suspense>
+  );
 }
