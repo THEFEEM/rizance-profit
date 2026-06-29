@@ -12,6 +12,11 @@ import {
 } from "@/lib/expense-categories";
 import { today } from "@/lib/date";
 import { createExpense, createIncome } from "@/lib/queries";
+import { checkAndIncrement } from "@/lib/plan-check";
+import {
+  getActiveSubscriptionPlan,
+  quotaExceededResponse,
+} from "@/lib/subscription-user";
 import { getCurrentUser } from "@/lib/session";
 import type { PaymentMethod } from "@/types";
 
@@ -50,6 +55,12 @@ export async function POST(req: NextRequest) {
 
   if (mediaType != null && !isSupportedMediaType(mediaType)) {
     return NextResponse.json({ error: { message: "Invalid input" } }, { status: 400 });
+  }
+
+  const activePlan = await getActiveSubscriptionPlan(user.id);
+  const planCheck = await checkAndIncrement(user.id, activePlan, "scan_slip");
+  if (!planCheck.allowed) {
+    return quotaExceededResponse(planCheck);
   }
 
   const scanKind = kind === "income" ? "income" : "expense";

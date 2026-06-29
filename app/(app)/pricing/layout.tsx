@@ -1,6 +1,3 @@
-import { redirect } from "next/navigation";
-
-/** Pricing UI hidden (Fix Pack I) — DB/API preserved for later. */
-export default function PricingLayout() {
-  redirect("/summary");
+export default function PricingLayout({ children }: { children: React.ReactNode }) {
+  return children;
 }

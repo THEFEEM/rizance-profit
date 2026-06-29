@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { LogOut, Pencil } from "lucide-react";
 import { ProfileModeSection } from "@/components/profile/ProfileModeSection";
+import { SubscriptionProfileSection } from "@/components/profile/SubscriptionProfileSection";
 import { ClearDataModal } from "@/components/settings/ClearDataModal";
 import { ShopMemberEditor } from "@/components/shop/ShopMemberEditor";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -200,6 +201,8 @@ export function ProfilePageContent({
             )}
           </dl>
         </section>
+
+        <SubscriptionProfileSection />
 
         <ProfileModeSection
           mode={mode}

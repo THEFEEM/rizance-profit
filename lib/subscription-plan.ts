@@ -30,3 +30,9 @@ export function planExpiresAt(plan: PaidStripePlan, from: Date = new Date()): Da
 export function planAmountSatang(plan: PaidStripePlan): number {
   return plan === "event_pass" ? 4900 : 9900;
 }
+
+export const PLAN_DISPLAY_NAMES: Record<SubscriptionPlan, string> = {
+  free: "ฟรี",
+  event_pass: "Event Pass",
+  business: "Business",
+};
