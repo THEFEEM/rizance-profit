@@ -142,3 +142,40 @@ export function isSavingsWithdrawalCategory(key: string): boolean {
 export function isSavingsDepositCategory(key: string): boolean {
   return key === PERSONAL_SAVINGS_DEPOSIT;
 }
+
+/** Personal expense keys usable on receipt line items (excludes savings_deposit). */
+export const PERSONAL_RECEIPT_EXPENSE_KEYS = PERSONAL_EXPENSE_KEYS.filter(
+  (key) => key !== PERSONAL_SAVINGS_DEPOSIT,
+);
+
+export type PersonalReceiptExpenseKey = (typeof PERSONAL_RECEIPT_EXPENSE_KEYS)[number];
+
+export const PERSONAL_EXPENSE_CATEGORY_LIST = PERSONAL_RECEIPT_EXPENSE_KEYS.map((key) => ({
+  key,
+  label: PERSONAL_EXPENSE_LABELS[key],
+}));
+
+/** Alias for receipt category dropdowns. */
+export const PERSONAL_EXPENSE_CATEGORIES = PERSONAL_EXPENSE_CATEGORY_LIST;
+
+/** Map AI receipt line category (shop keys) → personal_expense_entries.category */
+export function mapReceiptLineToPersonalExpenseCategory(
+  aiCategory: string | null,
+): PersonalExpenseKey {
+  const map: Record<string, PersonalExpenseKey> = {
+    materials: "food",
+    equipment: "other_expense",
+    beverages: "food",
+    packaging: "other_expense",
+    utilities: "electricity",
+    food: "food",
+    other: "other_expense",
+    rent: "rent",
+    transport: "transport",
+    salary: "other_expense",
+    marketing: "social",
+    wage: "other_expense",
+    expense_misc: "other_expense",
+  };
+  return map[aiCategory ?? ""] ?? "other_expense";
+}
