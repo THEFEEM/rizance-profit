@@ -56,6 +56,14 @@ export function getPlanLimits(plan: string): PlanLimits {
         receiptSplit: true,
         historyDays: -1,
       };
+    case "personal_plus":
+      return {
+        rizqChat: 100,
+        scanSlip: 100,
+        scanReceipt: 100,
+        receiptSplit: true,
+        historyDays: -1,
+      };
     default:
       return {
         rizqChat: 30,

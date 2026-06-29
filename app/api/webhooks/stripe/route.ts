@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { pool } from "@/lib/db";
-import { planExpiresAt, type PaidStripePlan } from "@/lib/subscription-plan";
+import { isPaidStripePlan, planExpiresAt, type PaidStripePlan } from "@/lib/subscription-plan";
 import { stripe } from "@/lib/stripe";
 
 function sessionSubscriptionId(
@@ -13,7 +13,7 @@ function sessionSubscriptionId(
 
 function sessionPlan(metadata: Stripe.Metadata | null): PaidStripePlan | null {
   const plan = metadata?.plan;
-  if (plan === "event_pass" || plan === "business") return plan;
+  if (plan && isPaidStripePlan(plan)) return plan;
   return null;
 }
 
@@ -82,7 +82,14 @@ export async function POST(req: NextRequest) {
         typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
       if (!customerId) break;
 
-      const newExpires = planExpiresAt("business");
+      const { rows } = await pool.query<{ subscription_plan: string }>(
+        `SELECT subscription_plan FROM users WHERE stripe_customer_id = $1`,
+        [customerId],
+      );
+      const storedPlan = rows[0]?.subscription_plan;
+      if (!storedPlan || !isPaidStripePlan(storedPlan) || storedPlan === "event_pass") break;
+
+      const newExpires = planExpiresAt(storedPlan);
       await pool.query(
         `UPDATE users SET subscription_expires_at = $1 WHERE stripe_customer_id = $2`,
         [newExpires.toISOString(), customerId],

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { query } from "@/lib/db";
 import {
   isPaidStripePlan,
+  PLAN_CONFIG,
   planAmountSatang,
   planExpiresAt,
   type PaidStripePlan,
@@ -20,28 +21,6 @@ type CheckoutUserRow = {
 const bodySchema = z.object({
   plan: z.string().min(1),
 });
-
-const PLAN_CONFIG: Record<
-  PaidStripePlan,
-  {
-    mode: "payment" | "subscription";
-    name: string;
-    unitAmount: number;
-    recurring?: { interval: "month" };
-  }
-> = {
-  event_pass: {
-    mode: "payment",
-    name: "Rizance Event Pass (7 วัน)",
-    unitAmount: 4900,
-  },
-  business: {
-    mode: "subscription",
-    name: "Rizance Business (รายเดือน)",
-    unitAmount: 9900,
-    recurring: { interval: "month" },
-  },
-};
 
 function appUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -92,7 +71,7 @@ export async function POST(req: NextRequest) {
     await query(`UPDATE users SET stripe_customer_id = $1 WHERE id = $2`, [customerId, user.id]);
   }
 
-  const config = PLAN_CONFIG[plan];
+  const config = PLAN_CONFIG[plan as PaidStripePlan];
   try {
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -101,9 +80,9 @@ export async function POST(req: NextRequest) {
         {
           price_data: {
             currency: "thb",
-            product_data: { name: config.name },
-            unit_amount: config.unitAmount,
-            ...(config.recurring ? { recurring: config.recurring } : {}),
+            product_data: { name: config.label },
+            unit_amount: config.amount,
+            ...(config.interval ? { recurring: { interval: config.interval } } : {}),
           },
           quantity: 1,
         },

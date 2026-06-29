@@ -87,7 +87,7 @@ export function SubscriptionProfileSection() {
           >
             เปลี่ยนแพ็กเกจ
           </Link>
-          {plan === "business" && !status?.isExpired && (
+          {(plan === "business" || plan === "personal_plus") && !status?.isExpired && (
             <button
               type="button"
               onClick={handleCancel}
