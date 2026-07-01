@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist } from "next/font/google";
+import { Geist, Noto_Serif_Thai, IBM_Plex_Sans_Thai, IBM_Plex_Mono } from "next/font/google";
 import RegisterSW from "@/components/pwa/RegisterSW";
 import { getAppUrl } from "@/lib/env";
 import "./globals.css";
@@ -7,6 +7,24 @@ import "./globals.css";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+});
+
+const notoSerifThai = Noto_Serif_Thai({
+  subsets: ["thai", "latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-serif-th",
+});
+
+const plexSansThai = IBM_Plex_Sans_Thai({
+  subsets: ["thai", "latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-sans-th",
+});
+
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-mono-th",
 });
 
 export const metadata: Metadata = {
@@ -62,7 +80,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="th" className={`${geistSans.variable} h-full antialiased`}>
+    <html
+      lang="th"
+      className={`${geistSans.variable} ${notoSerifThai.variable} ${plexSansThai.variable} ${plexMono.variable} h-full antialiased`}
+    >
       <body className="min-h-full flex flex-col">
         <RegisterSW />
         {children}
