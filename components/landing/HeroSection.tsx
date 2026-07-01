@@ -87,40 +87,10 @@ export function HeroSection() {
             </a>
           </div>
           <div
-            className={`mb-8 flex items-center justify-center gap-2 text-[13px] text-[var(--rz-muted)] lg:justify-start ${heroIn}`}
+            className={`flex items-center justify-center gap-2 text-[13px] text-[var(--rz-muted)] lg:justify-start ${heroIn}`}
             style={{ animationDelay: "320ms" }}
           >
             ไม่ต้องผูกบัตร <span className="h-1 w-1 rounded-full bg-[var(--rz-muted)]" /> เริ่มใช้ได้ใน 30 วินาที
-          </div>
-          <div
-            className={`flex items-center justify-center gap-3.5 lg:justify-start ${heroIn}`}
-            style={{ animationDelay: "380ms" }}
-          >
-            <div className="flex" aria-hidden="true">
-              {[
-                { c: "#4ADE9E", t: "ร" },
-                { c: "#EF9F27", t: "บ" },
-                { c: "#6BB6FF", t: "น" },
-              ].map((a, i) => (
-                <span
-                  key={a.t}
-                  className="flex h-[30px] w-[30px] items-center justify-center rounded-full border-2 border-[var(--rz-bg)] text-[10.5px] font-semibold text-[var(--rz-bg)]"
-                  style={{ background: a.c, marginLeft: i === 0 ? 0 : -8 }}
-                >
-                  {a.t}
-                </span>
-              ))}
-            </div>
-            <div>
-              <div className="flex gap-0.5 text-[12px] text-[var(--rz-amber)]" aria-hidden="true">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <span key={n}>★</span>
-                ))}
-              </div>
-              <div className="text-[13px] text-[var(--rz-muted)]">
-                <b className="font-semibold text-[var(--rz-text)]">ผู้ประกอบการหลายร้าน</b> เริ่มใช้ Rizq แล้ว
-              </div>
-            </div>
           </div>
         </div>
 
