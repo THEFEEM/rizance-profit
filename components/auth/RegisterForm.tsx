@@ -21,7 +21,13 @@ import type { RegisterMode } from "@/lib/register-mode";
 import { registerNameField, registerSubmitButtonClass } from "@/lib/register-mode";
 import type { User } from "@/types";
 
-export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
+export function RegisterForm({
+  googleEnabled,
+  checkoutPlan,
+}: {
+  googleEnabled: boolean;
+  checkoutPlan?: string;
+}) {
   const router = useRouter();
 
   const [mode, setMode] = useState<RegisterMode>("personal");
@@ -48,6 +54,21 @@ export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
       body: JSON.stringify({ shopName, email, password, mode }),
     });
     if (res.ok) {
+      // Came from a paid plan card on the landing page → go straight to checkout.
+      if (checkoutPlan) {
+        const checkout = await apiFetch<{ url: string }>("/api/checkout", {
+          method: "POST",
+          body: JSON.stringify({ plan: checkoutPlan }),
+        });
+        if (checkout.ok && checkout.data?.url) {
+          window.location.href = checkout.data.url;
+          return;
+        }
+        // Checkout couldn't start — account exists, let them retry from pricing.
+        router.replace("/pricing");
+        router.refresh();
+        return;
+      }
       router.replace(res.data.redirect || "/home");
       router.refresh();
     } else {
