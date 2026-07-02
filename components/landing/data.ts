@@ -83,40 +83,40 @@ export const CHART_DATA: ChartPoint[] = [
 
 export const PLANS: Plan[] = [
   {
+    key: "free",
     name: "ฟรี",
     price: "฿0",
     period: "ตลอดไป",
     tag: null,
     highlight: false,
     items: ["บันทึกไม่จำกัด", "Rizq AI จำกัดต่อเดือน", "ดูย้อนหลัง 7 วัน"],
-    href: "/register",
   },
   {
+    key: "personal_plus",
     name: "Personal Plus",
     price: "฿49",
     period: "/เดือน",
     tag: null,
     highlight: false,
     items: ["Rizq AI ใช้เต็มที่", "แยกใบเสร็จอัตโนมัติ", "ดูย้อนหลังไม่จำกัด"],
-    href: "/pricing",
   },
   {
+    key: "event_pass",
     name: "Event Pass",
     price: "฿49",
     period: "/7 วัน",
     tag: null,
     highlight: false,
     items: ["ใช้ได้เต็มที่ตลอดงาน", "แยกบัญชีต่องาน", "เหมาะกับบูธระยะสั้น"],
-    href: "/pricing",
   },
   {
+    key: "business",
     name: "Business",
     price: "฿99",
     period: "/เดือน",
     tag: "แนะนำ",
     highlight: true,
     items: ["ไม่จำกัดร้าน", "รายงานเชิงลึก", "รองรับทีมงาน"],
-    href: "/pricing",
   },
 ];
 

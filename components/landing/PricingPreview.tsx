@@ -1,10 +1,15 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
+import { getCurrentUser } from "@/lib/session";
 import { PLANS } from "./data";
+import { PlanButton } from "./PlanButton";
 import { Reveal } from "./shared/Reveal";
 import { btnGhost, btnPrimary, eyebrowSm, sectionPad, sectionSub, sectionTitle, wrap } from "./shared/ui";
 
-export function PricingPreview() {
+export async function PricingPreview() {
+  const user = await getCurrentUser();
+  const isLoggedIn = Boolean(user);
+
   return (
     <section id="pricing" className={sectionPad}>
       <div className={wrap}>
@@ -43,9 +48,13 @@ export function PricingPreview() {
                     </div>
                   ))}
                 </div>
-                <Link href={p.href} className={`w-full ${p.highlight ? btnPrimary : btnGhost}`}>
+                <PlanButton
+                  planKey={p.key}
+                  isLoggedIn={isLoggedIn}
+                  className={`w-full ${p.highlight ? btnPrimary : btnGhost}`}
+                >
                   เลือกแพ็กเกจนี้
-                </Link>
+                </PlanButton>
               </div>
             </Reveal>
           ))}

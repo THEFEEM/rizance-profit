@@ -31,13 +31,13 @@ export type TrustItem = {
 export type ChartPoint = { d: string; v: number };
 
 export type Plan = {
+  key: string;
   name: string;
   price: string;
   period: string;
   tag: string | null;
   highlight: boolean;
   items: string[];
-  href: string;
 };
 
 export type FaqEntry = { q: string; a: string };
