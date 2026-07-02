@@ -10,6 +10,7 @@ import { UserIcon } from "@/components/booth/setup/icons";
 import { ROLE_STYLES } from "@/components/booth/summary/role-styles";
 import { apiFetch } from "@/lib/api-client";
 import { today } from "@/lib/date";
+import { SHOW_CAPITAL_WITHDRAWAL } from "@/lib/feature-flags";
 import { formatMoney } from "@/lib/money";
 import {
   CAPITAL_DIRECTION_LABELS,
@@ -251,27 +252,31 @@ export function ShopMemberEditor({
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-wrap justify-end gap-1">
-                    <button
-                      type="button"
-                      onClick={() => openCapitalPanel(m, "contribution")}
-                      className="tap-target rounded-full px-2 py-1 text-[11px] font-medium text-rz-green active:bg-rz-card"
-                    >
-                      เพิ่มทุน
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openCapitalPanel(m, "withdrawal")}
-                      className="tap-target rounded-full px-2 py-1 text-[11px] font-medium text-rz-red active:bg-rz-card"
-                    >
-                      ถอนทุน
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openCapitalPanel(m, "history")}
-                      className="tap-target rounded-full px-2 py-1 text-[11px] font-medium text-rz-hint active:bg-rz-card"
-                    >
-                      ประวัติ
-                    </button>
+                    {SHOW_CAPITAL_WITHDRAWAL && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => openCapitalPanel(m, "contribution")}
+                          className="tap-target rounded-full px-2 py-1 text-[11px] font-medium text-rz-green active:bg-rz-card"
+                        >
+                          เพิ่มทุน
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openCapitalPanel(m, "withdrawal")}
+                          className="tap-target rounded-full px-2 py-1 text-[11px] font-medium text-rz-red active:bg-rz-card"
+                        >
+                          ถอนทุน
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openCapitalPanel(m, "history")}
+                          className="tap-target rounded-full px-2 py-1 text-[11px] font-medium text-rz-hint active:bg-rz-card"
+                        >
+                          ประวัติ
+                        </button>
+                      </>
+                    )}
                     <button
                       type="button"
                       onClick={() => removeMember(m.id)}
@@ -283,7 +288,7 @@ export function ShopMemberEditor({
                   </div>
                 </div>
 
-                {panel?.memberId === m.id && (
+                {SHOW_CAPITAL_WITHDRAWAL && panel?.memberId === m.id && (
                   <div className="border-t-[0.5px] border-rz-border px-3 py-3">
                     {panel.mode === "history" ? (
                       <>

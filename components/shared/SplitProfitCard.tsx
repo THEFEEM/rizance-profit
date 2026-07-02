@@ -1,5 +1,6 @@
 import { RoleBadge } from "@/components/booth/summary/role-styles";
 import { splitPercents } from "@/components/booth/summary/split-percents";
+import { SHOW_CAPITAL_WITHDRAWAL } from "@/lib/feature-flags";
 import { formatMoney, moneySign, toCents } from "@/lib/money";
 import type { SplitProfitResult } from "@/lib/booth-split";
 import type { MemberProfitWithdrawable } from "@/types/shop";
@@ -26,6 +27,7 @@ function CapitalRepayBanner({
   split: SplitProfitResult;
   currency: string;
 }) {
+  if (!SHOW_CAPITAL_WITHDRAWAL) return null;
   if (!split.repayCapitalFirst || split.capitalFullyRepaid) return null;
 
   if (split.isLoss) {
@@ -78,6 +80,7 @@ function withdrawalLines(
   shopWithdrawals: MemberProfitWithdrawable[] | undefined,
   currency: string,
 ) {
+  if (!SHOW_CAPITAL_WITHDRAWAL) return null;
   const w = shopWithdrawals?.find((r) => r.memberId === memberId);
   if (!w) return null;
   return (
@@ -103,7 +106,10 @@ export function SplitProfitCard({
 }: SplitProfitCardProps) {
   const percents = splitPercents(split);
   const titleAccent = accent === "amber" ? "text-rz-amber" : "text-rz-green";
-  const showProfitSplit = !split.repayCapitalFirst || split.capitalFullyRepaid;
+  // With the capital-repayment feature hidden, always show the profit split ratio
+  // instead of the "repay capital first / pending" state.
+  const showProfitSplit =
+    !SHOW_CAPITAL_WITHDRAWAL || !split.repayCapitalFirst || split.capitalFullyRepaid;
 
   const shareMembers = split.memberShares.filter(
     (s) => s.role === "investor" || s.role === "manager",

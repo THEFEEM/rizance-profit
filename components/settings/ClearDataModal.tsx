@@ -2,23 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
-import type { AppContextMode } from "@/types/context";
-
-const MODE_LABELS: Record<AppContextMode, string> = {
-  regular: "ร้านค้า",
-  personal: "ส่วนตัว",
-  booth: "บูธ",
-  project: "โครงการ",
-};
 
 export function ClearDataModal({
   open,
-  mode,
   onClose,
   onSuccess,
 }: {
   open: boolean;
-  mode: AppContextMode;
   onClose: () => void;
   onSuccess: () => void;
 }) {
@@ -43,7 +33,7 @@ export function ClearDataModal({
 
     setLoading(true);
     setError(null);
-    const res = await apiFetch<{ ok: true; mode: AppContextMode }>("/api/settings/clear-mode-data", {
+    const res = await apiFetch<{ ok: true }>("/api/settings/clear-all-data", {
       method: "POST",
     });
     setLoading(false);
@@ -70,9 +60,10 @@ export function ClearDataModal({
       <div className="relative z-10 w-full rounded-t-[24px] border-t border-rz-border bg-rz-card px-4 pb-6 pt-4 shadow-2xl">
         <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-rz-border" />
 
-        <h2 className="text-base font-semibold text-rz-text">{`⚠️ ล้างข้อมูล ${MODE_LABELS[mode]}`}</h2>
+        <h2 className="text-base font-semibold text-rz-text">⚠️ ล้างข้อมูลทั้งหมด</h2>
         <p className="mt-2 text-sm leading-6 text-rz-muted">
-          รายการธุรกรรม + ประวัติแชท จะถูกลบถาวร
+          ลบรายการธุรกรรมทั้งหมดทุกโหมด (ส่วนตัว/ร้านค้า/บูธ/องค์กร) ชื่อร้าน หุ้นส่วน
+          และการตั้งค่าจะยังคงอยู่ — ไม่สามารถกู้คืนได้
         </p>
 
         <div className="mt-4">
