@@ -3,7 +3,7 @@ export function isVercel(): boolean {
   return process.env.VERCEL === "1";
 }
 
-export const DEFAULT_APP_URL = "https://rizance.app";
+export const DEFAULT_APP_URL = "https://rizance.com";
 
 /** True on Vercel production deployments (not preview, not local). */
 export function isProduction(): boolean {
