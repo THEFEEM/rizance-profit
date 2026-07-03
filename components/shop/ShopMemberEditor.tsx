@@ -3,9 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EntryField } from "@/components/entry/EntryField";
-import { EntryOptionButton } from "@/components/entry/EntryOptionButton";
 import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
-import { SetupField, SetupPrimaryButton } from "@/components/booth/setup/SetupField";
+import { SetupPrimaryButton } from "@/components/booth/setup/SetupField";
 import { UserIcon } from "@/components/booth/setup/icons";
 import { ROLE_STYLES } from "@/components/booth/summary/role-styles";
 import { apiFetch } from "@/lib/api-client";
@@ -15,7 +14,6 @@ import { formatMoney } from "@/lib/money";
 import {
   CAPITAL_DIRECTION_LABELS,
   SHOP_MEMBER_ROLE_LABELS,
-  SHOP_MEMBER_ROLES,
   type CapitalDirection,
   type CapitalTransaction,
   type ShopMember,
@@ -88,12 +86,6 @@ export function ShopMemberEditor({
   currency?: string;
 }) {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [role, setRole] = useState<ShopMemberRole>("investor");
-  const [investmentRaw, setInvestmentRaw] = useState("");
-  const [addPadOpen, setAddPadOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const [panel, setPanel] = useState<MemberPanel | null>(null);
   const [capitalRaw, setCapitalRaw] = useState("");
@@ -153,32 +145,6 @@ export function ShopMemberEditor({
     setCapitalError(null);
   }
 
-  async function addMember() {
-    if (!name.trim()) return;
-    const amount = investmentRaw === "" ? 0 : Number(investmentRaw);
-    if (!Number.isFinite(amount) || amount < 0) {
-      setError("กรุณาระบุเงินลงทุนที่ถูกต้อง");
-      return;
-    }
-
-    setSaving(true);
-    setError(null);
-    const res = await apiFetch<ShopMember>("/api/shop/members", {
-      method: "POST",
-      body: JSON.stringify({ name: name.trim(), role, investmentAmount: amount }),
-    });
-
-    if (res.ok) {
-      setName("");
-      setInvestmentRaw("");
-      setAddPadOpen(false);
-      router.refresh();
-    } else {
-      setError(res.message);
-    }
-    setSaving(false);
-  }
-
   async function removeMember(memberId: string) {
     const res = await apiFetch(`/api/shop/members/${memberId}`, { method: "DELETE" });
     if (res.ok) {
@@ -233,7 +199,7 @@ export function ShopMemberEditor({
 
       <div className="px-4 py-3">
         {initialMembers.length === 0 && (
-          <p className="mb-3 text-sm text-rz-hint">ยังไม่มีหุ้นส่วน — เพิ่มได้ด้านล่าง</p>
+          <p className="mb-3 text-sm text-rz-hint">ยังไม่มีหุ้นส่วน</p>
         )}
 
         {initialMembers.length > 0 && (
@@ -380,69 +346,6 @@ export function ShopMemberEditor({
             ))}
           </ul>
         )}
-
-        <div className="rounded-[12px] border-[0.5px] border-rz-border p-3">
-          <p className="text-sm font-medium text-rz-text">เพิ่มสมาชิก</p>
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            {SHOP_MEMBER_ROLES.map((r) => (
-              <EntryOptionButton
-                key={r}
-                selected={role === r}
-                onClick={() => setRole(r)}
-                accent={r === "manager" ? "amber" : "green"}
-                className="text-xs"
-              >
-                {SHOP_MEMBER_ROLE_LABELS[r]}
-              </EntryOptionButton>
-            ))}
-          </div>
-
-          <div className="mt-3">
-            <SetupField
-              label="ชื่อ"
-              icon={<UserIcon />}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
-
-          <div className="mt-3">
-            <p className="text-xs text-rz-muted">เงินลงทุนเริ่มต้น (บาท)</p>
-            <p className="rz-tabular text-lg font-medium text-rz-text">
-              {formatTyped(investmentRaw) || "0"}
-            </p>
-            {addPadOpen ? (
-              <QuickAmountPad
-                value={investmentRaw}
-                onChange={setInvestmentRaw}
-                onSave={() => setAddPadOpen(false)}
-                saveLabel="ตกลง"
-                accent="green"
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => setAddPadOpen(true)}
-                className="tap-target text-sm font-medium text-rz-green"
-              >
-                ใส่จำนวน →
-              </button>
-            )}
-          </div>
-
-          {error && (
-            <p className="mt-3 text-sm text-rz-red" role="alert">
-              {error}
-            </p>
-          )}
-
-          <div className="mt-4">
-            <SetupPrimaryButton onClick={addMember} disabled={saving || !name.trim()}>
-              {saving ? "กำลังบันทึก…" : "เพิ่มสมาชิก"}
-            </SetupPrimaryButton>
-          </div>
-        </div>
       </div>
     </section>
   );

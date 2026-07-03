@@ -52,11 +52,13 @@ export function BoothMemberEditor({
   members,
   closed,
   currency = "THB",
+  allowAdd = false,
 }: {
   boothId: string;
   members: BoothMember[];
   closed: boolean;
   currency?: string;
+  allowAdd?: boolean;
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -111,11 +113,13 @@ export function BoothMemberEditor({
     if (res.ok) router.refresh();
   }
 
+  const showAddForm = allowAdd && !closed;
+
   return (
     <section className="px-4">
       <div className="mb-2 flex items-center justify-between gap-2">
         <h2 className="text-sm font-medium text-rz-muted">สมาชิก</h2>
-        {!closed && (
+        {showAddForm && (
           <a
             href="#add-member-form"
             className="tap-target text-sm font-medium text-rz-green"
@@ -127,7 +131,9 @@ export function BoothMemberEditor({
 
       {members.length === 0 && (
         <p className="mb-3 text-sm text-rz-hint">
-          ยังไม่มีสมาชิก — เพิ่มได้ หรือข้ามไปก่อน
+          {showAddForm
+            ? "ยังไม่มีสมาชิก — เพิ่มได้ หรือข้ามไปก่อน"
+            : "ยังไม่มีสมาชิก"}
         </p>
       )}
 
@@ -165,7 +171,7 @@ export function BoothMemberEditor({
         </ul>
       )}
 
-      {!closed && (
+      {showAddForm && (
         <div id="add-member-form" className="rounded-[14px] border-[0.5px] border-rz-border bg-rz-card p-4">
           <p className="text-sm font-medium text-rz-text">เพิ่มสมาชิก</p>
 

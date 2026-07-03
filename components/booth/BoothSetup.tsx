@@ -26,12 +26,15 @@ export function BoothSetup({
   closed,
   currency = "THB",
   createMode = false,
+  allowMemberAdd = false,
 }: {
   booth?: Booth;
   members: BoothMember[];
   closed: boolean;
   currency?: string;
   createMode?: boolean;
+  /** True during post-create onboarding — enables member add form on setup. */
+  allowMemberAdd?: boolean;
 }) {
   const router = useRouter();
   const [name, setName] = useState(booth?.name ?? "");
@@ -75,7 +78,7 @@ export function BoothSetup({
         body: JSON.stringify(payload),
       });
       if (res.ok) {
-        router.replace(`/booth/${res.data.id}/setup`);
+        router.replace(`/booth/${res.data.id}/setup?onboarding=1`);
         router.refresh();
         return true;
       }
@@ -221,6 +224,7 @@ export function BoothSetup({
           members={members}
           closed={closed}
           currency={currency}
+          allowAdd={allowMemberAdd}
         />
       )}
 
