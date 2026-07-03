@@ -1,7 +1,12 @@
 import { RoleBadge } from "@/components/booth/summary/role-styles";
 import { splitPercents } from "@/components/booth/summary/split-percents";
+import {
+  CapitalRecoveryProgress,
+  PartnerColorDot,
+  capitalRecoveryPartnerColors,
+} from "@/components/shared/CapitalRecoveryProgress";
 import { SHOW_CAPITAL_WITHDRAWAL } from "@/lib/feature-flags";
-import { formatMoney, moneySign, toCents, computeProfit } from "@/lib/money";
+import { formatMoney, moneySign } from "@/lib/money";
 import type { SplitProfitResult } from "@/lib/booth-split";
 import type { MemberProfitWithdrawable } from "@/types/shop";
 import { MEMBER_ROLE_LABELS } from "@/types/booth";
@@ -11,55 +16,6 @@ function shareAmountColor(isLoss: boolean, amount: string) {
   if (isLoss || sign < 0) return "text-rz-red";
   if (sign > 0) return "text-rz-green";
   return "text-rz-hint";
-}
-
-function capitalRepayProgressPct(split: SplitProfitResult): number {
-  const total = toCents(split.totalCapital ?? "0");
-  if (total <= 0) return 0;
-  const repaid = toCents(split.capitalRepaid ?? "0");
-  return Math.min(100, Math.max(0, (repaid / total) * 100));
-}
-
-function CapitalRecoveryProgress({
-  split,
-  currency,
-}: {
-  split: SplitProfitResult;
-  currency: string;
-}) {
-  if (!split.repayCapitalFirst || split.capitalFullyRepaid) return null;
-
-  const totalCapital = split.totalCapital ?? "0";
-  if (toCents(totalCapital) <= 0) return null;
-
-  const recovered = split.capitalRepaid ?? "0";
-  const remaining = computeProfit(totalCapital, recovered);
-  const pct = capitalRepayProgressPct(split);
-
-  return (
-    <div className="border-b-[0.5px] border-rz-border px-4 py-3">
-      <p className="text-sm text-rz-text">
-        คืนทุนแล้ว{" "}
-        <span className="rz-tabular font-medium">
-          {formatMoney(recovered, currency)} / {formatMoney(totalCapital, currency)}
-        </span>
-      </p>
-      <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-rz-elevated">
-        <div
-          className="h-full rounded-full bg-rz-green"
-          style={{ width: `${pct}%` }}
-          role="progressbar"
-          aria-valuenow={Math.round(pct)}
-          aria-valuemin={0}
-          aria-valuemax={100}
-        />
-      </div>
-      <p className="rz-tabular mt-1 text-xs text-rz-green">{Math.round(pct)}%</p>
-      <p className="mt-1 text-xs text-rz-hint">
-        เหลืออีก {formatMoney(remaining, currency)} ก่อนเริ่มแบ่งกำไร
-      </p>
-    </div>
-  );
 }
 
 export type SplitProfitCardProps = {
@@ -106,6 +62,7 @@ export function SplitProfitCard({
   const titleAccent = accent === "amber" ? "text-rz-amber" : "text-rz-green";
   const showProfitSplit =
     !split.repayCapitalFirst || split.capitalFullyRepaid;
+  const partnerColors = capitalRecoveryPartnerColors(split);
 
   const shareMembers = split.memberShares.filter(
     (s) => s.role === "investor" || s.role === "manager",
@@ -141,11 +98,16 @@ export function SplitProfitCard({
                   className="flex items-center justify-between gap-3 px-4 py-3 text-sm"
                 >
                   <div className="min-w-0 flex-1">
-                    <span className="font-medium text-rz-text">
-                      {s.name}
-                      {hasEquity && (
-                        <span className="font-normal text-rz-hint"> ({pct})</span>
+                    <span className="inline-flex max-w-full items-center gap-1.5 font-medium text-rz-text">
+                      {partnerColors?.get(s.memberId) && (
+                        <PartnerColorDot color={partnerColors.get(s.memberId)!} />
                       )}
+                      <span className="truncate">
+                        {s.name}
+                        {hasEquity && (
+                          <span className="font-normal text-rz-hint"> ({pct})</span>
+                        )}
+                      </span>
                     </span>
                     {showProfitSplit && withdrawalLines(s.memberId, shopWithdrawals, currency)}
                   </div>
@@ -209,7 +171,12 @@ export function SplitProfitCard({
               return (
                 <li key={s.memberId} className="px-4 py-3.5">
                   <div className="flex items-start justify-between gap-3">
-                    <span className="text-sm font-medium text-rz-text">{s.name}</span>
+                    <span className="inline-flex max-w-full items-center gap-1.5 text-sm font-medium text-rz-text">
+                      {partnerColors?.get(s.memberId) && (
+                        <PartnerColorDot color={partnerColors.get(s.memberId)!} />
+                      )}
+                      <span className="truncate">{s.name}</span>
+                    </span>
                     <span className={`rz-tabular text-[15px] font-medium ${shareColor}`}>
                       {formatMoney(displayAmount, currency)}
                     </span>
