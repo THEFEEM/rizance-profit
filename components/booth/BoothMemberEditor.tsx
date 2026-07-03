@@ -54,12 +54,14 @@ export function BoothMemberEditor({
   closed,
   currency = "THB",
   allowAdd = false,
+  hideHeader = false,
 }: {
   boothId: string;
   members: BoothMember[];
   closed: boolean;
   currency?: string;
   allowAdd?: boolean;
+  hideHeader?: boolean;
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -124,7 +126,8 @@ export function BoothMemberEditor({
   const showAddForm = allowAdd && !closed;
 
   return (
-    <section className="px-4">
+    <section className={hideHeader ? "" : "px-4"}>
+      {!hideHeader && (
       <div className="mb-2 flex items-center justify-between gap-2">
         <h2 className="text-sm font-medium text-rz-muted">สมาชิก</h2>
         {showAddForm && (
@@ -136,6 +139,7 @@ export function BoothMemberEditor({
           </a>
         )}
       </div>
+      )}
 
       {members.length === 0 && (
         <p className="mb-3 text-sm text-rz-hint">

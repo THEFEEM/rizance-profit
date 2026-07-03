@@ -7,6 +7,7 @@ import { LogOut, Pencil } from "lucide-react";
 import { ProfileModeSection } from "@/components/profile/ProfileModeSection";
 import { SubscriptionProfileSection } from "@/components/profile/SubscriptionProfileSection";
 import { ClearDataModal } from "@/components/settings/ClearDataModal";
+import { BoothMemberEditor } from "@/components/booth/BoothMemberEditor";
 import { ShopMemberEditor } from "@/components/shop/ShopMemberEditor";
 import { UserAvatar } from "@/components/UserAvatar";
 import { apiFetch } from "@/lib/api-client";
@@ -15,6 +16,7 @@ import { SHOW_PARTNERS_SECTION } from "@/lib/feature-flags";
 import { getAppVersionLabel } from "@/lib/app-version";
 import type { AuthProvider } from "@/types";
 import type { ShopMember } from "@/types/shop";
+import type { BoothMember } from "@/types/booth";
 import type { User } from "@/types";
 
 function authProviderBadge(provider: AuthProvider): string | null {
@@ -30,6 +32,8 @@ export function ProfilePageContent({
   boothName,
   projectId,
   shopMembers = [],
+  boothMembers = [],
+  boothClosed = false,
 }: {
   user: User;
   mode: "regular" | "booth" | "project" | "personal";
@@ -37,6 +41,8 @@ export function ProfilePageContent({
   boothName?: string;
   projectId?: string;
   shopMembers?: ShopMember[];
+  boothMembers?: BoothMember[];
+  boothClosed?: boolean;
 }) {
   const router = useRouter();
   const [name, setName] = useState(user.shopName);
@@ -213,8 +219,29 @@ export function ProfilePageContent({
           projectId={projectId}
         />
 
-        {SHOW_PARTNERS_SECTION && (mode === "regular" || mode === "booth") && (
+        {SHOW_PARTNERS_SECTION && mode === "regular" && (
           <ShopMemberEditor members={shopMembers} currency={user.currency} />
+        )}
+
+        {SHOW_PARTNERS_SECTION && mode === "booth" && boothId && (
+          <section className="overflow-hidden rounded-[14px] border-[0.5px] border-rz-border bg-rz-card">
+            <div className="border-b-[0.5px] border-rz-border px-4 py-3">
+              <h2 className="text-sm font-medium text-rz-text">สมาชิกบูธ</h2>
+              {boothName && (
+                <p className="mt-0.5 text-xs text-rz-hint">{boothName}</p>
+              )}
+            </div>
+            <div className="px-4 py-3">
+              <BoothMemberEditor
+                boothId={boothId}
+                members={boothMembers}
+                closed={boothClosed}
+                currency={user.currency}
+                allowAdd={false}
+                hideHeader
+              />
+            </div>
+          </section>
         )}
 
         <section className="rounded-[14px] border-[0.5px] border-rz-border bg-rz-card">
