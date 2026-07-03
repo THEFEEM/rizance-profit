@@ -808,6 +808,13 @@ export async function splitProfit(
   if (!summary) return null;
 
   const members = await listBoothMembers(userId, boothId);
+  const hasEquityPartners = members.some(
+    (m) =>
+      (m.role === "investor" || m.role === "manager") &&
+      Number(m.investmentAmount) > 0,
+  );
+  if (!hasEquityPartners) return null;
+
   const advances = await listBoothAdvances(userId, boothId);
 
   return computeSplitProfit({
@@ -820,6 +827,7 @@ export async function splitProfit(
     totalExpense: summary.entryExpense,
     advances,
     members: members.map(toSplitMemberInput),
+    repayCapitalFirst: true,
   });
 }
 

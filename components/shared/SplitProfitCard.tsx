@@ -1,7 +1,7 @@
 import { RoleBadge } from "@/components/booth/summary/role-styles";
 import { splitPercents } from "@/components/booth/summary/split-percents";
 import { SHOW_CAPITAL_WITHDRAWAL } from "@/lib/feature-flags";
-import { formatMoney, moneySign, toCents } from "@/lib/money";
+import { formatMoney, moneySign, toCents, computeProfit } from "@/lib/money";
 import type { SplitProfitResult } from "@/lib/booth-split";
 import type { MemberProfitWithdrawable } from "@/types/shop";
 import { MEMBER_ROLE_LABELS } from "@/types/booth";
@@ -20,46 +20,44 @@ function capitalRepayProgressPct(split: SplitProfitResult): number {
   return Math.min(100, Math.max(0, (repaid / total) * 100));
 }
 
-function CapitalRepayBanner({
+function CapitalRecoveryProgress({
   split,
   currency,
 }: {
   split: SplitProfitResult;
   currency: string;
 }) {
-  if (!SHOW_CAPITAL_WITHDRAWAL) return null;
   if (!split.repayCapitalFirst || split.capitalFullyRepaid) return null;
 
-  if (split.isLoss) {
-    return (
-      <div className="border-b-[0.5px] border-rz-border px-4 py-3">
-        <div className="flex items-center justify-between gap-2 text-xs">
-          <span className="text-rz-hint">ขาดทุน</span>
-          <span className="rz-tabular font-medium text-rz-red">
-            {formatMoney(split.netProfit, currency)}
-          </span>
-        </div>
-      </div>
-    );
-  }
+  const totalCapital = split.totalCapital ?? "0";
+  if (toCents(totalCapital) <= 0) return null;
 
+  const recovered = split.capitalRepaid ?? "0";
+  const remaining = computeProfit(totalCapital, recovered);
   const pct = capitalRepayProgressPct(split);
 
   return (
     <div className="border-b-[0.5px] border-rz-border px-4 py-3">
-      <div className="mb-1.5 flex items-center justify-between gap-2 text-xs">
-        <span className="text-rz-hint">กำลังคืนทุน</span>
-        <span className="rz-tabular text-rz-muted">
-          {formatMoney(split.capitalRepaid ?? "0", currency)} /{" "}
-          {formatMoney(split.totalCapital ?? "0", currency)}
+      <p className="text-sm text-rz-text">
+        คืนทุนแล้ว{" "}
+        <span className="rz-tabular font-medium">
+          {formatMoney(recovered, currency)} / {formatMoney(totalCapital, currency)}
         </span>
-      </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-rz-elevated">
+      </p>
+      <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-rz-elevated">
         <div
           className="h-full rounded-full bg-rz-green"
           style={{ width: `${pct}%` }}
+          role="progressbar"
+          aria-valuenow={Math.round(pct)}
+          aria-valuemin={0}
+          aria-valuemax={100}
         />
       </div>
+      <p className="rz-tabular mt-1 text-xs text-rz-green">{Math.round(pct)}%</p>
+      <p className="mt-1 text-xs text-rz-hint">
+        เหลืออีก {formatMoney(remaining, currency)} ก่อนเริ่มแบ่งกำไร
+      </p>
     </div>
   );
 }
@@ -106,10 +104,8 @@ export function SplitProfitCard({
 }: SplitProfitCardProps) {
   const percents = splitPercents(split);
   const titleAccent = accent === "amber" ? "text-rz-amber" : "text-rz-green";
-  // With the capital-repayment feature hidden, always show the profit split ratio
-  // instead of the "repay capital first / pending" state.
   const showProfitSplit =
-    !SHOW_CAPITAL_WITHDRAWAL || !split.repayCapitalFirst || split.capitalFullyRepaid;
+    !split.repayCapitalFirst || split.capitalFullyRepaid;
 
   const shareMembers = split.memberShares.filter(
     (s) => s.role === "investor" || s.role === "manager",
@@ -129,7 +125,7 @@ export function SplitProfitCard({
       <section className={`px-4 pt-3 ${className}`}>
         <h2 className={`mb-2 text-sm font-medium ${titleAccent}`}>{heading}</h2>
         <div className="overflow-hidden rounded-[14px] border-[0.5px] border-rz-border bg-rz-card">
-          <CapitalRepayBanner split={split} currency={currency} />
+          <CapitalRecoveryProgress split={split} currency={currency} />
           <ul className="divide-y divide-rz-border">
             {shareMembers.map((s) => {
               const pct = percents.members.get(s.memberId) ?? "0%";
@@ -147,16 +143,11 @@ export function SplitProfitCard({
                   <div className="min-w-0 flex-1">
                     <span className="font-medium text-rz-text">
                       {s.name}
-                      {showProfitSplit && hasEquity && (
+                      {hasEquity && (
                         <span className="font-normal text-rz-hint"> ({pct})</span>
                       )}
                     </span>
-                    {!showProfitSplit && hasEquity && (
-                      <span className="mt-0.5 block text-xs font-normal text-rz-hint">
-                        ลงทุน {formatMoney(s.investmentAmount, currency)}
-                      </span>
-                    )}
-                    {withdrawalLines(s.memberId, shopWithdrawals, currency)}
+                    {showProfitSplit && withdrawalLines(s.memberId, shopWithdrawals, currency)}
                   </div>
                   <span className={`rz-tabular shrink-0 font-medium ${shareColor}`}>
                     {formatMoney(displayAmount, currency)}
@@ -180,7 +171,7 @@ export function SplitProfitCard({
           </div>
         )}
 
-        <CapitalRepayBanner split={split} currency={currency} />
+        <CapitalRecoveryProgress split={split} currency={currency} />
 
         {!hasParticipants && !split.warning && (
           <p className="px-4 py-4 text-sm text-rz-amber">{emptyHint}</p>
