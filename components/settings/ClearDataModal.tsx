@@ -3,17 +3,71 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-client";
+import type { AppContextMode } from "@/types/context";
+
+type ResetScope = "personal" | "shop" | "booth" | "org";
+
+function appModeToResetScope(mode: AppContextMode): ResetScope {
+  if (mode === "regular") return "shop";
+  if (mode === "project") return "org";
+  return mode;
+}
+
+const RESET_COPY: Record<
+  ResetScope,
+  { title: string; paragraphs: string[] }
+> = {
+  personal: {
+    title: "รีเซ็ตข้อมูลส่วนตัว",
+    paragraphs: [
+      "ระบบจะลบธุรกรรมส่วนตัวทั้งหมดของคุณ (ไม่กระทบร้านค้า/บูธ/องค์กร)",
+      "สิทธิ์การใช้งาน (แพ็กเกจ) จะยังคงอยู่ ไม่หาย",
+      "การกระทำนี้ไม่สามารถกู้คืนได้",
+    ],
+  },
+  shop: {
+    title: "รีเซ็ตข้อมูลร้านค้านี้",
+    paragraphs: [
+      "ระบบจะลบทุกอย่างของร้านค้านี้เท่านั้น — ธุรกรรม หุ้นส่วน และชื่อร้าน",
+      "บูธ องค์กร และโหมดส่วนตัวของคุณจะไม่ถูกแตะต้อง",
+      "สิทธิ์การใช้งาน (แพ็กเกจ) จะยังคงอยู่ ไม่หาย",
+      "การกระทำนี้ไม่สามารถกู้คืนได้",
+    ],
+  },
+  booth: {
+    title: "รีเซ็ตข้อมูลบูธนี้",
+    paragraphs: [
+      "ระบบจะลบทุกอย่างของบูธนี้เท่านั้น — ธุรกรรม สมาชิก และตัวบูธ",
+      "บูธอื่น ร้านค้า และองค์กรของคุณจะไม่ถูกแตะต้อง",
+      "สิทธิ์การใช้งาน (แพ็กเกจ) จะยังคงอยู่ ไม่หาย",
+      "การกระทำนี้ไม่สามารถกู้คืนได้",
+    ],
+  },
+  org: {
+    title: "รีเซ็ตข้อมูลองค์กรนี้",
+    paragraphs: [
+      "ระบบจะลบทุกอย่างขององค์กรนี้เท่านั้น — ธุรกรรม สมาชิก และตัวองค์กร",
+      "องค์กรอื่น ร้านค้า และบูธของคุณจะไม่ถูกแตะต้อง",
+      "สิทธิ์การใช้งาน (แพ็กเกจ) จะยังคงอยู่ ไม่หาย",
+      "การกระทำนี้ไม่สามารถกู้คืนได้",
+    ],
+  },
+};
 
 export function ClearDataModal({
   open,
+  mode,
   onClose,
   onSuccess,
 }: {
   open: boolean;
+  mode: AppContextMode;
   onClose: () => void;
   onSuccess: () => void;
 }) {
   const router = useRouter();
+  const resetScope = appModeToResetScope(mode);
+  const copy = RESET_COPY[resetScope];
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,8 +89,9 @@ export function ClearDataModal({
 
     setLoading(true);
     setError(null);
-    const res = await apiFetch<{ ok: true; redirect: string }>("/api/settings/clear-all-data", {
+    const res = await apiFetch<{ ok: true; redirect?: string }>("/api/settings/clear-all-data", {
       method: "POST",
+      body: JSON.stringify({ mode: resetScope }),
     });
     setLoading(false);
 
@@ -46,7 +101,9 @@ export function ClearDataModal({
     }
 
     onSuccess();
-    router.replace(res.data.redirect ?? "/shop/new");
+    if (res.data.redirect) {
+      router.replace(res.data.redirect);
+    }
     router.refresh();
   }
 
@@ -64,16 +121,12 @@ export function ClearDataModal({
       <div className="relative z-10 w-full rounded-t-[24px] border-t border-rz-border bg-rz-card px-4 pb-6 pt-4 shadow-2xl">
         <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-rz-border" />
 
-        <h2 className="text-base font-semibold text-rz-text">รีเซ็ตข้อมูลทั้งหมด</h2>
-        <p className="mt-2 text-sm leading-6 text-rz-muted">
-          ระบบจะลบทุกอย่างทั้งหมด — ธุรกรรม ร้านค้า บูธ องค์กร และรายชื่อหุ้นส่วน
-          เหมือนกลับไปเป็นบัญชีใหม่ที่เพิ่งสมัคร
-        </p>
-        <p className="mt-2 text-sm leading-6 text-rz-muted">
-          สิทธิ์การใช้งาน (แพ็กเกจ) จะยังคงอยู่ ไม่หาย
-          <br />
-          การกระทำนี้ไม่สามารถกู้คืนได้
-        </p>
+        <h2 className="text-base font-semibold text-rz-text">{copy.title}</h2>
+        {copy.paragraphs.map((paragraph) => (
+          <p key={paragraph} className="mt-2 text-sm leading-6 text-rz-muted">
+            {paragraph}
+          </p>
+        ))}
 
         <div className="mt-4">
           <label htmlFor="clear-data-confirm" className="mb-2 block text-sm text-rz-hint">

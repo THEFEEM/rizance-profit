@@ -280,6 +280,7 @@ export function ProfilePageContent({
 
         <ClearDataModal
           open={showClearModal}
+          mode={mode}
           onClose={() => setShowClearModal(false)}
           onSuccess={() => setShowClearModal(false)}
         />
