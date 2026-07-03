@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
+import { CONTEXT_COOKIE, contextCookieOptions } from "@/lib/context";
 import { pool } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 
+/** Placeholder shop name after full reset — user renames on /shop/new. */
+const RESET_SHOP_NAME = "ร้านของฉัน";
+
 /**
- * Transaction tables cleared across every mode. All carry a user_id column, so a
- * single WHERE user_id = $1 per table is sufficient. Entities that define the
- * account itself — users, shops (users row), booths, projects, project_activities,
- * shop_members, booth_members, project_members, token_budgets, stripe_payments,
- * savings_goals, pricing/menu setup — are intentionally left untouched.
+ * Transaction tables cleared across every mode. All carry user_id.
+ * capital_transactions / profit_withdrawals must be cleared before shop_members.
  */
 const TRANSACTION_TABLES = [
   "income_entries",
@@ -42,8 +43,26 @@ export async function POST() {
       await client.query(`DELETE FROM ${table} WHERE user_id = $1`, [user.id]);
     }
 
+    // Shop: no shops table — members + shop_name on users (subscription untouched).
+    await client.query(`DELETE FROM shop_members WHERE user_id = $1`, [user.id]);
+    await client.query(
+      `UPDATE users SET shop_name = $2, updated_at = now() WHERE id = $1`,
+      [user.id, RESET_SHOP_NAME],
+    );
+
+    // Booths (booth_members cascade via booth_id FK).
+    await client.query(`DELETE FROM booths WHERE user_id = $1`, [user.id]);
+
+    // Projects (project_activities + project_members cascade via project_id FK).
+    await client.query(`DELETE FROM projects WHERE user_id = $1`, [user.id]);
+
     await client.query("COMMIT");
-    return NextResponse.json({ data: { ok: true } });
+
+    const res = NextResponse.json({
+      data: { ok: true, redirect: "/shop/new" as const },
+    });
+    res.cookies.set(CONTEXT_COOKIE, "regular", contextCookieOptions());
+    return res;
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

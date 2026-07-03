@@ -185,7 +185,7 @@ export function ProfilePageContent({
                 onClick={() => setShowClearModal(true)}
                 className="tap-target text-sm font-medium text-[#F87171]"
               >
-                ล้างข้อมูลทั้งหมด
+                รีเซ็ตข้อมูลทั้งหมด
               </button>
             </div>
             {providerBadge && (
@@ -281,10 +281,7 @@ export function ProfilePageContent({
         <ClearDataModal
           open={showClearModal}
           onClose={() => setShowClearModal(false)}
-          onSuccess={() => {
-            setShowClearModal(false);
-            router.refresh();
-          }}
+          onSuccess={() => setShowClearModal(false)}
         />
       </div>
     </div>
