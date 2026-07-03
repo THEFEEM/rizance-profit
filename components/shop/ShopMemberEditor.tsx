@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { DeleteConfirm, partnerDeleteConfirmCopy } from "@/components/DeleteConfirm";
 import { EntryField } from "@/components/entry/EntryField";
 import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
 import { SetupPrimaryButton } from "@/components/booth/setup/SetupField";
@@ -88,6 +89,8 @@ export function ShopMemberEditor({
   const router = useRouter();
 
   const [panel, setPanel] = useState<MemberPanel | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<ShopMember | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [capitalRaw, setCapitalRaw] = useState("");
   const [capitalPadOpen, setCapitalPadOpen] = useState(false);
   const [capitalNote, setCapitalNote] = useState("");
@@ -145,12 +148,17 @@ export function ShopMemberEditor({
     setCapitalError(null);
   }
 
-  async function removeMember(memberId: string) {
+  async function confirmRemoveMember() {
+    if (!pendingDelete || deleting) return;
+    setDeleting(true);
+    const memberId = pendingDelete.id;
     const res = await apiFetch(`/api/shop/members/${memberId}`, { method: "DELETE" });
     if (res.ok) {
       if (panel?.memberId === memberId) closePanel();
+      setPendingDelete(null);
       router.refresh();
     }
+    setDeleting(false);
   }
 
   async function submitCapitalTx(direction: CapitalDirection) {
@@ -245,7 +253,7 @@ export function ShopMemberEditor({
                     )}
                     <button
                       type="button"
-                      onClick={() => removeMember(m.id)}
+                      onClick={() => setPendingDelete(m)}
                       className="tap-target rounded-full px-2 py-1 text-[11px] text-rz-hint active:text-rz-red"
                       aria-label={`ลบ ${m.name}`}
                     >
@@ -347,6 +355,15 @@ export function ShopMemberEditor({
           </ul>
         )}
       </div>
+
+      {pendingDelete && (
+        <DeleteConfirm
+          {...partnerDeleteConfirmCopy(pendingDelete.name)}
+          onConfirm={confirmRemoveMember}
+          onCancel={() => !deleting && setPendingDelete(null)}
+          busy={deleting}
+        />
+      )}
     </section>
   );
 }

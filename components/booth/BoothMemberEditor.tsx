@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { DeleteConfirm, partnerDeleteConfirmCopy } from "@/components/DeleteConfirm";
 import { EntryOptionButton } from "@/components/entry/EntryOptionButton";
 import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
 import { SetupField, SetupPrimaryButton } from "@/components/booth/setup/SetupField";
@@ -69,6 +70,8 @@ export function BoothMemberEditor({
   const [padField, setPadField] = useState<"investment" | "wage" | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<BoothMember | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function addMember() {
     if (closed || !name.trim()) return;
@@ -105,12 +108,17 @@ export function BoothMemberEditor({
     setSaving(false);
   }
 
-  async function removeMember(memberId: string) {
-    if (closed) return;
-    const res = await apiFetch(`/api/booths/${boothId}/members/${memberId}`, {
+  async function confirmRemoveMember() {
+    if (closed || !pendingDelete || deleting) return;
+    setDeleting(true);
+    const res = await apiFetch(`/api/booths/${boothId}/members/${pendingDelete.id}`, {
       method: "DELETE",
     });
-    if (res.ok) router.refresh();
+    if (res.ok) {
+      setPendingDelete(null);
+      router.refresh();
+    }
+    setDeleting(false);
   }
 
   const showAddForm = allowAdd && !closed;
@@ -159,7 +167,7 @@ export function BoothMemberEditor({
               {!closed && (
                 <button
                   type="button"
-                  onClick={() => removeMember(m.id)}
+                  onClick={() => setPendingDelete(m)}
                   className="tap-target shrink-0 px-2 text-sm text-rz-hint active:text-rz-red"
                   aria-label={`ลบ ${m.name}`}
                 >
@@ -279,6 +287,15 @@ export function BoothMemberEditor({
             </SetupPrimaryButton>
           </div>
         </div>
+      )}
+
+      {pendingDelete && (
+        <DeleteConfirm
+          {...partnerDeleteConfirmCopy(pendingDelete.name)}
+          onConfirm={confirmRemoveMember}
+          onCancel={() => !deleting && setPendingDelete(null)}
+          busy={deleting}
+        />
       )}
     </section>
   );
