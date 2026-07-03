@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBoothCreditorOwed } from "@/lib/advance-creditors";
 import {
-  BoothCashInsufficientError,
-  boothCashInsufficientMessage,
+  BoothOnHandInsufficientError,
+  boothOnHandInsufficientMessage,
   createBoothCreditorRepayment,
 } from "@/lib/booth-creditor-repayment-queries";
 import { getBooth } from "@/lib/booth-queries";
@@ -66,9 +66,9 @@ export async function POST(req: NextRequest, context: RouteContext) {
         { status: 400 },
       );
     }
-    if (err instanceof BoothCashInsufficientError) {
+    if (err instanceof BoothOnHandInsufficientError) {
       return NextResponse.json(
-        { error: { message: boothCashInsufficientMessage(err.available) } },
+        { error: { message: boothOnHandInsufficientMessage(err.paymentMethod, err.available) } },
         { status: 400 },
       );
     }

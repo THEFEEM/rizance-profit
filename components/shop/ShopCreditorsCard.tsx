@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { CreditorRepaymentPaymentToggle } from "@/components/creditors/CreditorRepaymentPaymentToggle";
 import { EntryField } from "@/components/entry/EntryField";
-import { EntryOptionButton } from "@/components/entry/EntryOptionButton";
 import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
 import { SetupPrimaryButton } from "@/components/booth/setup/SetupField";
 import { apiFetch } from "@/lib/api-client";
@@ -12,8 +12,6 @@ import { formatMoney, toCents } from "@/lib/money";
 import type { CreditorWithRepayment } from "@/types/shop";
 import type { ShopOnHand } from "@/lib/shop-on-hand";
 import {
-  PAYMENT_METHOD_LABELS,
-  PAYMENT_METHODS,
   type PaymentMethod,
 } from "@/types/booth";
 import type { CreditorRepayment } from "@/types/shop";
@@ -176,6 +174,14 @@ function CreditorRow({
               saveLabel="ตกลง"
               accent="green"
               saveTone="green"
+              beforeSave={
+                <CreditorRepaymentPaymentToggle
+                  paymentMethod={paymentMethod}
+                  onChange={setPaymentMethod}
+                  selectedOnHand={selectedOnHand}
+                  currency={currency}
+                />
+              }
             />
           ) : (
             <button
@@ -186,25 +192,6 @@ function CreditorRow({
               ใส่จำนวน →
             </button>
           )}
-          <div>
-            <p className="mb-1.5 text-xs text-rz-muted">จ่ายด้วย</p>
-            <div className="flex flex-wrap gap-2">
-              {PAYMENT_METHODS.map((method) => (
-                <EntryOptionButton
-                  key={method}
-                  selected={paymentMethod === method}
-                  onClick={() => setPaymentMethod(method)}
-                  accent="green"
-                >
-                  {PAYMENT_METHOD_LABELS[method]}
-                </EntryOptionButton>
-              ))}
-            </div>
-            <p className="rz-tabular mt-2 text-xs text-rz-hint">
-              {PAYMENT_METHOD_LABELS[paymentMethod]}คงเหลือ{" "}
-              {formatMoney(selectedOnHand, currency)}
-            </p>
-          </div>
           <EntryField
             label="บันทึกเพิ่มเติม (ไม่บังคับ)"
             value={note}

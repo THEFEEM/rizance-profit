@@ -85,7 +85,9 @@ export function BoothEntryList({
       return `${date} · ${PAYMENT_METHOD_LABELS[row.entry.paymentMethod]}`;
     }
     const badge = expenseCostTypeLabel(row.entry.category);
-    return badge ? `${date} · ${badge}` : date;
+    const method = PAYMENT_METHOD_LABELS[row.entry.paymentMethod];
+    const tail = [badge, method].filter(Boolean).join(" · ");
+    return tail ? `${date} · ${tail}` : date;
   }
 
   function signedAmount(row: Row): string {

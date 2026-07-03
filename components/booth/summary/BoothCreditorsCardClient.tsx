@@ -2,15 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { CreditorRepaymentPaymentToggle } from "@/components/creditors/CreditorRepaymentPaymentToggle";
 import { EntryField } from "@/components/entry/EntryField";
 import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
 import { SetupPrimaryButton } from "@/components/booth/setup/SetupField";
 import { apiFetch } from "@/lib/api-client";
+import type { BoothOnHand } from "@/lib/booth-cash-on-hand";
 import { today } from "@/lib/date";
 import { formatMoney, toCents } from "@/lib/money";
 import type { BoothCreditorRow } from "@/lib/advance-creditors";
 import type { CreditorRepayment } from "@/types/shop";
-import type { PayerKind } from "@/types";
+import type { PayerKind, PaymentMethod } from "@/types";
 
 const KIND_LABELS: Record<PayerKind, string> = {
   member: "สมาชิก",
@@ -23,7 +25,7 @@ function BoothCreditorRowItem({
   row,
   boothId,
   currency,
-  cashOnHand,
+  onHand,
   panel,
   onOpen,
   onClose,
@@ -31,7 +33,7 @@ function BoothCreditorRowItem({
   row: BoothCreditorDisplayRow;
   boothId: string;
   currency: string;
-  cashOnHand: string;
+  onHand: BoothOnHand;
   panel: BoothCreditorDisplayRow | null;
   onOpen: (row: BoothCreditorDisplayRow) => void;
   onClose: () => void;
@@ -39,6 +41,7 @@ function BoothCreditorRowItem({
   const router = useRouter();
   const [amountRaw, setAmountRaw] = useState("");
   const [padOpen, setPadOpen] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [note, setNote] = useState("");
   const [entryDate, setEntryDate] = useState(today());
   const [saving, setSaving] = useState(false);
@@ -53,6 +56,8 @@ function BoothCreditorRowItem({
         ? 100
         : 0;
   const isOpen = panel?.name === row.name && panel?.payerKind === row.payerKind;
+  const selectedOnHand =
+    paymentMethod === "cash" ? onHand.cashOnHand : onHand.transferOnHand;
   const barColor = isPaidOff
     ? "bg-rz-green"
     : paidPercent === 0
@@ -82,7 +87,7 @@ function BoothCreditorRowItem({
           payerKind: row.payerKind,
           payerName: row.name,
           amount,
-          paymentMethod: "cash",
+          paymentMethod,
           note: note.trim() || undefined,
           entryDate,
         }),
@@ -139,6 +144,7 @@ function BoothCreditorRowItem({
             onClick={() => {
               setAmountRaw(row.remaining);
               setPadOpen(false);
+              setPaymentMethod("cash");
               setNote("");
               setEntryDate(today());
               setError(null);
@@ -168,6 +174,14 @@ function BoothCreditorRowItem({
               saveLabel="ตกลง"
               accent="green"
               saveTone="green"
+              beforeSave={
+                <CreditorRepaymentPaymentToggle
+                  paymentMethod={paymentMethod}
+                  onChange={setPaymentMethod}
+                  selectedOnHand={selectedOnHand}
+                  currency={currency}
+                />
+              }
             />
           ) : (
             <button
@@ -178,9 +192,6 @@ function BoothCreditorRowItem({
               ใส่จำนวน →
             </button>
           )}
-          <p className="rz-tabular mb-3 text-xs text-rz-hint">
-            เงินคงเหลือ {formatMoney(cashOnHand, currency)}
-          </p>
           <EntryField
             label="บันทึกเพิ่มเติม (ไม่บังคับ)"
             value={note}
@@ -226,7 +237,7 @@ function GroupBlock({
   rows,
   boothId,
   currency,
-  cashOnHand,
+  onHand,
   panel,
   onOpen,
   onClose,
@@ -235,7 +246,7 @@ function GroupBlock({
   rows: BoothCreditorDisplayRow[];
   boothId: string;
   currency: string;
-  cashOnHand: string;
+  onHand: BoothOnHand;
   panel: BoothCreditorDisplayRow | null;
   onOpen: (row: BoothCreditorDisplayRow) => void;
   onClose: () => void;
@@ -255,7 +266,7 @@ function GroupBlock({
             row={row}
             boothId={boothId}
             currency={currency}
-            cashOnHand={cashOnHand}
+            onHand={onHand}
             panel={panel}
             onOpen={onOpen}
             onClose={onClose}
@@ -275,12 +286,12 @@ function GroupBlock({
 export function BoothCreditorsCard({
   boothId,
   rows,
-  cashOnHand,
+  onHand,
   currency = "THB",
 }: {
   boothId: string;
   rows: BoothCreditorDisplayRow[];
-  cashOnHand: string;
+  onHand: BoothOnHand;
   currency?: string;
 }) {
   const [panel, setPanel] = useState<BoothCreditorDisplayRow | null>(null);
@@ -299,7 +310,7 @@ export function BoothCreditorsCard({
           rows={memberRows}
           boothId={boothId}
           currency={currency}
-          cashOnHand={cashOnHand}
+          onHand={onHand}
           panel={panel}
           onOpen={setPanel}
           onClose={() => setPanel(null)}
@@ -309,7 +320,7 @@ export function BoothCreditorsCard({
           rows={externalRows}
           boothId={boothId}
           currency={currency}
-          cashOnHand={cashOnHand}
+          onHand={onHand}
           panel={panel}
           onOpen={setPanel}
           onClose={() => setPanel(null)}

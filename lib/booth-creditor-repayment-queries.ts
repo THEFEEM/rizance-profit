@@ -2,7 +2,7 @@ import type { PoolClient } from "pg";
 import { pool } from "@/lib/db";
 import { isUndefinedColumnError } from "@/lib/db-migration-guard";
 import { today } from "@/lib/date";
-import { computeBoothCashOnHand } from "@/lib/booth-cash-on-hand";
+import { computeBoothOnHand } from "@/lib/booth-cash-on-hand";
 import { getBooth } from "@/lib/booth-queries";
 import type { CreditorRepaymentInput } from "@/lib/creditor-validation";
 import {
@@ -11,19 +11,40 @@ import {
   mapCreditorRepayment,
 } from "@/lib/creditor-repayment-queries";
 import { centsToDecimalString, formatMoney, toCents } from "@/lib/money";
+import type { PaymentMethod } from "@/types/booth";
 import type { CreditorRepayment } from "@/types/shop";
 
 const REPAYMENT_NOTE = "จ่ายคืนเจ้าหนี้";
 
-export class BoothCashInsufficientError extends Error {
-  constructor(public available: string) {
-    super("booth cash insufficient");
+export class BoothOnHandInsufficientError extends Error {
+  constructor(
+    public paymentMethod: PaymentMethod,
+    public available: string,
+  ) {
+    super("booth on-hand insufficient");
+    this.name = "BoothOnHandInsufficientError";
+  }
+}
+
+/** @deprecated Use boothOnHandInsufficientMessage */
+export class BoothCashInsufficientError extends BoothOnHandInsufficientError {
+  constructor(available: string) {
+    super("cash", available);
     this.name = "BoothCashInsufficientError";
   }
 }
 
+export function boothOnHandInsufficientMessage(
+  paymentMethod: PaymentMethod,
+  available: string,
+  currency = "THB",
+): string {
+  const label = paymentMethod === "cash" ? "เงินสด" : "เงินโอน";
+  return `${label}ไม่พอ (มี ${formatMoney(available, currency)})`;
+}
+
 export function boothCashInsufficientMessage(available: string, currency = "THB"): string {
-  return `เงินคงเหลือไม่พอ (มี ${formatMoney(available, currency)})`;
+  return boothOnHandInsufficientMessage("cash", available, currency);
 }
 
 async function sumBoothRepaidByCreditor(
@@ -53,6 +74,7 @@ export async function createBoothCreditorRepayment(
 
   const entryDate = input.entryDate ?? today();
   const amount = input.amount.toFixed(2);
+  const paymentMethod = input.paymentMethod;
   const client = await pool.connect();
 
   try {
@@ -72,9 +94,11 @@ export async function createBoothCreditorRepayment(
       );
     }
 
-    const cashOnHand = await computeBoothCashOnHand(userId, boothId);
-    if (toCents(amount) > toCents(cashOnHand)) {
-      throw new BoothCashInsufficientError(cashOnHand);
+    const onHand = await computeBoothOnHand(userId, boothId);
+    const methodOnHand =
+      paymentMethod === "cash" ? onHand.cashOnHand : onHand.transferOnHand;
+    if (toCents(amount) > toCents(methodOnHand)) {
+      throw new BoothOnHandInsufficientError(paymentMethod, methodOnHand);
     }
 
     const note = input.note?.trim()
@@ -84,7 +108,7 @@ export async function createBoothCreditorRepayment(
     const { rows } = await client.query<CreditorRepaymentRow>(
       `INSERT INTO creditor_repayments
          (user_id, booth_id, payer_kind, payer_name, amount, payment_method, note, entry_date)
-       VALUES ($1, $2, $3, $4, $5, 'cash', $6, $7::date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::date)
        RETURNING id, user_id, payer_kind, payer_name, amount, payment_method, note,
          entry_date::text AS entry_date, created_at`,
       [
@@ -93,6 +117,7 @@ export async function createBoothCreditorRepayment(
         input.payerKind,
         input.payerName,
         amount,
+        paymentMethod,
         note,
         entryDate,
       ],
@@ -100,14 +125,15 @@ export async function createBoothCreditorRepayment(
 
     await client.query(
       `INSERT INTO booth_expense_entries
-         (booth_id, user_id, amount, cost_type, category, label, note, entry_date)
-       VALUES ($1, $2, $3, 'variable', 'expense_misc', $4, $5, $6::date)`,
+         (booth_id, user_id, amount, cost_type, category, label, note, payment_method, entry_date)
+       VALUES ($1, $2, $3, 'variable', 'expense_misc', $4, $5, $6, $7::date)`,
       [
         boothId,
         userId,
         amount,
         `จ่ายคืน ${input.payerName}`,
         note,
+        paymentMethod,
         entryDate,
       ],
     );

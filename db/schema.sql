@@ -286,6 +286,8 @@ CREATE TABLE IF NOT EXISTS booth_expense_entries (
   note             VARCHAR(255),
   payer_member_id      UUID REFERENCES booth_members(id) ON DELETE SET NULL,
   external_payer_name  VARCHAR(120),
+  payment_method       VARCHAR(20) NOT NULL DEFAULT 'cash'
+    CHECK (payment_method IN ('cash', 'transfer')),
   entry_date           DATE NOT NULL,
   created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT booth_expense_entries_payer_xor_check CHECK (

@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 const MAX_INTEGER_DIGITS = 10;
 
 /** Format the raw typed string ("1234.5") with a grouped integer part. */
@@ -37,6 +39,7 @@ export function QuickAmountPad({
   saveLabel = "SAVE",
   accent = "green",
   saveTone,
+  beforeSave,
 }: {
   value: string;
   onChange: (next: string) => void;
@@ -45,6 +48,8 @@ export function QuickAmountPad({
   saveLabel?: string;
   accent?: "green" | "amber" | "rose" | "blue";
   saveTone?: "green" | "amber" | "red" | "rose" | "blue";
+  /** Rendered full-width above the save button (e.g. payment method toggle). */
+  beforeSave?: ReactNode;
 }) {
   const press = (k: Key) => onChange(applyKey(value, k));
   const canSave = !!value && Number(value) > 0 && !saving;
@@ -86,6 +91,7 @@ export function QuickAmountPad({
       <PadButton onClick={() => press("0")} className="col-span-2">
         0
       </PadButton>
+      {beforeSave ? <div className="col-span-4 px-1">{beforeSave}</div> : null}
       <button
         type="button"
         onClick={() => canSave && onSave()}

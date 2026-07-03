@@ -1,7 +1,7 @@
 import {
   boothCreditorsWithTableRepayments,
 } from "@/lib/advance-creditors";
-import { computeBoothCashOnHand } from "@/lib/booth-cash-on-hand";
+import { computeBoothOnHand } from "@/lib/booth-cash-on-hand";
 import { listBoothRepaymentsByCreditor } from "@/lib/booth-creditor-repayment-queries";
 import { listBoothAdvances } from "@/lib/booth-queries";
 import { BoothCreditorsCard } from "@/components/booth/summary/BoothCreditorsCardClient";
@@ -19,9 +19,9 @@ export async function BoothCreditorsCardSection({
   const advances = await listBoothAdvances(userId, boothId);
   if (advances.length === 0) return null;
 
-  const [repayments, cashOnHand] = await Promise.all([
+  const [repayments, onHand] = await Promise.all([
     listBoothRepaymentsByCreditor(userId, boothId),
-    computeBoothCashOnHand(userId, boothId),
+    computeBoothOnHand(userId, boothId),
   ]);
 
   const rows = boothCreditorsWithTableRepayments(
@@ -40,7 +40,7 @@ export async function BoothCreditorsCardSection({
     <BoothCreditorsCard
       boothId={boothId}
       rows={rows}
-      cashOnHand={cashOnHand}
+      onHand={onHand}
       currency={currency}
     />
   );

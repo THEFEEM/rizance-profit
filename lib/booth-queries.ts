@@ -124,6 +124,7 @@ type BoothExpenseRow = {
   note: string | null;
   payer_member_id: string | null;
   external_payer_name: string | null;
+  payment_method: string;
   entry_date: string;
   created_at: Date | string;
 };
@@ -140,6 +141,7 @@ function mapBoothExpense(r: BoothExpenseRow): BoothExpense {
     note: r.note,
     payerMemberId: r.payer_member_id,
     externalPayerName: externalRaw.length > 0 ? externalRaw : null,
+    paymentMethod: (r.payment_method ?? "cash") as PaymentMethod,
     entryDate: r.entry_date,
     createdAt: toIso(r.created_at),
   };
@@ -170,7 +172,7 @@ function mapBoothMember(r: BoothMemberRow): BoothMember {
 }
 
 const EXPENSE_RETURN = `id, booth_id, amount, cost_type, category, label, note, payer_member_id,
-  external_payer_name, entry_date::text AS entry_date, created_at`;
+  external_payer_name, payment_method, entry_date::text AS entry_date, created_at`;
 
 /** Fixed vs variable totals from expense category — never from cost_type. */
 function aggregateBoothExpenseTotals(

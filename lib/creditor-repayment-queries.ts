@@ -187,6 +187,16 @@ export async function createCreditorRepayment(
       ],
     );
 
+    const expenseNote = input.note?.trim()
+      ? `จ่ายคืน ${input.payerName} · ${input.note.trim()}`
+      : `จ่ายคืน ${input.payerName}`;
+
+    await client.query(
+      `INSERT INTO expense_entries (user_id, amount, category, payment_method, note, entry_date)
+       VALUES ($1, $2, 'expense_misc', $3, $4, $5::date)`,
+      [userId, amount, paymentMethod, expenseNote, entryDate],
+    );
+
     await client.query("COMMIT");
     return mapCreditorRepayment(rows[0]);
   } catch (err) {
