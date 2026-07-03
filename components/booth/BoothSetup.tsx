@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { EntryOptionButton } from "@/components/entry/EntryOptionButton";
 import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
 import { BoothMemberEditor } from "@/components/booth/BoothMemberEditor";
 import {
@@ -11,17 +10,14 @@ import {
   SetupSecondaryButton,
   SetupTextarea,
 } from "@/components/booth/setup/SetupField";
-import { BankIcon, CalendarIcon, PieChartIcon, TagIcon } from "@/components/booth/setup/icons";
+import { BankIcon, CalendarIcon, TagIcon } from "@/components/booth/setup/icons";
 import { apiFetch } from "@/lib/api-client";
 import { today } from "@/lib/date";
 import { SHOW_PARTNERS_SECTION } from "@/lib/feature-flags";
 import { computeProfit, formatMoney, moneySign } from "@/lib/money";
 import {
-  PROFIT_SPLIT_METHODS,
-  PROFIT_SPLIT_METHOD_LABELS,
   type Booth,
   type BoothMember,
-  type ProfitSplitMethod,
 } from "@/types/booth";
 
 export function BoothSetup({
@@ -43,9 +39,6 @@ export function BoothSetup({
     booth ? String(Math.round(Number(booth.poolBudget) * 100) / 100) : "",
   );
   const [poolGetsShare, setPoolGetsShare] = useState(booth?.poolGetsShare ?? false);
-  const [profitSplitMethod, setProfitSplitMethod] = useState<ProfitSplitMethod>(
-    booth?.profitSplitMethod ?? "equal",
-  );
   const [startDate, setStartDate] = useState(booth?.startDate ?? today());
   const [endDate, setEndDate] = useState(booth?.endDate ?? today());
   const [note, setNote] = useState(booth?.note ?? "");
@@ -70,7 +63,7 @@ export function BoothSetup({
       name: name.trim(),
       poolBudget: poolNum,
       poolGetsShare,
-      profitSplitMethod,
+      profitSplitMethod: createMode ? "by_equity" : booth?.profitSplitMethod ?? "by_equity",
       startDate,
       endDate,
       note: note.trim() || undefined,
@@ -222,37 +215,10 @@ export function BoothSetup({
         </div>
       </section>
 
-      {SHOW_PARTNERS_SECTION && (
-      <section className="px-4">
-        <label className="mb-2 flex items-center gap-2 text-sm font-medium text-rz-muted">
-          <span className="text-rz-hint">
-            <PieChartIcon />
-          </span>
-          วิธีแบ่งกำไร
-        </label>
-        <div className="grid grid-cols-2 gap-2">
-          {PROFIT_SPLIT_METHODS.map((m) => (
-            <EntryOptionButton
-              key={m}
-              selected={profitSplitMethod === m}
-              disabled={closed}
-              onClick={() => setProfitSplitMethod(m)}
-              accent="green"
-              layout="row"
-              className="text-center"
-            >
-              {PROFIT_SPLIT_METHOD_LABELS[m]}
-            </EntryOptionButton>
-          ))}
-        </div>
-      </section>
-      )}
-
       {SHOW_PARTNERS_SECTION && !createMode && booth && (
         <BoothMemberEditor
           boothId={booth.id}
           members={members}
-          profitSplitMethod={profitSplitMethod}
           closed={closed}
           currency={currency}
         />

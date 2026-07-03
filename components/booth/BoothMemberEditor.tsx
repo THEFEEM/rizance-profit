@@ -16,7 +16,6 @@ import {
   WAGE_TYPES,
   type BoothMember,
   type MemberRole,
-  type ProfitSplitMethod,
   type WageType,
 } from "@/types/booth";
 
@@ -51,13 +50,11 @@ function RoleIconTile({ role }: { role: MemberRole }) {
 export function BoothMemberEditor({
   boothId,
   members,
-  profitSplitMethod: _profitSplitMethod,
   closed,
   currency = "THB",
 }: {
   boothId: string;
   members: BoothMember[];
-  profitSplitMethod: ProfitSplitMethod;
   closed: boolean;
   currency?: string;
 }) {

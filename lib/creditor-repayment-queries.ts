@@ -11,7 +11,7 @@ import {
 } from "@/lib/shop-profit-withdrawal-queries";
 import type { CreditorRepayment } from "@/types/shop";
 
-type CreditorRepaymentRow = {
+export type CreditorRepaymentRow = {
   id: string;
   user_id: string;
   payer_kind: string;
@@ -22,6 +22,20 @@ type CreditorRepaymentRow = {
   entry_date: string;
   created_at: Date | string;
 };
+
+export function mapCreditorRepayment(r: CreditorRepaymentRow): CreditorRepayment {
+  return {
+    id: r.id,
+    userId: r.user_id,
+    payerKind: r.payer_kind as CreditorRepayment["payerKind"],
+    payerName: r.payer_name,
+    amount: r.amount,
+    paymentMethod: r.payment_method as CreditorRepayment["paymentMethod"],
+    note: r.note,
+    entryDate: r.entry_date,
+    createdAt: toIso(r.created_at),
+  };
+}
 
 const REPAYMENT_RETURN = `id, user_id, payer_kind, payer_name, amount, payment_method, note,
   entry_date::text AS entry_date, created_at`;
@@ -36,20 +50,6 @@ function repaymentQuery<T extends Record<string, unknown>>(
 
 function toIso(v: Date | string): string {
   return v instanceof Date ? v.toISOString() : String(v);
-}
-
-function mapCreditorRepayment(r: CreditorRepaymentRow): CreditorRepayment {
-  return {
-    id: r.id,
-    userId: r.user_id,
-    payerKind: r.payer_kind as CreditorRepayment["payerKind"],
-    payerName: r.payer_name,
-    amount: r.amount,
-    paymentMethod: r.payment_method as CreditorRepayment["paymentMethod"],
-    note: r.note,
-    entryDate: r.entry_date,
-    createdAt: toIso(r.created_at),
-  };
 }
 
 function isMissingRelationError(err: unknown): boolean {
@@ -87,7 +87,7 @@ export async function allTimeRepaymentsByMethod(
          COALESCE(SUM(CASE WHEN payment_method = 'cash' THEN amount ELSE 0 END), 0)::text AS cash_repayments,
          COALESCE(SUM(CASE WHEN payment_method = 'transfer' THEN amount ELSE 0 END), 0)::text AS transfer_repayments
        FROM creditor_repayments
-       WHERE user_id = $1`,
+       WHERE user_id = $1 AND booth_id IS NULL`,
       [userId],
     );
     const r = rows[0];
@@ -111,7 +111,7 @@ export async function listRepaymentsByCreditor(
     const { rows } = await query<{ payer_kind: string; name: string; repaid: string }>(
       `SELECT payer_kind, payer_name AS name, COALESCE(SUM(amount), 0)::text AS repaid
        FROM creditor_repayments
-       WHERE user_id = $1
+       WHERE user_id = $1 AND booth_id IS NULL
        GROUP BY payer_kind, payer_name`,
       [userId],
     );
@@ -131,7 +131,7 @@ async function sumRepaidByCreditor(
   const { rows } = await client.query<{ repaid: string }>(
     `SELECT COALESCE(SUM(amount), 0)::text AS repaid
      FROM creditor_repayments
-     WHERE user_id = $1 AND payer_kind = $2 AND payer_name = $3`,
+     WHERE user_id = $1 AND booth_id IS NULL AND payer_kind = $2 AND payer_name = $3`,
     [userId, payerKind, payerName],
   );
   return rows[0].repaid;
@@ -173,8 +173,8 @@ export async function createCreditorRepayment(
 
     const { rows } = await client.query<CreditorRepaymentRow>(
       `INSERT INTO creditor_repayments
-         (user_id, payer_kind, payer_name, amount, payment_method, note, entry_date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7::date)
+         (user_id, booth_id, payer_kind, payer_name, amount, payment_method, note, entry_date)
+       VALUES ($1, NULL, $2, $3, $4, $5, $6, $7::date)
        RETURNING ${REPAYMENT_RETURN}`,
       [
         userId,

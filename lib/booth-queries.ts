@@ -242,7 +242,7 @@ export async function createBooth(userId: string, input: BoothInput): Promise<Bo
       input.name,
       input.poolBudget.toFixed(2),
       input.poolGetsShare ?? false,
-      input.profitSplitMethod ?? "equal",
+      input.profitSplitMethod ?? "by_equity",
       input.startDate,
       input.endDate,
       input.note ?? null,
