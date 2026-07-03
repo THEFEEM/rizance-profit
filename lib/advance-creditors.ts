@@ -156,6 +156,35 @@ export async function getShopCreditorOwed(
   return row?.amount ?? null;
 }
 
+export async function getBoothCreditorOwed(
+  userId: string,
+  boothId: string,
+  payerKind: PayerKind,
+  payerName: string,
+): Promise<string | null> {
+  const { listBoothAdvances } = await import("@/lib/booth-queries");
+  const advances = await listBoothAdvances(userId, boothId);
+  let totalCents = 0;
+  for (const a of advances) {
+    const kind = a.isExternal ? "external" : "member";
+    if (kind === payerKind && a.creditorName === payerName) {
+      totalCents += toCents(a.amount);
+    }
+  }
+  return totalCents > 0 ? centsToDecimalString(totalCents) : null;
+}
+
+export function boothCreditorsWithTableRepayments(
+  advances: { creditorName: string; amount: string; isExternal: boolean }[],
+  repayments: { payerKind: string; name: string; repaid: string }[],
+): BoothCreditorRow[] {
+  const repaidForRow = repayments.map((r) => ({
+    name: r.name,
+    amount: r.repaid,
+  }));
+  return boothCreditorsWithRepayment(advances, repaidForRow);
+}
+
 export function creditorsByKind(
   rows: CreditorWithRepayment[],
   kind: PayerKind,

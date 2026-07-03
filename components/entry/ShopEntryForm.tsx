@@ -33,6 +33,7 @@ function mergeShopEntries(incomes: Income[], expenses: Expense[]): EntryRow[] {
       amount: e.amount,
       note: e.note,
       category: e.category,
+      paymentMethod: e.paymentMethod as PaymentMethod | undefined,
       createdAt: e.createdAt,
     })),
     ...expenses.map((e) => ({
@@ -41,6 +42,7 @@ function mergeShopEntries(incomes: Income[], expenses: Expense[]): EntryRow[] {
       amount: e.amount,
       note: e.note,
       category: e.category,
+      paymentMethod: (e.paymentMethod ?? "cash") as PaymentMethod,
       createdAt: e.createdAt,
     })),
   ];

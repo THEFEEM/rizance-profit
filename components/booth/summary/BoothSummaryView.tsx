@@ -43,7 +43,6 @@ export function BoothSummaryView({
           <BoothCreditorsCardSection
             userId={userId}
             boothId={boothId}
-            split={split}
             currency={currency}
           />
           <BoothSummaryLegend />

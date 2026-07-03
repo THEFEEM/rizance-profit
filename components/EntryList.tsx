@@ -16,6 +16,7 @@ import {
 } from "@/lib/personal-categories";
 import { DeleteConfirm } from "@/components/DeleteConfirm";
 import { ExpenseArrowIcon, IncomeArrowIcon } from "@/components/today/today-icons";
+import { PAYMENT_METHOD_LABELS, type PaymentMethod } from "@/types/booth";
 
 export type EntryRow = {
   id: string;
@@ -23,6 +24,7 @@ export type EntryRow = {
   amount: string;
   note: string | null;
   category?: ExpenseCategoryKey | IncomeCategoryKey | string;
+  paymentMethod?: PaymentMethod;
   createdAt: string;
   savingsGoalName?: string;
 };
@@ -60,9 +62,16 @@ function entryCategoryLabel(e: EntryRow, ledger: "shop" | "personal"): string {
 
 function entryMeta(e: EntryRow, ledger: "shop" | "personal"): string {
   const label = entryCategoryLabel(e, ledger);
-  if (ledger === "personal" || e.kind === "income") return label;
-  const typeLabel = expenseCostTypeLabel(e.category ?? "expense_misc");
-  return typeLabel ? `${label} · ${typeLabel}` : label;
+  if (ledger === "personal") return label;
+  const parts: string[] = [label];
+  if (e.paymentMethod) {
+    parts.push(PAYMENT_METHOD_LABELS[e.paymentMethod]);
+  }
+  if (e.kind === "expense" && ledger === "shop") {
+    const typeLabel = expenseCostTypeLabel(e.category ?? "expense_misc");
+    if (typeLabel) parts.push(typeLabel);
+  }
+  return parts.join(" · ");
 }
 
 export function EntryList({

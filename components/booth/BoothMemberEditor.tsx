@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { DeleteConfirm, partnerDeleteConfirmCopy } from "@/components/DeleteConfirm";
 import { EntryOptionButton } from "@/components/entry/EntryOptionButton";
 import { QuickAmountPad, formatTyped } from "@/components/QuickAmountPad";
 import { SetupField, SetupPrimaryButton } from "@/components/booth/setup/SetupField";
@@ -16,7 +17,6 @@ import {
   WAGE_TYPES,
   type BoothMember,
   type MemberRole,
-  type ProfitSplitMethod,
   type WageType,
 } from "@/types/booth";
 
@@ -51,15 +51,17 @@ function RoleIconTile({ role }: { role: MemberRole }) {
 export function BoothMemberEditor({
   boothId,
   members,
-  profitSplitMethod: _profitSplitMethod,
   closed,
   currency = "THB",
+  allowAdd = false,
+  hideHeader = false,
 }: {
   boothId: string;
   members: BoothMember[];
-  profitSplitMethod: ProfitSplitMethod;
   closed: boolean;
   currency?: string;
+  allowAdd?: boolean;
+  hideHeader?: boolean;
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -70,6 +72,8 @@ export function BoothMemberEditor({
   const [padField, setPadField] = useState<"investment" | "wage" | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<BoothMember | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function addMember() {
     if (closed || !name.trim()) return;
@@ -106,19 +110,27 @@ export function BoothMemberEditor({
     setSaving(false);
   }
 
-  async function removeMember(memberId: string) {
-    if (closed) return;
-    const res = await apiFetch(`/api/booths/${boothId}/members/${memberId}`, {
+  async function confirmRemoveMember() {
+    if (closed || !pendingDelete || deleting) return;
+    setDeleting(true);
+    const res = await apiFetch(`/api/booths/${boothId}/members/${pendingDelete.id}`, {
       method: "DELETE",
     });
-    if (res.ok) router.refresh();
+    if (res.ok) {
+      setPendingDelete(null);
+      router.refresh();
+    }
+    setDeleting(false);
   }
 
+  const showAddForm = allowAdd && !closed;
+
   return (
-    <section className="px-4">
+    <section className={hideHeader ? "" : "px-4"}>
+      {!hideHeader && (
       <div className="mb-2 flex items-center justify-between gap-2">
         <h2 className="text-sm font-medium text-rz-muted">สมาชิก</h2>
-        {!closed && (
+        {showAddForm && (
           <a
             href="#add-member-form"
             className="tap-target text-sm font-medium text-rz-green"
@@ -127,10 +139,13 @@ export function BoothMemberEditor({
           </a>
         )}
       </div>
+      )}
 
       {members.length === 0 && (
         <p className="mb-3 text-sm text-rz-hint">
-          ยังไม่มีสมาชิก — เพิ่มได้ หรือข้ามไปก่อน
+          {showAddForm
+            ? "ยังไม่มีสมาชิก — เพิ่มได้ หรือข้ามไปก่อน"
+            : "ยังไม่มีสมาชิก"}
         </p>
       )}
 
@@ -156,7 +171,7 @@ export function BoothMemberEditor({
               {!closed && (
                 <button
                   type="button"
-                  onClick={() => removeMember(m.id)}
+                  onClick={() => setPendingDelete(m)}
                   className="tap-target shrink-0 px-2 text-sm text-rz-hint active:text-rz-red"
                   aria-label={`ลบ ${m.name}`}
                 >
@@ -168,7 +183,7 @@ export function BoothMemberEditor({
         </ul>
       )}
 
-      {!closed && (
+      {showAddForm && (
         <div id="add-member-form" className="rounded-[14px] border-[0.5px] border-rz-border bg-rz-card p-4">
           <p className="text-sm font-medium text-rz-text">เพิ่มสมาชิก</p>
 
@@ -276,6 +291,15 @@ export function BoothMemberEditor({
             </SetupPrimaryButton>
           </div>
         </div>
+      )}
+
+      {pendingDelete && (
+        <DeleteConfirm
+          {...partnerDeleteConfirmCopy(pendingDelete.name)}
+          onConfirm={confirmRemoveMember}
+          onCancel={() => !deleting && setPendingDelete(null)}
+          busy={deleting}
+        />
       )}
     </section>
   );
