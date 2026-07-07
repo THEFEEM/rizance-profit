@@ -17,6 +17,7 @@ import { ShopProfitWithdrawalSection } from "@/components/shop/ShopProfitWithdra
 import { ViewFullSummaryButton } from "@/components/shared/ViewFullSummaryButton";
 import { buildTodayCategoryGroups } from "@/lib/today-category-groups";
 import type { User } from "@/types";
+import type { PaymentMethod } from "@/types/booth";
 
 /** Regular-shop Today — total sales hero + today's breakdown + partner split. */
 export async function RegularToday({ user }: { user: User }) {
@@ -41,6 +42,7 @@ export async function RegularToday({ user }: { user: User }) {
       amount: i.amount,
       note: i.note,
       category: i.category,
+      paymentMethod: i.paymentMethod as PaymentMethod | undefined,
       createdAt: i.createdAt,
     })),
     ...expenses.map((e) => ({
@@ -49,6 +51,7 @@ export async function RegularToday({ user }: { user: User }) {
       amount: e.amount,
       note: e.note,
       category: e.category,
+      paymentMethod: (e.paymentMethod ?? "cash") as PaymentMethod,
       createdAt: e.createdAt,
     })),
   ].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));

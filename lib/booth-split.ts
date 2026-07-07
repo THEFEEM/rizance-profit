@@ -305,21 +305,15 @@ export function computeSplitProfit(input: SplitProfitInput): SplitProfitResult {
     wageCost,
   );
 
-  const advanceRepayments = computeAdvanceRepayments(grossProfit, input.advances);
-  const repayTotal = sumDecimals(0, ...advanceRepayments.map((r) => r.amount));
-  const netProfit = computeProfit(grossProfit, repayTotal);
+  // Creditor repayments are manual (creditor_repayments table) — not auto-FIFO from profit.
+  const advanceRepayments: AdvanceRepayment[] = [];
+  const netProfit = grossProfit;
   const isLoss = toCents(netProfit) < 0;
 
   const repayCapitalFirst = input.repayCapitalFirst ?? false;
   const totalCapital = memberEquity;
   const capitalSplit = resolveCapitalSplit(repayCapitalFirst, netProfit, totalCapital);
   const profitToSplit = capitalSplit.profitToSplit;
-
-  const repaymentByMember = new Map(
-    advanceRepayments
-      .filter((r) => r.role === "member" && r.memberId)
-      .map((r) => [r.memberId!, r.amount]),
-  );
 
   const { memberWeights, poolWeight, warning } = shareWeights(
     input.profitSplitMethod,
@@ -347,7 +341,7 @@ export function computeSplitProfit(input: SplitProfitInput): SplitProfitResult {
       investmentAmount: member.investmentAmount,
       exactShare: exact,
       flooredShare: floorWholeBaht(exact),
-      advanceRepayment: repaymentByMember.get(member.id) ?? "0.00",
+      advanceRepayment: "0.00",
       wageCost: wage,
       eventDays:
         (member.role === "employee" || member.role === "manager") &&
@@ -373,7 +367,7 @@ export function computeSplitProfit(input: SplitProfitInput): SplitProfitResult {
       investmentAmount: "0.00",
       exactShare: "0.00",
       flooredShare: "0.00",
-      advanceRepayment: repaymentByMember.get(m.id) ?? "0.00",
+      advanceRepayment: "0.00",
       wageCost: wage,
       eventDays: m.wageType === "daily" ? eventDays : null,
     });
@@ -397,7 +391,7 @@ export function computeSplitProfit(input: SplitProfitInput): SplitProfitResult {
       investmentAmount: "0.00",
       exactShare: "0.00",
       flooredShare: "0.00",
-      advanceRepayment: repaymentByMember.get(m.id) ?? "0.00",
+      advanceRepayment: "0.00",
       wageCost: wage,
       eventDays: m.wageType === "daily" ? eventDays : null,
     });

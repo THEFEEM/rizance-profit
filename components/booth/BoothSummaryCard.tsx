@@ -186,7 +186,12 @@ export function BoothSummaryCard({
               แบ่งกำไร (ตัวอย่าง)
             </p>
             <p className="mt-1 text-sm text-rz-muted">
-              {PROFIT_SPLIT_METHOD_LABELS[split.method]}
+              {split.method === "by_equity" && (
+                <>{PROFIT_SPLIT_METHOD_LABELS.by_equity}</>
+              )}
+              {split.method === "by_equity" &&
+                (split.poolGetsShare && moneySign(split.poolShare.flooredShare) > 0) &&
+                " · "}
               {split.poolGetsShare && moneySign(split.poolShare.flooredShare) > 0 && (
                 <> · กอง {formatMoney(split.poolShare.flooredShare, currency)}</>
               )}

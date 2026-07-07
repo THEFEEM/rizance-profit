@@ -1,7 +1,8 @@
 import type { PoolClient } from "pg";
-import { query } from "@/lib/db";
+import { pool, query } from "@/lib/db";
 import { isUndefinedColumnError } from "@/lib/db-migration-guard";
 import { computeProfit, sumDecimals, toCents } from "@/lib/money";
+import { postTransferJournal } from "@/lib/shop-transfer-posting-adapter";
 import type {
   AllTimeSummary,
   AuthProvider,
@@ -451,13 +452,36 @@ function mapTransfer(r: TransferRow): MoneyTransfer {
 
 export async function createTransfer(userId: string, input: TransferInput): Promise<MoneyTransfer> {
   const entryDate = input.entryDate ?? today();
-  const { rows } = await query<TransferRow>(
-    `INSERT INTO money_transfers (user_id, amount, direction, note, entry_date)
-     VALUES ($1, $2, $3, $4, $5::date)
-     RETURNING id, amount, direction, note, entry_date::text AS entry_date, created_at`,
-    [userId, input.amount.toFixed(2), input.direction, input.note ?? null, entryDate],
-  );
-  return mapTransfer(rows[0]);
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const { rows } = await client.query<TransferRow>(
+      `INSERT INTO money_transfers (user_id, amount, direction, note, entry_date)
+       VALUES ($1, $2, $3, $4, $5::date)
+       RETURNING id, amount, direction, note, entry_date::text AS entry_date, created_at`,
+      [userId, input.amount.toFixed(2), input.direction, input.note ?? null, entryDate],
+    );
+
+    const transfer = mapTransfer(rows[0]!);
+
+    await postTransferJournal(client, {
+      id: transfer.id,
+      userId,
+      amount: transfer.amount,
+      direction: transfer.direction,
+      entryDate: transfer.entryDate,
+    });
+
+    await client.query("COMMIT");
+    return transfer;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export async function deleteTransfer(userId: string, id: string): Promise<boolean> {

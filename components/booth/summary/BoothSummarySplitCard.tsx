@@ -14,7 +14,7 @@ export function BoothSummarySplitCard({
       split={split}
       currency={currency}
       accent="amber"
-      emptyHint="ยังไม่มีผู้ลงทุน — เพิ่มสมาชิกในตั้งค่าบูธเพื่อแบ่งกำไร"
+      emptyHint="ยังไม่มีผู้ลงทุน — เพิ่มสมาชิกตอนสร้างบูธใหม่"
     />
   );
 }

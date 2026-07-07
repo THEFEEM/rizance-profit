@@ -219,7 +219,6 @@ export async function BoothStatsSummary({
           <BoothCreditorsCardSection
             userId={user.id}
             boothId={booth.id}
-            split={split}
             currency={user.currency}
           />
         </>

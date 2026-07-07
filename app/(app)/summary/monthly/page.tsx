@@ -24,6 +24,7 @@ import {
 } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/session";
 import { parseShopSummaryParams, SHOP_SUMMARY_LABELS } from "@/lib/summary-params";
+import type { PaymentMethod } from "@/types/booth";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,7 @@ export default async function ShopSummaryPage({
         amount: i.amount,
         note: i.note,
         category: i.category,
+        paymentMethod: i.paymentMethod as PaymentMethod | undefined,
         createdAt: i.createdAt,
       })),
       ...expenses.map((e) => ({
@@ -61,6 +63,7 @@ export default async function ShopSummaryPage({
         amount: e.amount,
         note: e.note,
         category: e.category,
+        paymentMethod: (e.paymentMethod ?? "cash") as PaymentMethod,
         createdAt: e.createdAt,
       })),
     ].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));

@@ -2,12 +2,14 @@ import {
   boothSummary,
   listBoothExpense,
   listBoothIncome,
+  splitProfit,
 } from "@/lib/booth-queries";
 import { computeProfit, sumDecimals } from "@/lib/money";
 import { BoothTodayHeroCard } from "@/components/today/BoothTodayHeroCard";
 import { BoothBudgetBar } from "@/components/today/BoothBudgetBar";
 import { TodayStatCards } from "@/components/TodayStatCards";
 import { BoothDayEntryList } from "@/components/BoothDayEntryList";
+import { SplitProfitCard } from "@/components/shared/SplitProfitCard";
 import { ViewFullSummaryButton } from "@/components/shared/ViewFullSummaryButton";
 import type { Booth } from "@/types/booth";
 import type { User } from "@/types";
@@ -21,10 +23,11 @@ export async function BoothToday({
   booth: Booth;
   date: string;
 }) {
-  const [eventSummary, incomes, expenses] = await Promise.all([
+  const [eventSummary, incomes, expenses, split] = await Promise.all([
     boothSummary(user.id, booth.id),
     listBoothIncome(user.id, booth.id),
     listBoothExpense(user.id, booth.id),
+    splitProfit(user.id, booth.id),
   ]);
 
   const event = eventSummary ?? {
@@ -63,6 +66,16 @@ export async function BoothToday({
         expenseLabel="รายจ่ายรวมบูธ"
         currency={user.currency}
       />
+
+      {split && (
+        <SplitProfitCard
+          split={split}
+          currency={user.currency}
+          accent="amber"
+          periodLabel="ทั้งหมด"
+          variant="compact"
+        />
+      )}
 
       <div className="mt-3 px-4">
         {hasEntries ? (

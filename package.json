@@ -1,6 +1,6 @@
 {
   "name": "rizance-profit",
-  "version": "2.1.0",
+  "version": "2.3.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -37,7 +37,10 @@
     "test:subscription": "node scripts/test-subscription.mjs",
     "test:payment": "node scripts/test-payment.mjs",
     "test:payment-webhook": "node scripts/test-payment-webhook.mjs",
-    "test:stripe-flow": "node scripts/test-stripe-flow.mjs"
+    "test:stripe-flow": "node scripts/test-stripe-flow.mjs",
+    "test:shop-transfer-posting-adapter": "npx tsx scripts/test-shop-transfer-posting-adapter.ts",
+    "test:shop-transfer-journal": "npx tsx scripts/test-shop-transfer-journal.ts",
+    "verify:migrations-0036-0037": "node scripts/verify-migrations-0036-0037.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

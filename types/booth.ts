@@ -88,6 +88,7 @@ export type BoothExpense = {
   payerMemberId: string | null;
   /** Trimmed non-empty when payer is outside the member list. */
   externalPayerName: string | null;
+  paymentMethod: PaymentMethod;
   entryDate: string;
   createdAt: string;
 };

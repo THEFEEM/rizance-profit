@@ -14,9 +14,10 @@ export function BoothSummaryHeader({
   split: SplitProfitResult | null;
   closed: boolean;
 }) {
-  const methodLabel = split
-    ? PROFIT_SPLIT_METHOD_LABELS[split.method]
-    : PROFIT_SPLIT_METHOD_LABELS[booth.profitSplitMethod];
+  const methodLabel =
+    split?.method === "by_equity" || booth.profitSplitMethod === "by_equity"
+      ? PROFIT_SPLIT_METHOD_LABELS.by_equity
+      : null;
 
   return (
     <header className="px-4 pb-4">
@@ -34,9 +35,11 @@ export function BoothSummaryHeader({
             </span>
           </p>
         </div>
+        {methodLabel && (
         <span className="shrink-0 rounded-full border-[0.5px] border-[#5A3F12] bg-[#2E2310] px-3 py-1.5 text-xs font-medium text-rz-amber">
           {methodLabel}
         </span>
+        )}
       </div>
       {closed && (
         <p className="mt-3 rounded-[14px] border-[0.5px] border-[#5A3F12] bg-[#2E2310]/60 px-4 py-3 text-sm text-rz-amber">

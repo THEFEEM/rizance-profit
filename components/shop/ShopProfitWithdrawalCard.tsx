@@ -9,6 +9,7 @@ import { SetupPrimaryButton } from "@/components/booth/setup/SetupField";
 import { ROLE_STYLES } from "@/components/booth/summary/role-styles";
 import { apiFetch } from "@/lib/api-client";
 import { today } from "@/lib/date";
+import { SHOW_CAPITAL_WITHDRAWAL } from "@/lib/feature-flags";
 import { formatMoney } from "@/lib/money";
 import type { ShopOnHand } from "@/lib/shop-on-hand";
 import {
@@ -46,6 +47,7 @@ export function ShopProfitWithdrawalCard({
 
   const maxDate = today();
 
+  if (!SHOW_CAPITAL_WITHDRAWAL) return null;
   if (members.length === 0) return null;
 
   function openPanel(m: MemberProfitWithdrawable) {
