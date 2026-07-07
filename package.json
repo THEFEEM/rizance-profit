@@ -38,6 +38,8 @@
     "test:payment": "node scripts/test-payment.mjs",
     "test:payment-webhook": "node scripts/test-payment-webhook.mjs",
     "test:stripe-flow": "node scripts/test-stripe-flow.mjs",
+    "test:shop-transfer-posting-adapter": "npx tsx scripts/test-shop-transfer-posting-adapter.ts",
+    "test:shop-transfer-journal": "npx tsx scripts/test-shop-transfer-journal.ts",
     "verify:migrations-0036-0037": "node scripts/verify-migrations-0036-0037.mjs"
   },
   "dependencies": {
