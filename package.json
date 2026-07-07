@@ -40,6 +40,8 @@
     "test:stripe-flow": "node scripts/test-stripe-flow.mjs",
     "test:shop-transfer-posting-adapter": "npx tsx scripts/test-shop-transfer-posting-adapter.ts",
     "test:shop-transfer-journal": "npx tsx scripts/test-shop-transfer-journal.ts",
+    "test:shop-capital-posting-adapter": "npx tsx scripts/test-shop-capital-posting-adapter.ts",
+    "test:shop-capital-journal": "npx tsx scripts/test-shop-capital-journal.ts",
     "verify:migrations-0036-0037": "node scripts/verify-migrations-0036-0037.mjs"
   },
   "dependencies": {
