@@ -2,6 +2,7 @@ import type { PoolClient } from "pg";
 import { pool } from "@/lib/db";
 import { today } from "@/lib/date";
 import { formatMoney, toCents } from "@/lib/money";
+import { postCapitalJournal } from "@/lib/shop-capital-posting-adapter";
 import type { CapitalTxInput } from "@/lib/shop-validation";
 import type { CapitalTransaction, ShopMember } from "@/types/shop";
 
@@ -33,6 +34,7 @@ type CapitalTxRow = {
   member_id: string;
   amount: string;
   direction: string;
+  payment_method: string;
   note: string | null;
   entry_date: string;
   created_at: Date | string;
@@ -55,7 +57,7 @@ function mapCapitalTx(r: CapitalTxRow): CapitalTransaction {
   };
 }
 
-const CAPITAL_TX_RETURN = `id, user_id, member_id, amount, direction, note,
+const CAPITAL_TX_RETURN = `id, user_id, member_id, amount, direction, payment_method, note,
   entry_date::text AS entry_date, created_at`;
 
 const LEDGER_EQUITY_SQL = `
@@ -84,6 +86,39 @@ export class CapitalWithdrawalLimitError extends Error {
 
 export function withdrawalLimitMessage(maxAmount: string, currency = "THB"): string {
   return `ถอนได้ไม่เกิน ${formatMoney(maxAmount, currency)}`;
+}
+
+async function getMemberName(
+  client: PoolClient,
+  userId: string,
+  memberId: string,
+): Promise<string | undefined> {
+  const { rows } = await client.query<{ name: string }>(
+    `SELECT name FROM shop_members WHERE id = $2 AND user_id = $1`,
+    [userId, memberId],
+  );
+  return rows[0]?.name;
+}
+
+async function postCapitalJournalForRow(
+  client: PoolClient,
+  row: CapitalTxRow,
+  memberName?: string,
+): Promise<void> {
+  const paymentMethod = row.payment_method;
+  if (paymentMethod !== "cash" && paymentMethod !== "transfer") {
+    throw new Error(`unexpected capital_transactions.payment_method: ${paymentMethod}`);
+  }
+
+  await postCapitalJournal(client, {
+    id: row.id,
+    userId: row.user_id,
+    amount: row.amount,
+    direction: row.direction as CapitalTransaction["direction"],
+    paymentMethod,
+    entryDate: row.entry_date,
+    memberName,
+  });
 }
 
 async function assertMemberOwned(
@@ -136,7 +171,10 @@ export async function insertCapitalContribution(
      RETURNING ${CAPITAL_TX_RETURN}`,
     [userId, memberId, params.amount, params.note, params.entryDate],
   );
-  return mapCapitalTx(rows[0]);
+  const row = rows[0]!;
+  const memberName = await getMemberName(client, userId, memberId);
+  await postCapitalJournalForRow(client, row, memberName);
+  return mapCapitalTx(row);
 }
 
 export async function createCapitalTx(
@@ -164,6 +202,7 @@ export async function createCapitalTx(
        RETURNING ${CAPITAL_TX_RETURN}`,
       [userId, input.memberId, amount, input.direction, input.note ?? null, entryDate],
     );
+    const row = rows[0]!;
 
     await syncMemberInvestment(client, userId, input.memberId);
 
@@ -171,13 +210,14 @@ export async function createCapitalTx(
       `SELECT ${MEMBER_RETURN} FROM shop_members WHERE id = $2 AND user_id = $1`,
       [userId, input.memberId],
     );
-
-    await client.query("COMMIT");
-
     const member = memberRes.rows[0] ? mapShopMemberRow(memberRes.rows[0]) : null;
     if (!member) throw new Error("Member not found after capital tx");
 
-    return { transaction: mapCapitalTx(rows[0]), member };
+    await postCapitalJournalForRow(client, row, member.name);
+
+    await client.query("COMMIT");
+
+    return { transaction: mapCapitalTx(row), member };
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;
