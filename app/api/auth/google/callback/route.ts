@@ -6,6 +6,7 @@ import {
   linkGoogleAccount,
 } from "@/lib/queries";
 import { signSession, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth";
+import { requestHostname } from "@/lib/jwt";
 import { CONTEXT_COOKIE, contextCookieOptions } from "@/lib/context";
 import { createGoogleOAuthClient, isGoogleAuthEnabled } from "@/lib/google-oauth";
 
@@ -87,7 +88,7 @@ export async function GET(req: NextRequest) {
 
     const token = await signSession(user.id);
     const res = NextResponse.redirect(new URL("/home", req.url));
-    res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
+    res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions(requestHostname(req)));
     if (isNewUser) {
       res.cookies.set(CONTEXT_COOKIE, "personal", contextCookieOptions());
     }

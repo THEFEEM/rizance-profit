@@ -69,6 +69,8 @@ export type Income = {
   note: string | null;
   entryDate: string; // YYYY-MM-DD
   createdAt: string;
+  voidedAt: string | null;
+  voidReason: string | null;
 };
 
 export type PayerKind = "member" | "external";

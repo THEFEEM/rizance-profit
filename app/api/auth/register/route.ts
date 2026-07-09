@@ -3,6 +3,7 @@ import { checkAuthRateLimit } from "@/lib/auth-rate-limit";
 import { registerSchema, fieldErrorsFrom } from "@/lib/validation";
 import { createUser, findUserByEmail } from "@/lib/queries";
 import { hashPassword, signSession, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth";
+import { requestHostname } from "@/lib/jwt";
 import { CONTEXT_COOKIE, contextCookieOptions } from "@/lib/context";
 
 export async function POST(req: NextRequest) {
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
 
   const token = await signSession(user.id);
   const res = NextResponse.json({ data: { user, redirect } }, { status: 201 });
-  res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
+  res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions(requestHostname(req)));
   res.cookies.set(CONTEXT_COOKIE, contextValue, contextCookieOptions());
   return res;
 }

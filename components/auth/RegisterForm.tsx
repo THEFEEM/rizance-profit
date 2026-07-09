@@ -7,7 +7,7 @@ import { AuthButton } from "@/components/auth/AuthButton";
 import { AuthDivider } from "@/components/auth/AuthDivider";
 import { AuthField } from "@/components/auth/AuthField";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
-import { RegisterModeTiles } from "@/components/auth/RegisterModeTiles";
+import { RegisterModeTiles, defaultRegisterMode } from "@/components/auth/RegisterModeTiles";
 import {
   EyeIcon,
   EyeOffIcon,
@@ -30,7 +30,7 @@ export function RegisterForm({
 }) {
   const router = useRouter();
 
-  const [mode, setMode] = useState<RegisterMode>("personal");
+  const [mode, setMode] = useState<RegisterMode>(defaultRegisterMode);
   const [shopName, setShopName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

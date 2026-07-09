@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { PricingCard, type PricingFeature } from "@/components/pricing/PricingCard";
 import { EntryPageHeader } from "@/components/entry/EntryPageHeader";
 import { apiFetch } from "@/lib/api-client";
+import { SHOW_PERSONAL_MODE } from "@/lib/feature-flags";
 import type { PaidStripePlan } from "@/lib/subscription-plan";
 import type { AppContextMode } from "@/types/context";
 
@@ -103,7 +104,7 @@ export function SubscriptionPricingContent({ mode }: { mode: AppContextMode }) {
   const activeExpiresAt = status?.isExpired ? null : status?.expiresAt ?? null;
 
   const paidPlan: PaidStripePlan | null = useMemo(() => {
-    if (mode === "personal") return "personal_plus";
+    if (mode === "personal" && SHOW_PERSONAL_MODE) return "personal_plus";
     if (mode === "booth") return "event_pass";
     if (mode === "regular") return "business";
     return null;
@@ -125,7 +126,9 @@ export function SubscriptionPricingContent({ mode }: { mode: AppContextMode }) {
       return;
     }
 
-    setError(res.ok ? "ไม่สามารถเปิดหน้าชำระเงินได้" : res.message);
+    setError(
+      res.ok ? "ไม่สามารถเปิดหน้าชำระเงินได้" : "ไม่สามารถดำเนินการชำระเงินได้ กรุณาลองใหม่อีกครั้ง",
+    );
   }
 
   return (

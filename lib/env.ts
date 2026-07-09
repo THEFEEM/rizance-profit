@@ -23,3 +23,18 @@ export function getAppUrl(): string {
 export function useSecureCookies(): boolean {
   return isVercel();
 }
+
+/** Cross-subdomain session cookie (e.g. `.rizance.com`). Unset in local dev. */
+export function sessionCookieDomain(): string | undefined {
+  return process.env.SESSION_COOKIE_DOMAIN || undefined;
+}
+
+/** POS web app origin for CORS on /api/pos/* (e.g. https://pos.rizance.com). */
+export function getPosAppOrigin(): string {
+  return process.env.POS_APP_ORIGIN?.trim() || "http://localhost:3001";
+}
+
+/** Public POS app URL for dashboard links (NEXT_PUBLIC_POS_APP_URL). */
+export function getPublicPosAppUrl(): string {
+  return process.env.NEXT_PUBLIC_POS_APP_URL?.trim() || "http://localhost:3001";
+}

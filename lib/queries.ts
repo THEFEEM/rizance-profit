@@ -72,6 +72,8 @@ type IncomeRow = {
   note: string | null;
   entry_date: string;
   created_at: Date | string;
+  voided_at?: Date | string | null;
+  void_reason?: string | null;
 };
 
 function mapIncome(r: IncomeRow): Income {
@@ -83,6 +85,8 @@ function mapIncome(r: IncomeRow): Income {
     note: r.note,
     entryDate: r.entry_date,
     createdAt: toIso(r.created_at),
+    voidedAt: r.voided_at != null ? toIso(r.voided_at) : null,
+    voidReason: r.void_reason ?? null,
   };
 }
 
@@ -244,7 +248,8 @@ export async function createIncome(userId: string, input: IncomeInput): Promise<
   const { rows } = await query<IncomeRow>(
     `INSERT INTO income_entries (user_id, amount, category, payment_method, note, entry_date)
      VALUES ($1, $2, $3, $4, $5, $6::date)
-     RETURNING id, amount, category, payment_method, note, entry_date::text AS entry_date, created_at`,
+     RETURNING id, amount, category, payment_method, note, entry_date::text AS entry_date, created_at,
+             voided_at, void_reason`,
     [userId, input.amount.toFixed(2), category, paymentMethod, input.note ?? null, entryDate],
   );
   return mapIncome(rows[0]);
@@ -252,7 +257,8 @@ export async function createIncome(userId: string, input: IncomeInput): Promise<
 
 export async function listIncomeByDate(userId: string, date: string): Promise<Income[]> {
   const { rows } = await query<IncomeRow>(
-    `SELECT id, amount, category, note, entry_date::text AS entry_date, created_at
+    `SELECT id, amount, category, note, entry_date::text AS entry_date, created_at,
+            voided_at, void_reason
      FROM income_entries
      WHERE user_id = $1 AND entry_date = $2
      ORDER BY created_at DESC`,
@@ -267,7 +273,8 @@ export async function listIncomeInPeriod(
   end: string,
 ): Promise<Income[]> {
   const { rows } = await query<IncomeRow>(
-    `SELECT id, amount, category, note, entry_date::text AS entry_date, created_at
+    `SELECT id, amount, category, note, entry_date::text AS entry_date, created_at,
+            voided_at, void_reason
      FROM income_entries
      WHERE user_id = $1 AND entry_date >= $2 AND entry_date <= $3
      ORDER BY entry_date DESC, created_at DESC`,

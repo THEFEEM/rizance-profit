@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/jwt";
-import { getAppUrl, isVercel } from "@/lib/env";
+import { getAppUrl, getPosAppOrigin, isVercel } from "@/lib/env";
 
 const PUBLIC_PATHS = ["/", "/login", "/register", "/pricing"];
 const LEGACY_APP_HOST = "rizance-profit.vercel.app";
@@ -15,9 +15,27 @@ function isPublicStaticFile(pathname: string): boolean {
   );
 }
 
+function applyPosCorsHeaders(res: NextResponse): NextResponse {
+  const origin = getPosAppOrigin();
+  res.headers.set("Access-Control-Allow-Origin", origin);
+  res.headers.set("Access-Control-Allow-Credentials", "true");
+  res.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.headers.set("Access-Control-Allow-Headers", "Content-Type");
+  res.headers.set("Vary", "Origin");
+  return res;
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const host = req.headers.get("host") ?? req.nextUrl.host;
+
+  // CORS for POS API only — credentials require explicit origin (never *).
+  if (pathname.startsWith("/api/pos/")) {
+    if (req.method === "OPTIONS") {
+      return applyPosCorsHeaders(new NextResponse(null, { status: 204 }));
+    }
+    return applyPosCorsHeaders(NextResponse.next());
+  }
 
   // Belt-and-suspenders: force HTTPS on production (Vercel terminates TLS at the edge).
   if (isVercel() && req.headers.get("x-forwarded-proto") === "http") {
@@ -59,8 +77,9 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Run on everything except API routes, Next internals, PWA files, and static assets.
   matcher: [
+    "/api/pos/:path*",
+    // Run on everything except API routes, Next internals, PWA files, and static assets.
     "/((?!api|_next/static|_next/image|favicon\\.ico|sw\\.js|manifest\\.json|icons/|.*\\.(?:png|jpg|jpeg|gif|svg|ico|json|webmanifest|txt|xml|webp)$).*)",
   ],
 };

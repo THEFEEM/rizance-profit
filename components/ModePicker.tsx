@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ModeRow } from "@/components/ModeRow";
 import { renderModeIcon } from "@/components/mode-icons";
 import { apiFetch } from "@/lib/api-client";
+import { SHOW_ORG_MODE, SHOW_PERSONAL_MODE } from "@/lib/feature-flags";
 import { activeOrgProjects } from "@/lib/mode-switch";
 import { orgDisplayName } from "@/lib/project-ui";
 import type { Booth } from "@/types/booth";
@@ -289,13 +290,15 @@ export function ModePicker({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4">
           <ul className="divide-y divide-rz-border border-t-[0.5px] border-rz-border">
-            <ModeRow
-              icon={renderModeIcon("personal")}
-              label="บุคคล"
-              selected={mode === "personal"}
-              disabled={switching}
-              onClick={selectPersonal}
-            />
+            {SHOW_PERSONAL_MODE && (
+              <ModeRow
+                icon={renderModeIcon("personal")}
+                label="บุคคล"
+                selected={mode === "personal"}
+                disabled={switching}
+                onClick={selectPersonal}
+              />
+            )}
             <ModeRow
               icon={renderModeIcon("regular")}
               label={shopName}
@@ -313,7 +316,7 @@ export function ModePicker({
                 onClick={selectBooth}
               />
             )}
-            {orgLabel && (
+            {SHOW_ORG_MODE && orgLabel && (
               <ModeRow
                 icon={renderModeIcon("org")}
                 label={orgLabel}
@@ -343,7 +346,7 @@ export function ModePicker({
             >
               ＋ สร้างบูธใหม่
             </Link>
-            {orgs.length === 0 && (
+            {SHOW_ORG_MODE && orgs.length === 0 && (
               <Link
                 href="/projects/new"
                 onClick={close}

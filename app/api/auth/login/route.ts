@@ -3,6 +3,7 @@ import { checkAuthRateLimit } from "@/lib/auth-rate-limit";
 import { loginSchema, fieldErrorsFrom } from "@/lib/validation";
 import { findUserByEmail } from "@/lib/queries";
 import { verifyPassword, signSession, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth";
+import { requestHostname } from "@/lib/jwt";
 
 export async function POST(req: NextRequest) {
   const limited = checkAuthRateLimit(req, "login");
@@ -46,6 +47,6 @@ export async function POST(req: NextRequest) {
 
   const token = await signSession(user.id);
   const res = NextResponse.json({ data: { user } }, { status: 200 });
-  res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
+  res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions(requestHostname(req)));
   return res;
 }
