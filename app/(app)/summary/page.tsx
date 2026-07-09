@@ -2,6 +2,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import { CONTEXT_COOKIE, resolveTodayContext } from "@/lib/context";
+import { SHOW_ORG_MODE, SHOW_PERSONAL_MODE } from "@/lib/feature-flags";
+import { userHasOrgData, userHasPersonalData } from "@/lib/mode-access";
 import {
   RegularStatsSummary,
   parseRegularStatsParams,
@@ -28,11 +30,11 @@ export default async function StatsSummaryPage({
     cookieStore.get(CONTEXT_COOKIE)?.value,
   );
 
-  if (ctx.mode === "project") {
+  if (ctx.mode === "project" && (SHOW_ORG_MODE || (await userHasOrgData(user.id)))) {
     redirect(`/projects/${ctx.projectId}/summary`);
   }
 
-  if (ctx.mode === "personal") {
+  if (ctx.mode === "personal" && (SHOW_PERSONAL_MODE || (await userHasPersonalData(user.id)))) {
     redirect("/personal/summary");
   }
 

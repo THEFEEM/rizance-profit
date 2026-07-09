@@ -14,15 +14,18 @@ import { TodayCategoryMiniList } from "@/components/today/TodayCategoryMiniList"
 import { EntryList, type EntryRow } from "@/components/EntryList";
 import { SplitProfitCard } from "@/components/shared/SplitProfitCard";
 import { ShopProfitWithdrawalSection } from "@/components/shop/ShopProfitWithdrawalSection";
+import { ShopPosLaunchCard } from "@/components/shop/ShopPosLaunchCard";
 import { ViewFullSummaryButton } from "@/components/shared/ViewFullSummaryButton";
 import { buildTodayCategoryGroups } from "@/lib/today-category-groups";
+import { getPublicPosAppUrl } from "@/lib/env";
+import { getActiveSubscriptionPlan } from "@/lib/subscription-user";
 import type { User } from "@/types";
 import type { PaymentMethod } from "@/types/booth";
 
 /** Regular-shop Today — total sales hero + today's breakdown + partner split. */
 export async function RegularToday({ user }: { user: User }) {
   const date = today();
-  const [monthly, summary, incomes, expenses, onHand, split, shopWithdrawals] =
+  const [monthly, summary, incomes, expenses, onHand, split, shopWithdrawals, activePlan] =
     await Promise.all([
     monthToDateSummary(user.id),
     dailySummary(user.id, date),
@@ -31,6 +34,7 @@ export async function RegularToday({ user }: { user: User }) {
     computeShopOnHand(user.id),
     shopSplitProfit(user.id, date, date),
     shopMemberProfitWithdrawable(user.id),
+    getActiveSubscriptionPlan(user.id),
   ]);
 
   const { cashOnHand, transferOnHand, totalOnHand } = onHand;
@@ -77,6 +81,8 @@ export async function RegularToday({ user }: { user: User }) {
         expense={summary.expense}
         currency={user.currency}
       />
+
+      <ShopPosLaunchCard plan={activePlan} posAppUrl={getPublicPosAppUrl()} />
 
       {split && (
         <SplitProfitCard

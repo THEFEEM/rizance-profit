@@ -1,0 +1,120 @@
+{
+  "email": "pos-net-diag-1783291616514@rizance.test",
+  "steps": [
+    {
+      "step": "1_clear_cookies",
+      "detail": "Cleared all cookies in browser context"
+    },
+    {
+      "step": "register",
+      "detail": {
+        "status": 201,
+        "body": {
+          "data": {
+            "user": {
+              "id": "0b6d73af-8907-4cfb-8be3-5ae7d880eea0",
+              "email": "pos-net-diag-1783291616514@rizance.test",
+              "shopName": "Net Diag",
+              "displayName": null,
+              "avatarUrl": null,
+              "authProvider": "email",
+              "currency": "THB",
+              "monthlyBudget": null,
+              "createdAt": "2026-07-05T22:46:59.474Z"
+            },
+            "redirect": "/home"
+          }
+        }
+      }
+    },
+    {
+      "step": "1b_clear_after_register",
+      "detail": "Cleared cookies again before UI login"
+    },
+    {
+      "step": "2_login",
+      "detail": "Redirected to https://www.rizance.com/home"
+    },
+    {
+      "step": "2_cookie_check",
+      "detail": {
+        "found": true,
+        "name": "rizance_session",
+        "domain": ".rizance.com",
+        "path": "/",
+        "secure": true,
+        "httpOnly": true,
+        "sameSite": "Lax",
+        "domainOk": true
+      }
+    },
+    {
+      "step": "3_pos_cookies",
+      "detail": [
+        {
+          "name": "rizance_session",
+          "value": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIwYjZkNzNhZi04OTA3LTRjZmItOGJlMy01YWU3ZDg4MGVlYTAiLCJpYXQiOjE3ODMyOTE2MjEsImV4cCI6MTc4Mzg5NjQyMX0.XW-NF5C0E-6V02t5KwL0U9d8kS0gBi_5-4GQhHlwdMs",
+          "domain": ".rizance.com",
+          "path": "/",
+          "expires": 1783896421.905265,
+          "httpOnly": true,
+          "secure": true,
+          "sameSite": "Lax"
+        }
+      ]
+    },
+    {
+      "step": "3_pos_session_request",
+      "detail": {
+        "requestUrl": "https://rizance.com/api/pos/session",
+        "requestHeaders": {
+          "sec-ch-ua-platform": "\"Windows\"",
+          "referer": "https://pos.rizance.com/",
+          "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/134.0.6998.35 Safari/537.36",
+          "sec-ch-ua": "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"HeadlessChrome\";v=\"134\"",
+          "content-type": "application/json",
+          "sec-ch-ua-mobile": "?0"
+        }
+      }
+    },
+    {
+      "step": "3_pos_page_text",
+      "detail": "กรุณาเข้าสู่ระบบที่ Rizance Profit ก่อน\n\nไปหน้า Login"
+    }
+  ],
+  "sessionRequest": {
+    "requestUrl": "https://rizance.com/api/pos/session",
+    "requestHeaders": {
+      "sec-ch-ua-platform": "\"Windows\"",
+      "referer": "https://pos.rizance.com/",
+      "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/134.0.6998.35 Safari/537.36",
+      "sec-ch-ua": "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"HeadlessChrome\";v=\"134\"",
+      "content-type": "application/json",
+      "sec-ch-ua-mobile": "?0"
+    }
+  },
+  "cookiesAfterLogin": [
+    {
+      "name": "rizance_session",
+      "value": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIwYjZkNzNhZi04OTA3LTRjZmItOGJlMy01YWU3ZDg4MGVlYTAiLCJpYXQiOjE3ODMyOTE2MjEsImV4cCI6MTc4Mzg5NjQyMX0.XW-NF5C0E-6V02t5KwL0U9d8kS0gBi_5-4GQhHlwdMs",
+      "domain": ".rizance.com",
+      "path": "/",
+      "expires": 1783896421.905265,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    }
+  ],
+  "cookiesOnPos": [
+    {
+      "name": "rizance_session",
+      "value": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIwYjZkNzNhZi04OTA3LTRjZmItOGJlMy01YWU3ZDg4MGVlYTAiLCJpYXQiOjE3ODMyOTE2MjEsImV4cCI6MTc4Mzg5NjQyMX0.XW-NF5C0E-6V02t5KwL0U9d8kS0gBi_5-4GQhHlwdMs",
+      "domain": ".rizance.com",
+      "path": "/",
+      "expires": 1783896421.905265,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    }
+  ]
+}

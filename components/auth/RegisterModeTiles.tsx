@@ -1,4 +1,5 @@
 import { renderModeIcon } from "@/components/mode-icons";
+import { SHOW_ORG_MODE, SHOW_PERSONAL_MODE } from "@/lib/feature-flags";
 import type { RegisterMode } from "@/lib/register-mode";
 
 const TILES: {
@@ -35,6 +36,19 @@ const TILES: {
   },
 ];
 
+function visibleTiles() {
+  return TILES.filter((tile) => {
+    if (tile.mode === "personal" && !SHOW_PERSONAL_MODE) return false;
+    if (tile.mode === "org" && !SHOW_ORG_MODE) return false;
+    return true;
+  });
+}
+
+export function defaultRegisterMode(): RegisterMode {
+  const tiles = visibleTiles();
+  return tiles[0]?.mode ?? "regular";
+}
+
 export function RegisterModeTiles({
   value,
   onChange,
@@ -42,9 +56,15 @@ export function RegisterModeTiles({
   value: RegisterMode;
   onChange: (mode: RegisterMode) => void;
 }) {
+  const tiles = visibleTiles();
+
   return (
-    <div className="grid grid-cols-2 gap-2.5">
-      {TILES.map((tile) => {
+    <div
+      className={`grid gap-2.5 ${
+        tiles.length <= 2 ? "grid-cols-2" : "grid-cols-2"
+      }`}
+    >
+      {tiles.map((tile) => {
         const selected = value === tile.mode;
         return (
           <button

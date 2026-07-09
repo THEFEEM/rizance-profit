@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-client";
+import { SHOW_ORG_MODE } from "@/lib/feature-flags";
 import { Building2, Store, Tent } from "lucide-react";
 import { modeAccentTextClass } from "@/components/mode-icons";
 import { orgDisplayName } from "@/lib/project-ui";
@@ -209,24 +210,26 @@ export function ModeSwitcher({
             <Tent size={14} className={mode === "booth" ? "" : modeAccentTextClass("booth")} />
             บูธ
           </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={projectTabSelected}
-            disabled={switching}
-            onClick={switchToProject}
-            className={`${tabBase} min-w-0 ${
-              projectTabSelected
-                ? "bg-rz-purple text-rz-bg"
-                : "text-rz-muted active:bg-rz-card"
-            }`}
-          >
-            <Building2
-              size={14}
-              className={`shrink-0 ${projectTabSelected ? "" : modeAccentTextClass("org")}`}
-            />
-            <span className="truncate">{orgLabel}</span>
-          </button>
+          {SHOW_ORG_MODE && (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={projectTabSelected}
+              disabled={switching}
+              onClick={switchToProject}
+              className={`${tabBase} min-w-0 ${
+                projectTabSelected
+                  ? "bg-rz-purple text-rz-bg"
+                  : "text-rz-muted active:bg-rz-card"
+              }`}
+            >
+              <Building2
+                size={14}
+                className={`shrink-0 ${projectTabSelected ? "" : modeAccentTextClass("org")}`}
+              />
+              <span className="truncate">{orgLabel}</span>
+            </button>
+          )}
         </div>
         {mode === "booth" && boothName && (
           <p className="mt-2 flex items-center justify-center gap-1.5 truncate text-center text-[11px] font-medium text-rz-amber">

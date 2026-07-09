@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import Stripe from "stripe";
 import { z } from "zod";
 import { query } from "@/lib/db";
 import {
@@ -22,8 +23,69 @@ const bodySchema = z.object({
   plan: z.string().min(1),
 });
 
+const CHECKOUT_USER_MESSAGE = "ไม่สามารถดำเนินการชำระเงินได้ กรุณาลองใหม่อีกครั้ง";
+
 function appUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+}
+
+function isMissingStripeCustomer(error: unknown): boolean {
+  return (
+    error instanceof Stripe.errors.StripeInvalidRequestError &&
+    error.code === "resource_missing" &&
+    (error.param === "customer" || /No such customer/i.test(error.message ?? ""))
+  );
+}
+
+function checkoutSessionParams(
+  customerId: string,
+  user: CheckoutUserRow,
+  plan: PaidStripePlan,
+): Stripe.Checkout.SessionCreateParams {
+  const config = PLAN_CONFIG[plan];
+  return {
+    customer: customerId,
+    mode: config.mode,
+    line_items: [
+      {
+        price_data: {
+          currency: "thb",
+          product_data: { name: config.label },
+          unit_amount: config.amount,
+          ...(config.interval ? { recurring: { interval: config.interval } } : {}),
+        },
+        quantity: 1,
+      },
+    ],
+    success_url: `${appUrl()}/pricing?success=true`,
+    cancel_url: `${appUrl()}/pricing?canceled=true`,
+    metadata: {
+      userId: user.id,
+      plan,
+    },
+  };
+}
+
+async function createCheckoutSessionWithCustomerRecovery(
+  customerId: string,
+  user: CheckoutUserRow,
+  plan: PaidStripePlan,
+): Promise<Stripe.Checkout.Session> {
+  try {
+    return await stripe.checkout.sessions.create(checkoutSessionParams(customerId, user, plan));
+  } catch (error) {
+    if (!isMissingStripeCustomer(error)) throw error;
+
+    console.error("[checkout] Stripe customer missing, recreating:", error);
+
+    const customer = await stripe.customers.create({
+      email: user.email,
+      metadata: { userId: user.id },
+    });
+    await query(`UPDATE users SET stripe_customer_id = $1 WHERE id = $2`, [customer.id, user.id]);
+
+    return await stripe.checkout.sessions.create(checkoutSessionParams(customer.id, user, plan));
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -71,33 +133,16 @@ export async function POST(req: NextRequest) {
     await query(`UPDATE users SET stripe_customer_id = $1 WHERE id = $2`, [customerId, user.id]);
   }
 
-  const config = PLAN_CONFIG[plan as PaidStripePlan];
   try {
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      mode: config.mode,
-      line_items: [
-        {
-          price_data: {
-            currency: "thb",
-            product_data: { name: config.label },
-            unit_amount: config.amount,
-            ...(config.interval ? { recurring: { interval: config.interval } } : {}),
-          },
-          quantity: 1,
-        },
-      ],
-      success_url: `${appUrl()}/pricing?success=true`,
-      cancel_url: `${appUrl()}/pricing?canceled=true`,
-      metadata: {
-        userId: user.id,
-        plan,
-      },
-    });
+    const session = await createCheckoutSessionWithCustomerRecovery(
+      customerId,
+      user,
+      plan as PaidStripePlan,
+    );
 
     if (!session.url) {
       return NextResponse.json(
-        { error: { message: "Stripe did not return a checkout URL" } },
+        { error: { message: CHECKOUT_USER_MESSAGE } },
         { status: 502 },
       );
     }
@@ -111,8 +156,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ data: { url: session.url } });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Stripe checkout session failed";
-    return NextResponse.json({ error: { message } }, { status: 502 });
+    console.error("[checkout] Stripe checkout session failed:", error);
+    return NextResponse.json({ error: { message: CHECKOUT_USER_MESSAGE } }, { status: 502 });
   }
 }

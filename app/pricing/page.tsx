@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { SubscriptionPricingContent } from "@/components/pricing/SubscriptionPricingContent";
 import { CONTEXT_COOKIE, resolveTodayContext } from "@/lib/context";
+import { SHOW_ORG_MODE, SHOW_PERSONAL_MODE } from "@/lib/feature-flags";
 import { getCurrentUser } from "@/lib/session";
 import type { AppContextMode } from "@/types/context";
 
@@ -10,12 +11,14 @@ export const dynamic = "force-dynamic";
 
 export default async function PublicPricingPage() {
   const user = await getCurrentUser();
-  let mode: AppContextMode = "personal";
+  let mode: AppContextMode = SHOW_PERSONAL_MODE ? "personal" : "regular";
 
   if (user) {
     const rawContext = (await cookies()).get(CONTEXT_COOKIE)?.value;
     const ctx = await resolveTodayContext(user.id, undefined, rawContext);
     mode = ctx.mode;
+    if (mode === "personal" && !SHOW_PERSONAL_MODE) mode = "regular";
+    if (mode === "project" && !SHOW_ORG_MODE) mode = "regular";
   }
 
   return (

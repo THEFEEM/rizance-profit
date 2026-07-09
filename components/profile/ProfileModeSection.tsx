@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ModeRow } from "@/components/ModeRow";
 import { renderModeIcon } from "@/components/mode-icons";
 import { apiFetch } from "@/lib/api-client";
+import { SHOW_ORG_MODE, SHOW_PERSONAL_MODE } from "@/lib/feature-flags";
 import { activeOrgProjects } from "@/lib/mode-switch";
 import { orgDisplayName } from "@/lib/project-ui";
 import type { Booth } from "@/types/booth";
@@ -149,13 +150,15 @@ export function ProfileModeSection({
       ) : (
         <>
           <ul className="divide-y divide-rz-border">
-            <ModeRow
-              icon={renderModeIcon("personal")}
-              label="บุคคล"
-              selected={mode === "personal"}
-              disabled={switching}
-              onClick={selectPersonal}
-            />
+            {SHOW_PERSONAL_MODE && (
+              <ModeRow
+                icon={renderModeIcon("personal")}
+                label="บุคคล"
+                selected={mode === "personal"}
+                disabled={switching}
+                onClick={selectPersonal}
+              />
+            )}
             <ModeRow
               icon={renderModeIcon("regular")}
               label={shopName}
@@ -187,7 +190,7 @@ export function ProfileModeSection({
                 </Link>
               </li>
             )}
-            {orgLabel ? (
+            {SHOW_ORG_MODE && orgLabel ? (
               <ModeRow
                 icon={renderModeIcon("org")}
                 label={orgLabel}
@@ -196,7 +199,7 @@ export function ProfileModeSection({
                 disabled={switching}
                 onClick={selectOrg}
               />
-            ) : (
+            ) : SHOW_ORG_MODE ? (
               <li>
                 <Link
                   href="/projects/new"
@@ -209,7 +212,7 @@ export function ProfileModeSection({
                   <span className="shrink-0 text-xs text-rz-hint">สร้าง →</span>
                 </Link>
               </li>
-            )}
+            ) : null}
           </ul>
 
           {boothPickerOpen && openBooths.length > 1 && (
