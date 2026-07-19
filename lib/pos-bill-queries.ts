@@ -10,6 +10,7 @@ import type {
   PosBillDetail,
   PosBillItem,
   PosBillListItem,
+  PosPaymentMethod,
   VoidPosBillResult,
 } from "@/types/pos";
 
@@ -176,7 +177,7 @@ export async function getPosBillDetail(
   );
   if (!billRows[0]) return null;
 
-  const [{ rows: itemRows }, { rows: modifierRows }] = await Promise.all([
+  const [{ rows: itemRows }, { rows: modifierRows }, { rows: paymentRows }] = await Promise.all([
     pool.query<BillItemRow>(
       `SELECT ${ITEM_RETURN}
        FROM pos_bill_items
@@ -190,6 +191,20 @@ export async function getPosBillDetail(
        JOIN pos_bill_items bi ON bi.id = bim.bill_item_id
        WHERE bi.bill_id = $1
        ORDER BY bim.sort_order ASC`,
+      [billId],
+    ),
+    pool.query<{
+      id: string;
+      bill_id: string;
+      method: string;
+      amount: string;
+      income_entry_id: string | null;
+      sort_order: number;
+    }>(
+      `SELECT id, bill_id, method, amount::text, income_entry_id, sort_order
+       FROM pos_bill_payments
+       WHERE bill_id = $1
+       ORDER BY sort_order ASC`,
       [billId],
     ),
   ]);
@@ -207,7 +222,18 @@ export async function getPosBillDetail(
     return mods?.length ? { ...item, modifiers: mods } : item;
   });
 
-  return mapBillDetail(billRows[0], items);
+  const detail = mapBillDetail(billRows[0], items);
+  if (paymentRows.length > 0) {
+    detail.payments = paymentRows.map((r) => ({
+      id: r.id,
+      billId: r.bill_id,
+      method: r.method as PosPaymentMethod,
+      amount: r.amount,
+      incomeEntryId: r.income_entry_id,
+      sortOrder: r.sort_order,
+    }));
+  }
+  return detail;
 }
 
 /**
@@ -280,12 +306,23 @@ export async function voidPosBill(
       );
     }
 
-    if (bill.income_entry_id) {
+    // Soft-void every linked income entry — split bills may have booked into
+    // both cash and transfer buckets (pos_bill_payments.income_entry_id).
+    const { rows: paymentEntryRows } = await client.query<{ income_entry_id: string }>(
+      `SELECT DISTINCT income_entry_id
+       FROM pos_bill_payments
+       WHERE bill_id = $1 AND income_entry_id IS NOT NULL`,
+      [billId],
+    );
+    const incomeEntryIds = new Set<string>(paymentEntryRows.map((r) => r.income_entry_id));
+    if (bill.income_entry_id) incomeEntryIds.add(bill.income_entry_id);
+
+    for (const incomeEntryId of incomeEntryIds) {
       const { rowCount } = await client.query(
         `UPDATE income_entries
          SET voided_at = now(), void_reason = $3
          WHERE id = $1 AND user_id = $2 AND voided_at IS NULL`,
-        [bill.income_entry_id, userId, reason],
+        [incomeEntryId, userId, reason],
       );
       if ((rowCount ?? 0) === 0) {
         throw new PosBillNotVoidableError();

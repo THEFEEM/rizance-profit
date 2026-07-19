@@ -1,5 +1,17 @@
-export const POS_PAYMENT_METHODS = ["cash", "promptpay"] as const;
+export const POS_PAYMENT_METHODS = ["cash", "promptpay", "thai_chuay_thai"] as const;
 export type PosPaymentMethod = (typeof POS_PAYMENT_METHODS)[number];
+
+/** Bill-level method: single method, or 'split' when paid via multiple methods. */
+export type PosBillPaymentMethod = PosPaymentMethod | "split";
+
+export type PosBillPayment = {
+  id: string;
+  billId: string;
+  method: PosPaymentMethod;
+  amount: string;
+  incomeEntryId: string | null;
+  sortOrder: number;
+};
 
 export type PosBillStatus = "paid" | "voided";
 
@@ -9,7 +21,7 @@ export type PosBill = {
   billNo: string;
   status: PosBillStatus;
   totalAmount: string;
-  paymentMethod: PosPaymentMethod;
+  paymentMethod: PosBillPaymentMethod;
   entryDate: string;
   incomeEntryId: string | null;
   createdAt: string;
@@ -22,7 +34,7 @@ export type PosBillListItem = {
   billNo: string;
   status: PosBillStatus;
   total: string;
-  paymentMethod: PosPaymentMethod;
+  paymentMethod: PosBillPaymentMethod;
   paidAt: string;
   voidedAt: string | null;
   itemCount: number;
@@ -32,6 +44,7 @@ export type PosBillDetail = PosBill & {
   voidedAt: string | null;
   voidReason: string | null;
   items: PosBillItem[];
+  payments?: PosBillPayment[];
 };
 
 export type VoidPosBillResult = {
@@ -60,7 +73,10 @@ export type PosBillItem = {
 
 export type ClosePosBillInput = {
   items: { productId: string; qty: number; modifierIds?: string[] }[];
-  paymentMethod: PosPaymentMethod;
+  /** Legacy single-method checkout (full amount). Ignored when `payments` present. */
+  paymentMethod?: PosPaymentMethod;
+  /** Split payment: 1..3 entries, Σ amount must equal the bill total exactly. */
+  payments?: { method: PosPaymentMethod; amount: number }[];
   entryDate?: string;
 };
 
@@ -86,6 +102,7 @@ export type PosModifierGroup = {
 export type ClosePosBillResult = {
   bill: PosBill;
   items: PosBillItem[];
+  payments: PosBillPayment[];
   negativeStockProductIds: string[];
 };
 

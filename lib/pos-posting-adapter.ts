@@ -24,7 +24,33 @@ export type PosPostingBillInput = Pick<
 export type PosPostingItemInput = Pick<PosBillItem, "unitCostPrice" | "quantity">;
 
 function cashOrBankAccount(paymentMethod: PosPaymentMethod): string {
-  return paymentMethod === "promptpay" ? BANK_ACCOUNT : CASH_ACCOUNT;
+  return paymentMethod === "cash" ? CASH_ACCOUNT : BANK_ACCOUNT;
+}
+
+export type PosPostingPaymentInput = {
+  method: PosPaymentMethod;
+  amount: string;
+};
+
+/**
+ * Bucket payments into cash (1000) vs bank (1010) debit totals.
+ * promptpay + thai_chuay_thai both settle to the bank bucket.
+ */
+function paymentDebitLines(payments: PosPostingPaymentInput[]): JournalLineInput[] {
+  let cashCents = 0;
+  let bankCents = 0;
+  for (const p of payments) {
+    if (p.method === "cash") cashCents += toCents(p.amount);
+    else bankCents += toCents(p.amount);
+  }
+  const lines: JournalLineInput[] = [];
+  if (cashCents > 0) {
+    lines.push({ accountCode: CASH_ACCOUNT, debit: centsToDecimalString(cashCents), credit: 0 });
+  }
+  if (bankCents > 0) {
+    lines.push({ accountCode: BANK_ACCOUNT, debit: centsToDecimalString(bankCents), credit: 0 });
+  }
+  return lines;
 }
 
 function itemCogs(unitCostPrice: string, quantity: string): string {
@@ -53,13 +79,26 @@ function billEntryDate(bill: PosPostingBillInput): string {
 export function buildPosBillPaidLines(
   bill: PosPostingBillInput,
   items: PosPostingItemInput[],
+  payments?: PosPostingPaymentInput[],
 ): JournalLineInput[] {
   const totalRevenue = bill.totalAmount;
   const cogs = totalCogs(items);
-  const cashOrBank = cashOrBankAccount(bill.paymentMethod);
+
+  // Split payment: one debit line per bucket. Legacy fallback: single line
+  // from the bill-level method ('split' never reaches here without payments).
+  const debitLines =
+    payments && payments.length > 0
+      ? paymentDebitLines(payments)
+      : [
+          {
+            accountCode: cashOrBankAccount(bill.paymentMethod as PosPaymentMethod),
+            debit: totalRevenue,
+            credit: 0,
+          },
+        ];
 
   const lines: JournalLineInput[] = [
-    { accountCode: cashOrBank, debit: totalRevenue, credit: 0 },
+    ...debitLines,
     { accountCode: REVENUE_ACCOUNT, debit: 0, credit: totalRevenue },
   ];
 
@@ -85,8 +124,9 @@ export async function postPosBillJournal(
   client: PoolClient,
   bill: PosPostingBillInput,
   items: PosPostingItemInput[],
+  payments?: PosPostingPaymentInput[],
 ): Promise<JournalEntry> {
-  const lines = buildPosBillPaidLines(bill, items);
+  const lines = buildPosBillPaidLines(bill, items, payments);
   return postJournalEntry(client, {
     userId: bill.userId,
     entryDate: billEntryDate(bill),

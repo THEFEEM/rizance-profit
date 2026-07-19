@@ -7,7 +7,7 @@ export type PosDailySummary = {
   paidTotal: string;
   paidCount: number;
   voidedCount: number;
-  byMethod: { cash: string; promptpay: string };
+  byMethod: { cash: string; promptpay: string; thaiChuayThai: string };
   topProducts: { productName: string; quantity: string; total: string }[];
   /** 24 entries, index = hour 0-23 (Asia/Bangkok), paid bills only. */
   hourly: { count: number; total: string }[];
@@ -36,7 +36,7 @@ export async function getPosDailySummary(
   userId: string,
   date: string,
 ): Promise<PosDailySummary> {
-  const [totalsResult, topResult, hourlyResult] = await Promise.all([
+  const [totalsResult, methodResult, topResult, hourlyResult] = await Promise.all([
     pool.query<TotalsRow>(
       `SELECT status, payment_method,
               COUNT(*)::text AS bill_count,
@@ -44,6 +44,24 @@ export async function getPosDailySummary(
        FROM pos_bills
        WHERE user_id = $1 AND entry_date = $2
        GROUP BY status, payment_method`,
+      [userId, date],
+    ),
+    // Per-method amounts from payment rows (split-aware); bills without
+    // payment rows (pre-0051) fall back to their bill-level method.
+    pool.query<{ method: string; total: string }>(
+      `SELECT method, COALESCE(SUM(amount), 0)::text AS total
+       FROM (
+         SELECT p.method, p.amount
+         FROM pos_bill_payments p
+         JOIN pos_bills b ON b.id = p.bill_id
+         WHERE b.user_id = $1 AND b.entry_date = $2 AND b.status = 'paid'
+         UNION ALL
+         SELECT b.payment_method AS method, b.total_amount AS amount
+         FROM pos_bills b
+         WHERE b.user_id = $1 AND b.entry_date = $2 AND b.status = 'paid'
+           AND NOT EXISTS (SELECT 1 FROM pos_bill_payments p WHERE p.bill_id = b.id)
+       ) x
+       GROUP BY method`,
       [userId, date],
     ),
     pool.query<TopProductRow>(
@@ -73,8 +91,6 @@ export async function getPosDailySummary(
   let paidTotal = 0;
   let paidCount = 0;
   let voidedCount = 0;
-  let cash = 0;
-  let promptpay = 0;
 
   for (const r of totalsResult.rows) {
     const count = parseInt(r.bill_count, 10);
@@ -82,11 +98,19 @@ export async function getPosDailySummary(
     if (r.status === "paid") {
       paidCount += count;
       paidTotal += total;
-      if (r.payment_method === "cash") cash += total;
-      else if (r.payment_method === "promptpay") promptpay += total;
     } else if (r.status === "voided") {
       voidedCount += count;
     }
+  }
+
+  let cash = 0;
+  let promptpay = 0;
+  let thaiChuayThai = 0;
+  for (const r of methodResult.rows) {
+    const total = parseFloat(r.total);
+    if (r.method === "cash") cash += total;
+    else if (r.method === "promptpay") promptpay += total;
+    else if (r.method === "thai_chuay_thai") thaiChuayThai += total;
   }
 
   const hourly = Array.from({ length: 24 }, () => ({ count: 0, total: "0.00" }));
@@ -104,7 +128,11 @@ export async function getPosDailySummary(
     paidTotal: paidTotal.toFixed(2),
     paidCount,
     voidedCount,
-    byMethod: { cash: cash.toFixed(2), promptpay: promptpay.toFixed(2) },
+    byMethod: {
+      cash: cash.toFixed(2),
+      promptpay: promptpay.toFixed(2),
+      thaiChuayThai: thaiChuayThai.toFixed(2),
+    },
     topProducts: topResult.rows.map((r) => ({
       productName: r.product_name,
       quantity: parseFloat(r.quantity).toString(),

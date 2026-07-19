@@ -4,6 +4,7 @@ import { closePosBillSchema, listPosBillsQuerySchema } from "@/lib/pos-validatio
 import { listPosBillsByDate } from "@/lib/pos-bill-queries";
 import {
   PosEmptyCartError,
+  PosPaymentMismatchError,
   PosProductNotFoundError,
   closePosBill,
 } from "@/lib/pos-close-bill-queries";
@@ -73,6 +74,9 @@ export async function POST(req: NextRequest) {
     }
     if (err instanceof PosInvalidModifierError) {
       return posErrorResponse("invalid_modifier", 400);
+    }
+    if (err instanceof PosPaymentMismatchError) {
+      return posErrorResponse("payment_mismatch", 400);
     }
     if (err instanceof PosModifierRuleError) {
       return posErrorResponse("modifier_required", 400);

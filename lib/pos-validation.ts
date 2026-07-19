@@ -6,14 +6,41 @@ const cartLine = z.object({
   modifierIds: z.array(z.string().uuid()).max(20).optional(),
 });
 
-export const closePosBillSchema = z.object({
-  items: z.array(cartLine).min(1),
-  paymentMethod: z.enum(["cash", "promptpay"]),
-  entryDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional(),
+const paymentMethodEnum = z.enum(["cash", "promptpay", "thai_chuay_thai"]);
+
+const billPayment = z.object({
+  method: paymentMethodEnum,
+  amount: z
+    .number()
+    .finite()
+    .gt(0)
+    .max(9_999_999_999.99)
+    .refine((n) => Math.abs(n * 100 - Math.round(n * 100)) < 1e-6, {
+      message: "Amount can have at most 2 decimal places",
+    }),
 });
+
+export const closePosBillSchema = z
+  .object({
+    items: z.array(cartLine).min(1),
+    paymentMethod: paymentMethodEnum.optional(),
+    payments: z.array(billPayment).min(1).max(3).optional(),
+    entryDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
+  })
+  .refine((d) => d.paymentMethod !== undefined || (d.payments?.length ?? 0) > 0, {
+    message: "paymentMethod or payments is required",
+  })
+  .refine(
+    (d) => {
+      // A method may appear at most once per bill.
+      const methods = (d.payments ?? []).map((p) => p.method);
+      return new Set(methods).size === methods.length;
+    },
+    { message: "Duplicate payment method" },
+  );
 
 export type ClosePosBillBody = z.infer<typeof closePosBillSchema>;
 

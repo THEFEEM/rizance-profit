@@ -22,7 +22,15 @@ import type {
 export const POS_TO_INCOME_PAYMENT_METHOD: Record<PosPaymentMethod, "cash" | "transfer"> = {
   cash: "cash",
   promptpay: "transfer",
+  thai_chuay_thai: "transfer",
 };
+
+export class PosPaymentMismatchError extends Error {
+  constructor() {
+    super("pos payments do not sum to bill total");
+    this.name = "PosPaymentMismatchError";
+  }
+}
 
 type UserSubRow = {
   subscription_plan: string;
@@ -242,13 +250,29 @@ export async function closePosBill(
 
     const totalAmount = sumDecimals(...computedLines.map((l) => l.lineTotal));
 
+    // Normalize payments: explicit split list, or legacy single method = full total.
+    // Server re-validates the sum — client amounts are never trusted blindly.
+    const payments: { method: PosPaymentMethod; amount: string }[] = input.payments?.length
+      ? input.payments.map((p) => ({
+          method: p.method,
+          amount: centsToDecimalString(toCents(p.amount)),
+        }))
+      : [{ method: input.paymentMethod ?? "cash", amount: totalAmount }];
+
+    const paymentsSumCents = payments.reduce((sum, p) => sum + toCents(p.amount), 0);
+    if (paymentsSumCents !== toCents(totalAmount)) {
+      throw new PosPaymentMismatchError();
+    }
+
+    const billMethod = payments.length === 1 ? payments[0].method : "split";
+
     const { rows: billRows } = await client.query<BillRow>(
       `INSERT INTO pos_bills
          (user_id, bill_no, status, total_amount, payment_method, entry_date)
        VALUES ($1, $2, 'paid', $3, $4, $5::date)
        RETURNING id, user_id, bill_no, status, total_amount::text, payment_method,
          entry_date::text, income_entry_id, created_at`,
-      [userId, billNo, totalAmount, input.paymentMethod, entryDate],
+      [userId, billNo, totalAmount, billMethod, entryDate],
     );
     const bill = billRows[0];
 
@@ -320,14 +344,57 @@ export async function closePosBill(
       }
     }
 
-    const incomeNote = `POS ${billNo}`;
-    const incomePaymentMethod = POS_TO_INCOME_PAYMENT_METHOD[input.paymentMethod];
-    const { rows: incomeRows } = await client.query<{ id: string }>(
-      `INSERT INTO income_entries (user_id, amount, category, payment_method, note, entry_date)
-       VALUES ($1, $2, 'storefront', $3, $4, $5::date)
-       RETURNING id`,
-      [userId, totalAmount, incomePaymentMethod, incomeNote, entryDate],
-    );
+    // Income entries per bucket: cash → 'cash', promptpay/thai_chuay_thai → 'transfer'.
+    // Split bills produce up to 2 entries so เงินสด/เงินโอน on-hand stay correct.
+    let cashCents = 0;
+    let transferCents = 0;
+    for (const p of payments) {
+      if (POS_TO_INCOME_PAYMENT_METHOD[p.method] === "cash") cashCents += toCents(p.amount);
+      else transferCents += toCents(p.amount);
+    }
+
+    const incomeEntryByBucket: Partial<Record<"cash" | "transfer", string>> = {};
+    for (const bucket of ["cash", "transfer"] as const) {
+      const cents = bucket === "cash" ? cashCents : transferCents;
+      if (cents <= 0) continue;
+      const { rows: incomeRows } = await client.query<{ id: string }>(
+        `INSERT INTO income_entries (user_id, amount, category, payment_method, note, entry_date)
+         VALUES ($1, $2, 'storefront', $3, $4, $5::date)
+         RETURNING id`,
+        [userId, centsToDecimalString(cents), bucket, `POS ${billNo}`, entryDate],
+      );
+      incomeEntryByBucket[bucket] = incomeRows[0].id;
+    }
+
+    const primaryIncomeEntryId =
+      incomeEntryByBucket.cash ?? incomeEntryByBucket.transfer ?? null;
+
+    const insertedPayments = [];
+    for (let i = 0; i < payments.length; i++) {
+      const p = payments[i];
+      const bucket = POS_TO_INCOME_PAYMENT_METHOD[p.method];
+      const { rows: payRows } = await client.query<{
+        id: string;
+        bill_id: string;
+        method: PosPaymentMethod;
+        amount: string;
+        income_entry_id: string | null;
+        sort_order: number;
+      }>(
+        `INSERT INTO pos_bill_payments (bill_id, method, amount, income_entry_id, sort_order)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, bill_id, method, amount::text, income_entry_id, sort_order`,
+        [bill.id, p.method, p.amount, incomeEntryByBucket[bucket] ?? null, i],
+      );
+      insertedPayments.push({
+        id: payRows[0].id,
+        billId: payRows[0].bill_id,
+        method: payRows[0].method,
+        amount: payRows[0].amount,
+        incomeEntryId: payRows[0].income_entry_id,
+        sortOrder: payRows[0].sort_order,
+      });
+    }
 
     const { rows: linkedBillRows } = await client.query<BillRow>(
       `UPDATE pos_bills
@@ -335,18 +402,19 @@ export async function closePosBill(
        WHERE id = $1 AND user_id = $2
        RETURNING id, user_id, bill_no, status, total_amount::text, payment_method,
          entry_date::text, income_entry_id, created_at`,
-      [bill.id, userId, incomeRows[0].id],
+      [bill.id, userId, primaryIncomeEntryId],
     );
 
     const mappedBill = mapBill(linkedBillRows[0]);
 
-    await postPosBillJournal(client, mappedBill, insertedItems);
+    await postPosBillJournal(client, mappedBill, insertedItems, payments);
 
     await client.query("COMMIT");
 
     return {
       bill: mappedBill,
       items: insertedItems,
+      payments: insertedPayments,
       negativeStockProductIds,
     };
   } catch (err) {
