@@ -5,13 +5,16 @@ import {
   createPosProduct,
   listPosCatalog,
 } from "@/lib/pos-queries";
+import { setProductModifierGroups } from "@/lib/pos-modifier-queries";
 import { createPosProductSchema } from "@/lib/pos-validation";
 
 export async function GET(req: NextRequest) {
   const userId = await requirePosSessionAndPlan(req);
   if (userId instanceof NextResponse) return userId;
 
-  const catalog = await listPosCatalog(userId);
+  const includeInactive = req.nextUrl.searchParams.get("includeInactive") === "1";
+  const includeCost = req.nextUrl.searchParams.get("includeCost") === "1";
+  const catalog = await listPosCatalog(userId, { includeInactive, includeCost });
   return NextResponse.json({ data: catalog });
 }
 
@@ -32,7 +35,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const product = await createPosProduct(userId, parsed.data);
+    const { modifierGroupIds, ...productInput } = parsed.data;
+    const product = await createPosProduct(userId, productInput);
+    if (modifierGroupIds !== undefined) {
+      const ok = await setProductModifierGroups(userId, product.id, modifierGroupIds);
+      if (!ok) return posErrorResponse("invalid_modifier_group", 400);
+    }
     return NextResponse.json({ data: product }, { status: 201 });
   } catch (err) {
     if (err instanceof PosInvalidCategoryError) {

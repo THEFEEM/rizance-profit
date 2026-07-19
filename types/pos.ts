@@ -39,6 +39,11 @@ export type VoidPosBillResult = {
   status: "voided";
 };
 
+export type PosBillItemModifier = {
+  modifierName: string;
+  priceDelta: string;
+};
+
 export type PosBillItem = {
   id: string;
   billId: string;
@@ -50,12 +55,32 @@ export type PosBillItem = {
   lineTotal: string;
   lineCost: string;
   sortOrder: number;
+  modifiers?: PosBillItemModifier[];
 };
 
 export type ClosePosBillInput = {
-  items: { productId: string; qty: number }[];
+  items: { productId: string; qty: number; modifierIds?: string[] }[];
   paymentMethod: PosPaymentMethod;
   entryDate?: string;
+};
+
+export type PosModifier = {
+  id: string;
+  groupId: string;
+  name: string;
+  priceDelta: string;
+  isActive: boolean;
+  sortOrder: number;
+};
+
+export type PosModifierGroup = {
+  id: string;
+  name: string;
+  minSelect: number;
+  maxSelect: number;
+  isActive: boolean;
+  sortOrder: number;
+  modifiers: PosModifier[];
 };
 
 export type ClosePosBillResult = {
@@ -79,6 +104,12 @@ export type PosProductPublic = {
   stockQty: string;
   categoryId: string | null;
   unit: string | null;
+  imageUrl: string | null;
+  /** Modifier groups attached to this product (ordered). */
+  modifierGroupIds?: string[];
+  isActive?: boolean;
+  /** Only present when GET ?includeCost=1 (products management). Never on sell catalog. */
+  costPrice?: string;
 };
 
 export type PosProduct = PosProductPublic & {
@@ -90,4 +121,5 @@ export type PosProduct = PosProductPublic & {
 export type PosCatalog = {
   categories: PosCategory[];
   products: PosProductPublic[];
+  modifierGroups: PosModifierGroup[];
 };

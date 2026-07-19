@@ -1,4 +1,8 @@
 import { pool } from "@/lib/db";
+import {
+  listPosModifierGroups,
+  listProductModifierGroupLinks,
+} from "@/lib/pos-modifier-queries";
 import type {
   CreatePosCategoryInput,
   CreatePosProductInput,
@@ -23,13 +27,14 @@ type ProductRow = {
   track_stock: boolean;
   category_id: string | null;
   unit: string | null;
+  image_url: string | null;
   sort_order: number;
   is_active: boolean;
 };
 
 const CATEGORY_RETURN = `id, name, color, sort_order`;
 const PRODUCT_RETURN = `id, name, sell_price::text AS sell_price, cost_price::text AS cost_price,
-  stock_qty::text AS stock_qty, track_stock, category_id, unit, sort_order, is_active`;
+  stock_qty::text AS stock_qty, track_stock, category_id, unit, image_url, sort_order, is_active`;
 
 function mapCategory(r: CategoryRow): PosCategory {
   return {
@@ -49,6 +54,8 @@ function mapProductPublic(r: ProductRow): PosProductPublic {
     stockQty: r.stock_qty,
     categoryId: r.category_id,
     unit: r.unit,
+    imageUrl: r.image_url,
+    isActive: r.is_active,
   };
 }
 
@@ -84,8 +91,12 @@ function isUniqueViolation(err: unknown): boolean {
   );
 }
 
-export async function listPosCatalog(userId: string): Promise<PosCatalog> {
-  const [categoriesResult, productsResult] = await Promise.all([
+export async function listPosCatalog(
+  userId: string,
+  opts?: { includeInactive?: boolean; includeCost?: boolean },
+): Promise<PosCatalog> {
+  const productFilter = opts?.includeInactive ? "" : " AND is_active = true";
+  const [categoriesResult, productsResult, modifierGroups, groupLinks] = await Promise.all([
     pool.query<CategoryRow>(
       `SELECT ${CATEGORY_RETURN}
        FROM pos_categories
@@ -96,15 +107,24 @@ export async function listPosCatalog(userId: string): Promise<PosCatalog> {
     pool.query<ProductRow>(
       `SELECT ${PRODUCT_RETURN}
        FROM pos_products
-       WHERE user_id = $1 AND is_active = true
+       WHERE user_id = $1${productFilter}
        ORDER BY sort_order ASC, name ASC`,
       [userId],
     ),
+    listPosModifierGroups(userId, { includeInactive: opts?.includeInactive }),
+    listProductModifierGroupLinks(userId),
   ]);
 
   return {
     categories: categoriesResult.rows.map(mapCategory),
-    products: productsResult.rows.map(mapProductPublic),
+    products: productsResult.rows.map((r) => {
+      const base = mapProductPublic(r);
+      const modifierGroupIds = groupLinks.get(r.id);
+      const withGroups = modifierGroupIds?.length ? { ...base, modifierGroupIds } : base;
+      if (!opts?.includeCost) return withGroups;
+      return { ...withGroups, costPrice: r.cost_price };
+    }),
+    modifierGroups,
   };
 }
 
@@ -226,6 +246,37 @@ export async function updatePosProduct(
     params,
   );
 
+  return rows[0] ? mapProduct(rows[0]) : null;
+}
+
+/**
+ * Current image_url of an owned product.
+ * Returns `undefined` when the product does not exist / is not owned,
+ * `null` when it exists but has no image.
+ */
+export async function getPosProductImageUrl(
+  userId: string,
+  productId: string,
+): Promise<string | null | undefined> {
+  const { rows } = await pool.query<{ image_url: string | null }>(
+    `SELECT image_url FROM pos_products WHERE id = $2 AND user_id = $1`,
+    [userId, productId],
+  );
+  if (!rows[0]) return undefined;
+  return rows[0].image_url;
+}
+
+export async function setPosProductImageUrl(
+  userId: string,
+  productId: string,
+  imageUrl: string | null,
+): Promise<PosProduct | null> {
+  const { rows } = await pool.query<ProductRow>(
+    `UPDATE pos_products SET image_url = $3, updated_at = now()
+     WHERE id = $2 AND user_id = $1
+     RETURNING ${PRODUCT_RETURN}`,
+    [userId, productId, imageUrl],
+  );
   return rows[0] ? mapProduct(rows[0]) : null;
 }
 
