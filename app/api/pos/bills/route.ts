@@ -7,6 +7,10 @@ import {
   PosProductNotFoundError,
   closePosBill,
 } from "@/lib/pos-close-bill-queries";
+import {
+  PosInvalidModifierError,
+  PosModifierRuleError,
+} from "@/lib/pos-modifier-queries";
 import { today } from "@/lib/date";
 
 export async function GET(req: NextRequest) {
@@ -66,6 +70,12 @@ export async function POST(req: NextRequest) {
     }
     if (err instanceof PosEmptyCartError) {
       return posErrorResponse("empty_cart", 400);
+    }
+    if (err instanceof PosInvalidModifierError) {
+      return posErrorResponse("invalid_modifier", 400);
+    }
+    if (err instanceof PosModifierRuleError) {
+      return posErrorResponse("modifier_required", 400);
     }
     throw err;
   }

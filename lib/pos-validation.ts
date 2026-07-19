@@ -3,6 +3,7 @@ import { z } from "zod";
 const cartLine = z.object({
   productId: z.string().uuid(),
   qty: z.number().positive(),
+  modifierIds: z.array(z.string().uuid()).max(20).optional(),
 });
 
 export const closePosBillSchema = z.object({
@@ -68,6 +69,7 @@ export const createPosProductSchema = z.object({
   stockQty: stockQtyNonNegative.default(0),
   categoryId: z.string().uuid().optional(),
   unit: z.string().max(20).optional(),
+  modifierGroupIds: z.array(z.string().uuid()).max(10).optional(),
 });
 
 export const updatePosProductSchema = z
@@ -80,6 +82,61 @@ export const updatePosProductSchema = z
     unit: z.string().max(20).nullable().optional(),
     isActive: z.boolean().optional(),
     sortOrder: z.number().int().optional(),
+    modifierGroupIds: z.array(z.string().uuid()).max(10).optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "At least one field is required",
+  });
+
+// --- Modifiers -------------------------------------------------------------
+
+const modifierName = z.preprocess(
+  (v) => (typeof v === "string" ? v.trim() : v),
+  z.string().min(1).max(80),
+);
+
+const priceDelta = z
+  .number()
+  .finite()
+  .gte(-9_999_999_999.99)
+  .max(9_999_999_999.99)
+  .refine((n) => Math.abs(n * 100 - Math.round(n * 100)) < 1e-6, {
+    message: "Price delta can have at most 2 decimal places",
+  });
+
+export const createPosModifierGroupSchema = z
+  .object({
+    name: modifierName,
+    minSelect: z.number().int().gte(0).default(0),
+    maxSelect: z.number().int().gte(1).default(1),
+    sortOrder: z.number().int().default(0),
+  })
+  .refine((d) => d.minSelect <= d.maxSelect, { message: "minSelect must be <= maxSelect" });
+
+export const updatePosModifierGroupSchema = z
+  .object({
+    name: modifierName.optional(),
+    minSelect: z.number().int().gte(0).optional(),
+    maxSelect: z.number().int().gte(1).optional(),
+    sortOrder: z.number().int().optional(),
+    isActive: z.boolean().optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "At least one field is required",
+  });
+
+export const createPosModifierSchema = z.object({
+  name: modifierName,
+  priceDelta: priceDelta.default(0),
+  sortOrder: z.number().int().default(0),
+});
+
+export const updatePosModifierSchema = z
+  .object({
+    name: modifierName.optional(),
+    priceDelta: priceDelta.optional(),
+    sortOrder: z.number().int().optional(),
+    isActive: z.boolean().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field is required",

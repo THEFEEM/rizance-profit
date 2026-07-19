@@ -176,15 +176,38 @@ export async function getPosBillDetail(
   );
   if (!billRows[0]) return null;
 
-  const { rows: itemRows } = await pool.query<BillItemRow>(
-    `SELECT ${ITEM_RETURN}
-     FROM pos_bill_items
-     WHERE bill_id = $1
-     ORDER BY sort_order ASC, id ASC`,
-    [billId],
-  );
+  const [{ rows: itemRows }, { rows: modifierRows }] = await Promise.all([
+    pool.query<BillItemRow>(
+      `SELECT ${ITEM_RETURN}
+       FROM pos_bill_items
+       WHERE bill_id = $1
+       ORDER BY sort_order ASC, id ASC`,
+      [billId],
+    ),
+    pool.query<{ bill_item_id: string; modifier_name: string; price_delta: string }>(
+      `SELECT bim.bill_item_id, bim.modifier_name, bim.price_delta::text AS price_delta
+       FROM pos_bill_item_modifiers bim
+       JOIN pos_bill_items bi ON bi.id = bim.bill_item_id
+       WHERE bi.bill_id = $1
+       ORDER BY bim.sort_order ASC`,
+      [billId],
+    ),
+  ]);
 
-  return mapBillDetail(billRows[0], itemRows.map(mapBillItem));
+  const modifiersByItem = new Map<string, { modifierName: string; priceDelta: string }[]>();
+  for (const r of modifierRows) {
+    const arr = modifiersByItem.get(r.bill_item_id) ?? [];
+    arr.push({ modifierName: r.modifier_name, priceDelta: r.price_delta });
+    modifiersByItem.set(r.bill_item_id, arr);
+  }
+
+  const items = itemRows.map((r) => {
+    const item = mapBillItem(r);
+    const mods = modifiersByItem.get(r.id);
+    return mods?.length ? { ...item, modifiers: mods } : item;
+  });
+
+  return mapBillDetail(billRows[0], items);
 }
 
 /**

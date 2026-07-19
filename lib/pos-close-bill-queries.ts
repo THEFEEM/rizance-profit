@@ -6,6 +6,7 @@ import { isPosPlanAllowed } from "@/lib/pos-config";
 import { resolveActivePlan } from "@/lib/subscription-plan";
 import { lockShopUser } from "@/lib/shop-profit-withdrawal-queries";
 import { postPosBillJournal } from "@/lib/pos-posting-adapter";
+import { resolveCartModifiers, type SelectedModifier } from "@/lib/pos-modifier-queries";
 import type {
   ClosePosBillInput,
   ClosePosBillResult,
@@ -221,11 +222,22 @@ export async function closePosBill(
     const productIds = input.items.map((i) => i.productId);
     const products = await lockCartProducts(client, userId, productIds);
 
+    // Modifiers: validate ownership/rules, price resolved server-side only.
+    const modifiersByLine = await resolveCartModifiers(client, userId, input.items);
+
     const computedLines = input.items.map((line, sortOrder) => {
       const product = products.get(line.productId)!;
-      const lineTotal = lineMoney(product.sell_price, line.qty);
+      const selectedModifiers: SelectedModifier[] = modifiersByLine.get(sortOrder) ?? [];
+      // Effective unit price = base + Σ delta (cents-safe). Stored in
+      // unit_sell_price so SUM(line_total) = total_amount = journal — the
+      // posting adapter stays untouched.
+      const unitPriceCents =
+        toCents(product.sell_price) +
+        selectedModifiers.reduce((sum, m) => sum + toCents(m.priceDelta), 0);
+      const unitSellPrice = centsToDecimalString(unitPriceCents);
+      const lineTotal = lineMoney(unitSellPrice, line.qty);
       const lineCost = lineMoney(product.cost_price, line.qty);
-      return { line, product, lineTotal, lineCost, sortOrder };
+      return { line, product, unitSellPrice, lineTotal, lineCost, sortOrder, selectedModifiers };
     });
 
     const totalAmount = sumDecimals(...computedLines.map((l) => l.lineTotal));
@@ -242,7 +254,7 @@ export async function closePosBill(
 
     const insertedItems: PosBillItem[] = [];
 
-    for (const { line, product, lineTotal, lineCost, sortOrder } of computedLines) {
+    for (const { line, product, unitSellPrice, lineTotal, lineCost, sortOrder, selectedModifiers } of computedLines) {
       const { rows: itemRows } = await client.query<BillItemRow>(
         `INSERT INTO pos_bill_items
            (bill_id, product_id, product_name, unit_sell_price, unit_cost_price,
@@ -255,7 +267,7 @@ export async function closePosBill(
           bill.id,
           product.id,
           product.name,
-          product.sell_price,
+          unitSellPrice,
           product.cost_price,
           line.qty,
           lineTotal,
@@ -263,7 +275,25 @@ export async function closePosBill(
           sortOrder,
         ],
       );
-      insertedItems.push(mapBillItem(itemRows[0]));
+      const insertedItem = mapBillItem(itemRows[0]);
+
+      // Snapshot selected modifiers (name + delta as-of sale) onto the line.
+      for (let i = 0; i < selectedModifiers.length; i++) {
+        const m = selectedModifiers[i];
+        await client.query(
+          `INSERT INTO pos_bill_item_modifiers
+             (bill_item_id, modifier_id, modifier_name, price_delta, sort_order)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [insertedItem.id, m.id, m.name, m.priceDelta, i],
+        );
+      }
+      if (selectedModifiers.length > 0) {
+        insertedItem.modifiers = selectedModifiers.map((m) => ({
+          modifierName: m.name,
+          priceDelta: m.priceDelta,
+        }));
+      }
+      insertedItems.push(insertedItem);
 
       if (product.track_stock) {
         const qtyChange = -line.qty;
