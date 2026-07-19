@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { posErrorResponse, posNotFoundResponse, requirePosSessionAndPlan } from "@/lib/pos-auth";
-import { PosInvalidCategoryError, updatePosProduct } from "@/lib/pos-queries";
+import { PosInvalidCategoryError, deletePosProduct, updatePosProduct } from "@/lib/pos-queries";
 import { setProductModifierGroups } from "@/lib/pos-modifier-queries";
 import { updatePosProductSchema } from "@/lib/pos-validation";
+import {
+  deleteObject,
+  isSupabaseStorageConfigured,
+  objectPathFromPublicUrl,
+  posMenuBucket,
+} from "@/lib/supabase-storage";
 
 export async function PATCH(
   req: NextRequest,
@@ -41,4 +47,26 @@ export async function PATCH(
     }
     throw err;
   }
+}
+
+/** DELETE /api/pos/products/:id — permanent removal (history keeps snapshots). */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const userId = await requirePosSessionAndPlan(req);
+  if (userId instanceof NextResponse) return userId;
+
+  const { id } = await params;
+
+  const deleted = await deletePosProduct(userId, id);
+  if (!deleted) return posNotFoundResponse();
+
+  // Best-effort image cleanup — the product row is already gone.
+  if (deleted.imageUrl && isSupabaseStorageConfigured()) {
+    const path = objectPathFromPublicUrl(posMenuBucket(), deleted.imageUrl);
+    if (path) void deleteObject(posMenuBucket(), path).catch(() => undefined);
+  }
+
+  return NextResponse.json({ data: { productId: id, deleted: true } });
 }

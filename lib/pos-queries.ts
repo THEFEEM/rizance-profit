@@ -280,6 +280,26 @@ export async function setPosProductImageUrl(
   return rows[0] ? mapProduct(rows[0]) : null;
 }
 
+/**
+ * Hard-delete a product. Safe for history: pos_bill_items keeps
+ * product_name/prices as snapshot (product_id → NULL via FK), stock movements
+ * cascade away, modifier-group links cascade.
+ * Returns the old image_url for storage cleanup, undefined if not found/owned.
+ */
+export async function deletePosProduct(
+  userId: string,
+  productId: string,
+): Promise<{ imageUrl: string | null } | undefined> {
+  const { rows } = await pool.query<{ image_url: string | null }>(
+    `DELETE FROM pos_products
+     WHERE id = $2 AND user_id = $1
+     RETURNING image_url`,
+    [userId, productId],
+  );
+  if (!rows[0]) return undefined;
+  return { imageUrl: rows[0].image_url };
+}
+
 export async function createPosCategory(
   userId: string,
   input: CreatePosCategoryInput,
