@@ -1,5 +1,5 @@
 /** Comma-separated plan slugs allowed to use POS (e.g. business or business,business_pro). */
-const DEFAULT_POS_ALLOWED_PLANS = "business";
+const DEFAULT_POS_ALLOWED_PLANS = "business,business_pro";
 
 export function getPosAllowedPlans(): string[] {
   const raw = process.env.POS_ALLOWED_PLANS?.trim() || DEFAULT_POS_ALLOWED_PLANS;
