@@ -186,6 +186,39 @@ export const updatePosCategorySchema = z
     message: "At least one field is required",
   });
 
+// --- Public QR orders --------------------------------------------------------
+
+export const publicOrderSchema = z.object({
+  token: z.string().uuid(),
+  customerName: z.preprocess(
+    (v) => (typeof v === "string" ? v.trim() : v),
+    z.string().min(1).max(80),
+  ),
+  customerPhone: z
+    .preprocess(
+      (v) => (typeof v === "string" ? v.replace(/[\s-]/g, "") : v),
+      z.string().regex(/^0\d{8,9}$/),
+    )
+    .optional(),
+  note: z
+    .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(200))
+    .optional(),
+  pickupAtText: z
+    .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(40))
+    .optional(),
+  items: z.array(cartLine).min(1).max(20),
+});
+
+export type PublicOrderBody = z.infer<typeof publicOrderSchema>;
+
+export const updatePosOrderSchema = z.object({
+  status: z.enum(["accepted", "ready", "completed", "cancelled"]),
+  cancelReason: z
+    .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(200))
+    .optional(),
+  billId: z.string().uuid().optional(),
+});
+
 export type CreatePosProductInput = z.infer<typeof createPosProductSchema>;
 export type UpdatePosProductInput = z.infer<typeof updatePosProductSchema>;
 export type CreatePosCategoryInput = z.infer<typeof createPosCategorySchema>;

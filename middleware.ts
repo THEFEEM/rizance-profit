@@ -29,8 +29,8 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const host = req.headers.get("host") ?? req.nextUrl.host;
 
-  // CORS for POS API only — credentials require explicit origin (never *).
-  if (pathname.startsWith("/api/pos/")) {
+  // CORS for POS API + public QR-order API — explicit origin (never *).
+  if (pathname.startsWith("/api/pos/") || pathname.startsWith("/api/public/")) {
     if (req.method === "OPTIONS") {
       return applyPosCorsHeaders(new NextResponse(null, { status: 204 }));
     }
@@ -79,6 +79,7 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     "/api/pos/:path*",
+    "/api/public/:path*",
     // Run on everything except API routes, Next internals, PWA files, and static assets.
     "/((?!api|_next/static|_next/image|favicon\\.ico|sw\\.js|manifest\\.json|icons/|.*\\.(?:png|jpg|jpeg|gif|svg|ico|json|webmanifest|txt|xml|webp)$).*)",
   ],
