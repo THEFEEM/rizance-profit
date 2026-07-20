@@ -190,10 +190,9 @@ export const updatePosCategorySchema = z
 
 export const publicOrderSchema = z.object({
   token: z.string().uuid(),
-  customerName: z.preprocess(
-    (v) => (typeof v === "string" ? v.trim() : v),
-    z.string().min(1).max(80),
-  ),
+  customerName: z
+    .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(80))
+    .optional(),
   customerPhone: z
     .preprocess(
       (v) => (typeof v === "string" ? v.replace(/[\s-]/g, "") : v),

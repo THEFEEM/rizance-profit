@@ -151,7 +151,7 @@ async function nextOrderNo(client: PoolClient, userId: string): Promise<string> 
 }
 
 export type CreatePublicOrderInput = {
-  customerName: string;
+  customerName?: string;
   customerPhone?: string;
   note?: string;
   pickupAtText?: string;
@@ -209,7 +209,7 @@ export async function createPublicOrder(
       [
         userId,
         orderNo,
-        input.customerName,
+        input.customerName?.trim() || "ลูกค้า QR",
         input.customerPhone ?? null,
         input.note ?? null,
         input.pickupAtText ?? null,
