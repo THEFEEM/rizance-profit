@@ -210,6 +210,17 @@ export const publicOrderSchema = z.object({
 
 export type PublicOrderBody = z.infer<typeof publicOrderSchema>;
 
+/** ออเดอร์หน้าร้าน (พนักงานจดให้) — ยังไม่จ่าย */
+export const staffOrderSchema = z.object({
+  items: z.array(cartLine).min(1).max(50),
+  customerName: z
+    .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(80))
+    .optional(),
+  note: z
+    .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(200))
+    .optional(),
+});
+
 export const updatePosOrderSchema = z.object({
   status: z.enum(["accepted", "cooking", "ready", "completed", "cancelled"]),
   cancelReason: z

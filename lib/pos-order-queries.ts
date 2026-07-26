@@ -259,6 +259,110 @@ export async function createPublicOrder(
   }
 }
 
+/**
+ * ออเดอร์จากพนักงานหน้าร้าน (ยังไม่จ่าย) — channel 'pos', เริ่มที่ 'accepted'
+ * เพราะพนักงานรับออเดอร์เองแล้ว ไม่มี bill_id จนกว่าจะเก็บเงินตอนลูกค้ามารับ
+ * ราคาคิดฝั่ง server เหมือน QR (client ส่งแค่ id)
+ */
+export async function createStaffOrder(
+  userId: string,
+  input: {
+    items: { productId: string; qty: number; modifierIds?: string[] }[];
+    customerName?: string;
+    note?: string;
+  },
+): Promise<PosOrder> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const productIds = [...new Set(input.items.map((i) => i.productId))];
+    const { rows: productRows } = await client.query<{
+      id: string;
+      name: string;
+      sell_price: string;
+    }>(
+      `SELECT id, name, sell_price::text FROM pos_products
+       WHERE user_id = $1 AND id = ANY($2::uuid[]) AND is_active = true`,
+      [userId, productIds],
+    );
+    const products = new Map(productRows.map((r) => [r.id, r]));
+    if (products.size !== productIds.length) throw new PosOrderProductError();
+
+    const modifiersByLine = await resolveCartModifiers(client, userId, input.items);
+
+    const computed = input.items.map((line, sortOrder) => {
+      const product = products.get(line.productId)!;
+      const selected: SelectedModifier[] = modifiersByLine.get(sortOrder) ?? [];
+      const unitCents =
+        toCents(product.sell_price) + selected.reduce((s, m) => s + toCents(m.priceDelta), 0);
+      const lineCents = Math.round((unitCents * Math.round(line.qty * 1000)) / 1000);
+      return {
+        line,
+        product,
+        selected,
+        unitSellPrice: centsToDecimalString(unitCents),
+        lineTotal: centsToDecimalString(lineCents),
+        sortOrder,
+      };
+    });
+
+    const totalAmount = sumDecimals(...computed.map((c) => c.lineTotal));
+    const orderNo = await nextOrderNo(client, userId);
+
+    const { rows: orderRows } = await client.query<OrderRow>(
+      `INSERT INTO pos_orders
+         (user_id, order_no, status, channel, customer_name, note, total_amount)
+       VALUES ($1, $2, 'accepted', 'pos', $3, $4, $5)
+       RETURNING ${ORDER_RETURN}`,
+      [
+        userId,
+        orderNo,
+        input.customerName?.trim() || "หน้าร้าน",
+        input.note?.trim() || null,
+        totalAmount,
+      ],
+    );
+    const orderId = orderRows[0].id;
+
+    for (const c of computed) {
+      const { rows: itemRows } = await client.query<{ id: string }>(
+        `INSERT INTO pos_order_items
+           (order_id, product_id, product_name, unit_sell_price, quantity, line_total, sort_order)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING id`,
+        [
+          orderId,
+          c.product.id,
+          c.product.name,
+          c.unitSellPrice,
+          c.line.qty,
+          c.lineTotal,
+          c.sortOrder,
+        ],
+      );
+      for (let i = 0; i < c.selected.length; i++) {
+        const m = c.selected[i];
+        await client.query(
+          `INSERT INTO pos_order_item_modifiers
+             (order_item_id, modifier_id, modifier_name, price_delta, sort_order)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [itemRows[0].id, m.id, m.name, m.priceDelta, i],
+        );
+      }
+    }
+
+    await client.query("COMMIT");
+    const items = await loadOrderItems([orderId]);
+    return mapOrder(orderRows[0], items.get(orderId) ?? []);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 export class PosBillNotFoundForTicketError extends Error {
   constructor() {
     super("bill not found for kitchen ticket");
