@@ -184,7 +184,7 @@ try {
   else fail("cart_total_188", cartText.slice(0, 300).replace(/\n/g, " | "));
 
   await guest.getByPlaceholder("เช่น น้องเฟม").fill(CUSTOMER_NAME);
-  await guest.getByText("หลังเลิกเรียน").click();
+  await guest.getByText("อีก 15 นาที").click();
   await guest.getByRole("button", { name: /ยืนยันสั่ง/ }).click();
   await guest.waitForURL(/\/o\//, { timeout: 30000 });
   await guest.getByText(/Q\d{6}-\d{3}/).waitFor({ timeout: 15000 });

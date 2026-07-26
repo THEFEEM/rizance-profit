@@ -15,13 +15,15 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT = join(__dirname, "..", "docs", "prod-history-void-e2e");
 mkdirSync(OUT, { recursive: true });
 
-const PROFIT = "https://www.rizance.com";
-const POS = "https://pos.rizance.com";
+const PROFIT = "https://rizance.app";
+const POS = "https://pos.rizance.app";
+const PROFIT_COM = "https://www.rizance.com";
 const SESSION_API = `${PROFIT}/api/pos/session`;
 const stamp = Date.now();
 const emailA = `pos-browser-a-${stamp}@rizance.test`;
 const emailB = `pos-browser-b-${stamp}@rizance.test`;
 const emailHistory = `pos-history-${stamp}@rizance.test`;
+const emailWww = `pos-www-${stamp}@rizance.test`;
 const password = `Smoke${stamp}!`;
 const productName = `E2E History ${stamp}`;
 const voidReason = `ทดสอบ void production ${stamp}`;
@@ -72,7 +74,7 @@ function reportSession(captured, label) {
   else fail(`${label}_pos_session_network`, `last status ${ok.status} (expected 200)`);
 }
 
-async function registerAccount(page, email, mode = "personal") {
+async function registerAccount(page, email, mode = "regular") {
   return page.evaluate(
     async ({ email, password, mode }) => {
       const res = await fetch("/api/auth/register", {
@@ -85,6 +87,44 @@ async function registerAccount(page, email, mode = "personal") {
     },
     { email, password, mode },
   );
+}
+
+async function deleteUserByEmail(email) {
+  const pool = new pg.Pool(pgPoolOptions(loadDatabaseUrl()));
+  try {
+    await pool.query(`DELETE FROM users WHERE email = $1`, [email]);
+  } finally {
+    await pool.end();
+  }
+}
+
+async function assertPosJournalAndTrialBalance(userId, billId, label) {
+  const pool = new pg.Pool(pgPoolOptions(loadDatabaseUrl()));
+  try {
+    const journals = await pool.query(
+      `SELECT id, source_module, source_event_type, source_event_id::text
+       FROM journal_entries
+       WHERE user_id = $1 AND source_module = 'pos' AND source_event_id = $2
+       ORDER BY created_at`,
+      [userId, billId],
+    );
+    const paid = journals.rows.find((r) => r.source_event_type === "pos_bill_paid");
+    if (paid) pass(`${label}_journal_pos_bill_paid`, paid.id);
+    else fail(`${label}_journal_pos_bill_paid`, `rows=${journals.rows.length}`);
+
+    const trial = await pool.query(
+      `SELECT COALESCE(SUM(jl.debit - jl.credit), 0)::text AS sum_balance
+       FROM journal_lines jl
+       JOIN journal_entries je ON je.id = jl.entry_id
+       WHERE je.user_id = $1`,
+      [userId],
+    );
+    const sum = Number(trial.rows[0]?.sum_balance ?? "NaN");
+    if (Math.abs(sum) < 0.001) pass(`${label}_trial_balance_sum0`, String(sum));
+    else fail(`${label}_trial_balance_sum0`, String(sum));
+  } finally {
+    await pool.end();
+  }
 }
 
 async function uiLogin(page, email) {
@@ -209,7 +249,7 @@ async function cleanupTestData(userId, productIds, billIds) {
   await pool.end();
 }
 
-/** A: login www → open POS → sell/upgrade page (not login prompt) */
+/** A: login rizance.app → open POS → sell/upgrade page (not login prompt) */
 async function caseA() {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext();
@@ -230,7 +270,7 @@ async function caseA() {
     pass("case_a_login", `home at ${page.url()}`);
 
     const session = (await context.cookies()).find((c) => c.name === "rizance_session");
-    if (session?.domain === ".rizance.com") pass("case_a_cookie_domain", session.domain);
+    if (session?.domain === ".rizance.app") pass("case_a_cookie_domain", session.domain);
     else fail("case_a_cookie_domain", session ? `got ${session.domain}` : "no rizance_session");
 
     await page.goto(POS, { waitUntil: "networkidle", timeout: 45000 });
@@ -244,6 +284,12 @@ async function caseA() {
   } catch (e) {
     fail("case_a", String(e));
   } finally {
+    try {
+      await deleteUserByEmail(emailA);
+      pass("case_a_cleanup", emailA);
+    } catch (e) {
+      fail("case_a_cleanup", String(e));
+    }
     await page.close();
     await context.close();
     await browser.close();
@@ -271,13 +317,13 @@ async function caseB() {
 
     // POS auto-redirects to login on 401; fallback: click "ไปหน้า Login" link
     try {
-      await page.waitForURL(/rizance\.com\/login/, { timeout: 15000 });
+      await page.waitForURL(/rizance\.app\/login/, { timeout: 15000 });
       pass("case_b_pos_to_login", "auto-redirect to login");
     } catch {
       const posBody = await page.locator("body").innerText();
       if (posBody.includes("ไปหน้า Login")) {
         await page.getByRole("link", { name: /ไปหน้า Login/i }).click();
-        await page.waitForURL(/rizance\.com\/login/, { timeout: 15000 });
+        await page.waitForURL(/rizance\.app\/login/, { timeout: 15000 });
         pass("case_b_pos_to_login", "clicked login link");
       } else {
         fail("case_b_pos_to_login", `stuck at ${page.url()}: ${posBody.slice(0, 120)}`);
@@ -292,7 +338,7 @@ async function caseB() {
     await page.locator('input[type="password"]').fill(password);
     await page.getByRole("button", { name: /log in/i }).click();
 
-    await page.waitForURL(/pos\.rizance\.com/, { timeout: 45000 });
+    await page.waitForURL(/pos\.rizance\.app/, { timeout: 45000 });
     await page.waitForLoadState("networkidle", { timeout: 45000 });
     await page.waitForFunction(
       () => {
@@ -314,6 +360,12 @@ async function caseB() {
   } catch (e) {
     fail("case_b", String(e));
   } finally {
+    try {
+      await deleteUserByEmail(emailB);
+      pass("case_b_cleanup", emailB);
+    } catch (e) {
+      fail("case_b_cleanup", String(e));
+    }
     await page.close();
     await context.close();
     await browser.close();
@@ -369,6 +421,8 @@ async function caseHistoryVoid() {
     billIds.push(billId1);
     pass("case_c_create_bill_today", `${billNo1} total=${bill1.body?.data?.bill?.totalAmount}`);
 
+    await assertPosJournalAndTrialBalance(userId, billId1, "case_c");
+
     const bill2 = await posApi(page, "/api/pos/bills", {
       method: "POST",
       body: JSON.stringify({
@@ -418,7 +472,7 @@ async function caseHistoryVoid() {
 
     // 6–7. Void bill1 via UI
     await page.getByRole("button", { name: "ยกเลิกบิลนี้" }).click();
-    await page.waitForSelector("h3:has-text('ยืนยันยกเลิกบิล')", { timeout: 5000 });
+    await page.waitForSelector("h2:has-text('ยืนยันยกเลิกบิล')", { timeout: 10000 });
     await page.locator("textarea").fill(voidReason);
     await page.getByRole("button", { name: "ยืนยันยกเลิก" }).click();
 
@@ -462,6 +516,7 @@ async function caseHistoryVoid() {
     await bill2Row.click();
     await page.waitForSelector("h2:has-text('รายละเอียดบิล')", { timeout: 10000 });
     await page.getByRole("button", { name: "ยกเลิกบิลนี้" }).click();
+    await page.waitForSelector("h2:has-text('ยืนยันยกเลิกบิล')", { timeout: 10000 });
     await page.locator("textarea").fill("should fail cross-day");
     await page.getByRole("button", { name: "ยืนยันยกเลิก" }).click();
 
@@ -471,7 +526,9 @@ async function caseHistoryVoid() {
 
     // Close modal for clean screenshot state
     await page.getByRole("button", { name: "ไม่ยกเลิก" }).click();
-    await page.getByRole("button", { name: "✕" }).click();
+    // Detail sheet may use ✕ or backdrop; try close if still open
+    const closeBtn = page.getByRole("button", { name: "✕" });
+    if (await closeBtn.count()) await closeBtn.click();
   } catch (e) {
     fail("case_c", String(e));
   } finally {
@@ -489,9 +546,108 @@ async function caseHistoryVoid() {
   }
 }
 
+/** Register page on rizance.app — only shop/booth tiles (no personal/org). */
+async function caseRegisterTiles() {
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  try {
+    console.log("\n=== Register tiles (rizance.app/register) ===\n");
+    await page.goto(`${PROFIT}/register`, { waitUntil: "networkidle", timeout: 45000 });
+    const body = await page.locator("body").innerText();
+    const hasShop = body.includes("ร้านค้า");
+    const hasBooth = body.includes("บูธ");
+    const hasPersonal = body.includes("บุคคล");
+    const hasOrg = body.includes("องค์กร");
+    if (hasShop && hasBooth) pass("register_tiles_shop_booth", "ร้านค้า + บูธ");
+    else fail("register_tiles_shop_booth", `shop=${hasShop} booth=${hasBooth}`);
+    if (!hasPersonal && !hasOrg) pass("register_tiles_no_personal_org", "hidden");
+    else fail("register_tiles_no_personal_org", `personal=${hasPersonal} org=${hasOrg}`);
+  } catch (e) {
+    fail("register_tiles", String(e));
+  } finally {
+    await page.close();
+    await context.close();
+    await browser.close();
+  }
+}
+
+/** www.rizance.com login/logout — host-only cookie (no Domain attribute). */
+async function caseWwwCookie() {
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  try {
+    console.log("\n=== www.rizance.com cookie regression ===\n");
+    await page.goto(`${PROFIT_COM}/login`, { waitUntil: "domcontentloaded" });
+
+    const reg = await page.evaluate(
+      async ({ email, password }) => {
+        const res = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ email, password, shopName: "WWW Cookie Shop", mode: "regular" }),
+        });
+        const setCookie = res.headers.getSetCookie?.() ?? [];
+        return { status: res.status, setCookie };
+      },
+      { email: emailWww, password },
+    );
+    if (reg.status !== 201 && reg.status !== 200) {
+      fail("www_register", `status ${reg.status}`);
+      return;
+    }
+    pass("www_register", `status ${reg.status}`);
+
+    const sessionHeader = (reg.setCookie ?? []).find((c) => c.startsWith("rizance_session="));
+    if (sessionHeader) {
+      const hasDomain = /(?:^|;\s*)Domain=/i.test(sessionHeader);
+      if (!hasDomain) pass("www_cookie_host_only", "no Domain attribute");
+      else fail("www_cookie_host_only", sessionHeader.slice(0, 160));
+    } else {
+      // Fallback: Playwright cookie jar — host-only usually stores bare hostname
+      const jar = (await context.cookies()).find((c) => c.name === "rizance_session");
+      if (jar && jar.domain === "www.rizance.com" && !jar.domain.startsWith(".")) {
+        pass("www_cookie_host_only", `playwright domain=${jar.domain}`);
+      } else {
+        fail("www_cookie_host_only", jar ? `domain=${jar.domain}` : "no session cookie");
+      }
+    }
+
+    await page.goto(`${PROFIT_COM}/home`, { waitUntil: "networkidle" });
+    if (!page.url().includes("/login")) pass("www_home_after_register", page.url());
+    else fail("www_home_after_register", page.url());
+
+    const logoutOk = await page.evaluate(async () => {
+      const r = await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+      return r.ok;
+    });
+    if (logoutOk) pass("www_logout");
+    else fail("www_logout", "logout API failed");
+
+    await page.goto(`${PROFIT_COM}/home`, { waitUntil: "networkidle" });
+    if (page.url().includes("/login")) pass("www_redirect_login_after_logout", page.url());
+    else fail("www_redirect_login_after_logout", page.url());
+  } catch (e) {
+    fail("www_cookie", String(e));
+  } finally {
+    try {
+      await deleteUserByEmail(emailWww);
+      pass("www_cleanup", emailWww);
+    } catch (e) {
+      fail("www_cleanup", String(e));
+    }
+    await page.close();
+    await context.close();
+    await browser.close();
+  }
+}
+
 async function main() {
   console.log(`PROFIT=${PROFIT}`);
   console.log(`POS=${POS}`);
+  console.log(`PROFIT_COM=${PROFIT_COM}`);
   console.log(`SESSION_API=${SESSION_API}`);
   console.log(`Screenshots: ${OUT}\n`);
 
@@ -504,6 +660,8 @@ async function main() {
   }
 
   await caseHistoryVoid();
+  await caseRegisterTiles();
+  await caseWwwCookie();
 
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} passed`);
