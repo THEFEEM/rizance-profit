@@ -9,6 +9,8 @@ export type PosShopSettings = {
   onlineOrderingEnabled: boolean;
   /** เปิดจอครัว — ปิดบิล walk-in แล้วสร้างตั๋วครัวอัตโนมัติ */
   kitchenEnabled: boolean;
+  /** NULL = ยังไม่เปิดร้านจริง (ยังล้างข้อมูลเทสได้) */
+  liveAt: string | null;
 };
 
 type SettingsRow = {
@@ -19,10 +21,11 @@ type SettingsRow = {
   public_menu_token: string | null;
   online_ordering_enabled: boolean;
   kitchen_enabled: boolean;
+  live_at: Date | string | null;
 };
 
 const SETTINGS_RETURN = `default_payment_method, promptpay_id, receipt_header,
-  allow_negative_stock, public_menu_token, online_ordering_enabled, kitchen_enabled`;
+  allow_negative_stock, public_menu_token, online_ordering_enabled, kitchen_enabled, live_at`;
 
 function mapSettings(r: SettingsRow): PosShopSettings {
   return {
@@ -33,6 +36,12 @@ function mapSettings(r: SettingsRow): PosShopSettings {
     publicMenuToken: r.public_menu_token,
     onlineOrderingEnabled: r.online_ordering_enabled,
     kitchenEnabled: r.kitchen_enabled,
+    liveAt:
+      r.live_at == null
+        ? null
+        : r.live_at instanceof Date
+          ? r.live_at.toISOString()
+          : String(r.live_at),
   };
 }
 
@@ -54,6 +63,8 @@ export type UpdatePosShopSettingsInput = {
   defaultPaymentMethod?: "cash" | "promptpay";
   onlineOrderingEnabled?: boolean;
   kitchenEnabled?: boolean;
+  /** ทางเดียว: ตั้ง live_at ได้ครั้งแรกครั้งเดียว ปลดล็อกไม่ได้ผ่าน API */
+  goLive?: boolean;
 };
 
 export async function upsertPosShopSettings(
@@ -63,14 +74,15 @@ export async function upsertPosShopSettings(
   const { rows } = await pool.query<SettingsRow>(
     `INSERT INTO pos_shop_settings
        (user_id, promptpay_id, receipt_header, default_payment_method,
-        online_ordering_enabled, kitchen_enabled)
+        online_ordering_enabled, kitchen_enabled, live_at)
      VALUES (
        $1,
        $2,
        $3,
        COALESCE($4, 'cash'),
        COALESCE($7, false),
-       COALESCE($8, false)
+       COALESCE($8, false),
+       CASE WHEN $9 THEN now() ELSE NULL END
      )
      ON CONFLICT (user_id) DO UPDATE SET
        promptpay_id            = CASE WHEN $5 THEN $2 ELSE pos_shop_settings.promptpay_id END,
@@ -78,6 +90,9 @@ export async function upsertPosShopSettings(
        default_payment_method  = COALESCE($4, pos_shop_settings.default_payment_method),
        online_ordering_enabled = COALESCE($7, pos_shop_settings.online_ordering_enabled),
        kitchen_enabled         = COALESCE($8, pos_shop_settings.kitchen_enabled),
+       -- one-way: เซ็ตได้เฉพาะตอนยัง NULL เท่านั้น
+       live_at                 = COALESCE(pos_shop_settings.live_at,
+                                          CASE WHEN $9 THEN now() ELSE NULL END),
        updated_at              = now()
      RETURNING ${SETTINGS_RETURN}`,
     [
@@ -89,6 +104,7 @@ export async function upsertPosShopSettings(
       input.receiptHeader !== undefined,
       input.onlineOrderingEnabled ?? null,
       input.kitchenEnabled ?? null,
+      input.goLive === true,
     ],
   );
   if (!rows[0]) throw new Error("Could not upsert POS shop settings");

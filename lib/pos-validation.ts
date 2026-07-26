@@ -186,6 +186,67 @@ export const updatePosCategorySchema = z
     message: "At least one field is required",
   });
 
+// --- Ingredients / recipes ---------------------------------------------------
+
+const PURCHASE_UNIT_ENUM = z.enum(["ml", "g", "kg", "l", "piece", "shot", "pump"]);
+
+const positiveQty = z
+  .number()
+  .finite()
+  .gt(0)
+  .max(9_999_999)
+  .refine((n) => Math.abs(n * 10000 - Math.round(n * 10000)) < 1e-6, {
+    message: "Quantity can have at most 4 decimal places",
+  });
+
+const ingredientName = z.preprocess(
+  (v) => (typeof v === "string" ? v.trim() : v),
+  z.string().min(1).max(120),
+);
+
+export const createPosIngredientSchema = z.object({
+  name: ingredientName,
+  purchaseQuantity: positiveQty,
+  purchaseUnit: PURCHASE_UNIT_ENUM,
+  purchasePrice: moneyNonNegative,
+  trackStock: z.boolean().default(true),
+  lowStockThreshold: z.number().finite().gte(0).nullable().optional(),
+});
+
+export const updatePosIngredientSchema = z
+  .object({
+    name: ingredientName.optional(),
+    purchaseQuantity: positiveQty.optional(),
+    purchaseUnit: PURCHASE_UNIT_ENUM.optional(),
+    purchasePrice: moneyNonNegative.optional(),
+    trackStock: z.boolean().optional(),
+    lowStockThreshold: z.number().finite().gte(0).nullable().optional(),
+  })
+  .refine((d) => Object.keys(d).length > 0, { message: "At least one field is required" });
+
+export const setRecipeSchema = z.object({
+  lines: z.array(z.object({ ingredientId: z.string().uuid(), quantity: positiveQty })).max(30),
+});
+
+export const restockIngredientSchema = z.object({
+  ingredientId: z.string().uuid(),
+  quantity: positiveQty,
+  totalCost: moneyNonNegative.optional(),
+  paymentMethod: z.enum(["cash", "transfer"]).optional(),
+  updatePurchasePrice: z.boolean().optional(),
+  note: z
+    .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(200))
+    .optional(),
+});
+
+export const adjustIngredientSchema = z.object({
+  ingredientId: z.string().uuid(),
+  actualQty: z.number().finite().gte(0).max(9_999_999),
+  note: z
+    .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(200))
+    .optional(),
+});
+
 // --- Public QR orders --------------------------------------------------------
 
 export const publicOrderSchema = z.object({

@@ -7,6 +7,7 @@ import { resolveActivePlan } from "@/lib/subscription-plan";
 import { lockShopUser } from "@/lib/shop-profit-withdrawal-queries";
 import { postPosBillJournal } from "@/lib/pos-posting-adapter";
 import { resolveCartModifiers, type SelectedModifier } from "@/lib/pos-modifier-queries";
+import { deductIngredientsForBill } from "@/lib/pos-ingredient-queries";
 import type {
   ClosePosBillInput,
   ClosePosBillResult,
@@ -343,6 +344,18 @@ export async function closePosBill(
         }
       }
     }
+
+    // ตัดวัตถุดิบตามสูตร (สินค้า + modifier ที่เลือก) — ใน transaction เดียวกับบิล
+    await deductIngredientsForBill(
+      client,
+      userId,
+      bill.id,
+      computedLines.map((l) => ({
+        productId: l.product.id,
+        qty: l.line.qty,
+        modifierIds: l.selectedModifiers.map((m) => m.id),
+      })),
+    );
 
     // Income entries per bucket: cash → 'cash', promptpay/thai_chuay_thai → 'transfer'.
     // Split bills produce up to 2 entries so เงินสด/เงินโอน on-hand stay correct.

@@ -4,6 +4,7 @@ import { today, todayAt } from "@/lib/date";
 import { isPosPlanAllowed } from "@/lib/pos-config";
 import { lockShopUser } from "@/lib/shop-profit-withdrawal-queries";
 import { voidPosBillJournal } from "@/lib/pos-posting-adapter";
+import { restoreIngredientsForVoidedBill } from "@/lib/pos-ingredient-queries";
 import { resolveActivePlan } from "@/lib/subscription-plan";
 import { PosPlanRequiredError } from "@/lib/pos-close-bill-queries";
 import type {
@@ -305,6 +306,9 @@ export async function voidPosBill(
         [item.product_id, userId, qty],
       );
     }
+
+    // คืนวัตถุดิบตามที่ตัดไปจริง (อ่านจาก movement 'sale' ของบิลนี้)
+    await restoreIngredientsForVoidedBill(client, userId, billId);
 
     // Soft-void every linked income entry — split bills may have booked into
     // both cash and transfer buckets (pos_bill_payments.income_entry_id).

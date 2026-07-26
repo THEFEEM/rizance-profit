@@ -29,6 +29,7 @@ const updateSettingsSchema = z
     defaultPaymentMethod: z.enum(["cash", "promptpay"]).optional(),
     onlineOrderingEnabled: z.boolean().optional(),
     kitchenEnabled: z.boolean().optional(),
+    goLive: z.literal(true).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field is required",
