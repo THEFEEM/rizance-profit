@@ -35,6 +35,11 @@ export function posMenuBucket(): string {
   return process.env.SUPABASE_POS_MENU_BUCKET?.trim() || "pos-menu";
 }
 
+/** สลิปโอนเงินของลูกค้า QR — bucket แยกจากรูปเมนู */
+export function posSlipBucket(): string {
+  return process.env.SUPABASE_POS_SLIP_BUCKET?.trim() || "pos-slips";
+}
+
 export function isSupabaseStorageConfigured(): boolean {
   return Boolean(process.env.SUPABASE_URL?.trim() && process.env.SUPABASE_SERVICE_ROLE_KEY?.trim());
 }

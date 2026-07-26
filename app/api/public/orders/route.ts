@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authRateLimitExceeded, clientIp } from "@/lib/rate-limit";
 import {
+  PosDeliveryMinOrderError,
+  PosDeliveryUnavailableError,
   PosOrderProductError,
   createPublicOrder,
   getShopByMenuToken,
@@ -41,6 +43,15 @@ export async function POST(req: NextRequest) {
     const result = await createPublicOrder(shop.userId, input);
     return NextResponse.json({ data: result }, { status: 201 });
   } catch (err) {
+    if (err instanceof PosDeliveryUnavailableError) {
+      return NextResponse.json({ error: "delivery_unavailable" }, { status: 400 });
+    }
+    if (err instanceof PosDeliveryMinOrderError) {
+      return NextResponse.json(
+        { error: "delivery_min_order", data: { minOrder: err.minOrder } },
+        { status: 400 },
+      );
+    }
     if (err instanceof PosOrderProductError) {
       return NextResponse.json({ error: "invalid_product" }, { status: 400 });
     }

@@ -26,7 +26,18 @@ export async function GET(
 
   const catalog = await listPosCatalog(shop.userId);
   return NextResponse.json(
-    { data: { shopName: shop.shopName, catalog } },
+    {
+      data: {
+        shopName: shop.shopName,
+        catalog,
+        delivery: {
+          enabled: shop.deliveryEnabled,
+          fee: shop.deliveryFee,
+          minOrder: shop.deliveryMinOrder,
+          areaNote: shop.deliveryAreaNote,
+        },
+      },
+    },
     { headers: { "Cache-Control": "private, no-cache, no-store, must-revalidate" } },
   );
 }

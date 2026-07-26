@@ -70,6 +70,7 @@ type BillItemRow = {
   line_total: string;
   line_cost: string;
   sort_order: number;
+  note: string | null;
 };
 
 export class PosPlanRequiredError extends Error {
@@ -123,6 +124,7 @@ function mapBillItem(r: BillItemRow): PosBillItem {
     lineTotal: r.line_total,
     lineCost: r.line_cost,
     sortOrder: r.sort_order,
+    note: r.note,
   };
 }
 
@@ -249,7 +251,20 @@ export async function closePosBill(
       return { line, product, unitSellPrice, lineTotal, lineCost, sortOrder, selectedModifiers };
     });
 
-    const totalAmount = sumDecimals(...computedLines.map((l) => l.lineTotal));
+    // ค่าบริการเพิ่ม (เช่น ค่าส่งเดลิเวอรี่) — เก็บเป็นบรรทัดในบิลที่ไม่มี product_id
+    // เพื่อให้ SUM(bill_items.line_total) = total_amount = journal เสมอ
+    const surchargeLines = (input.surcharges ?? [])
+      .map((sc, i) => ({
+        label: sc.label,
+        lineTotal: centsToDecimalString(toCents(sc.amount)),
+        sortOrder: computedLines.length + i,
+      }))
+      .filter((sc) => toCents(sc.lineTotal) > 0);
+
+    const totalAmount = sumDecimals(
+      ...computedLines.map((l) => l.lineTotal),
+      ...surchargeLines.map((sc) => sc.lineTotal),
+    );
 
     // Normalize payments: explicit split list, or legacy single method = full total.
     // Server re-validates the sum — client amounts are never trusted blindly.
@@ -283,11 +298,11 @@ export async function closePosBill(
       const { rows: itemRows } = await client.query<BillItemRow>(
         `INSERT INTO pos_bill_items
            (bill_id, product_id, product_name, unit_sell_price, unit_cost_price,
-            quantity, line_total, line_cost, sort_order)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            quantity, line_total, line_cost, sort_order, note)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING id, bill_id, product_id, product_name,
            unit_sell_price::text, unit_cost_price::text, quantity::text,
-           line_total::text, line_cost::text, sort_order`,
+           line_total::text, line_cost::text, sort_order, note`,
         [
           bill.id,
           product.id,
@@ -298,6 +313,7 @@ export async function closePosBill(
           lineTotal,
           lineCost,
           sortOrder,
+          line.note?.trim() || null,
         ],
       );
       const insertedItem = mapBillItem(itemRows[0]);
@@ -343,6 +359,20 @@ export async function closePosBill(
           negativeStockProductIds.push(product.id);
         }
       }
+    }
+
+    for (const sc of surchargeLines) {
+      const { rows: scRows } = await client.query<BillItemRow>(
+        `INSERT INTO pos_bill_items
+           (bill_id, product_id, product_name, unit_sell_price, unit_cost_price,
+            quantity, line_total, line_cost, sort_order, note)
+         VALUES ($1, NULL, $2, $3, 0, 1, $3, 0, $4, NULL)
+         RETURNING id, bill_id, product_id, product_name,
+           unit_sell_price::text, unit_cost_price::text, quantity::text,
+           line_total::text, line_cost::text, sort_order, note`,
+        [bill.id, sc.label, sc.lineTotal, sc.sortOrder],
+      );
+      insertedItems.push(mapBillItem(scRows[0]));
     }
 
     // ตัดวัตถุดิบตามสูตร (สินค้า + modifier ที่เลือก) — ใน transaction เดียวกับบิล

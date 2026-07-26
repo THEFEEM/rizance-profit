@@ -3,6 +3,7 @@ import { pool } from "@/lib/db";
 import { today } from "@/lib/date";
 import { centsToDecimalString, sumDecimals, toCents } from "@/lib/money";
 import { resolveCartModifiers, type SelectedModifier } from "@/lib/pos-modifier-queries";
+import { pushOrderStatus } from "@/lib/pos-push-queries";
 
 /**
  * QR pre-orders — reservations only. No stock/income/journal here; staff
@@ -30,6 +31,8 @@ export type PosOrderItem = {
   quantity: string;
   lineTotal: string;
   sortOrder: number;
+  /** โน้ตต่อรายการ เช่น "ไม่ใส่ผัก" */
+  note: string | null;
   modifiers?: PosOrderItemModifier[];
   /** ids needed by staff to convert to a bill via closeBill */
   modifierIds?: string[];
@@ -48,6 +51,18 @@ export type PosOrder = {
   billId: string | null;
   cancelReason: string | null;
   createdAt: string;
+  /** at_shop = จ่ายที่ร้าน · prepaid_transfer = ลูกค้าโอนมาก่อน */
+  paymentIntent: "at_shop" | "prepaid_transfer";
+  slipUrl: string | null;
+  slipUploadedAt: string | null;
+  slipVerifiedAt: string | null;
+  slipRejectedReason: string | null;
+  /** pickup = มารับที่ร้าน · delivery = ส่งถึงบ้าน */
+  orderType: "pickup" | "delivery";
+  deliveryAddress: string | null;
+  deliveryNote: string | null;
+  /** ค่าส่ง (รวมอยู่ใน totalAmount แล้ว) */
+  deliveryFee: string;
   items: PosOrderItem[];
 };
 
@@ -56,6 +71,20 @@ export type PublicOrderResult = {
   accessToken: string;
   totalAmount: string;
 };
+
+export class PosDeliveryUnavailableError extends Error {
+  constructor() {
+    super("delivery not available");
+    this.name = "PosDeliveryUnavailableError";
+  }
+}
+
+export class PosDeliveryMinOrderError extends Error {
+  constructor(public minOrder: string) {
+    super("order below delivery minimum");
+    this.name = "PosDeliveryMinOrderError";
+  }
+}
 
 export class PosOrderProductError extends Error {
   constructor() {
@@ -91,13 +120,28 @@ type OrderRow = {
   bill_id: string | null;
   cancel_reason: string | null;
   created_at: Date | string;
+  payment_intent: string;
+  slip_url: string | null;
+  slip_uploaded_at: Date | string | null;
+  slip_verified_at: Date | string | null;
+  slip_rejected_reason: string | null;
+  order_type: string;
+  delivery_address: string | null;
+  delivery_note: string | null;
+  delivery_fee: string;
 };
 
 const ORDER_RETURN = `id, order_no, status, channel, customer_name, customer_phone, note,
-  pickup_at_text, total_amount::text AS total_amount, bill_id, cancel_reason, created_at`;
+  pickup_at_text, total_amount::text AS total_amount, bill_id, cancel_reason, created_at,
+  payment_intent, slip_url, slip_uploaded_at, slip_verified_at, slip_rejected_reason,
+  order_type, delivery_address, delivery_note, delivery_fee::text AS delivery_fee`;
 
 function toIso(v: Date | string): string {
   return v instanceof Date ? v.toISOString() : String(v);
+}
+
+function toIsoOrNull(v: Date | string | null): string | null {
+  return v == null ? null : toIso(v);
 }
 
 function mapOrder(r: OrderRow, items: PosOrderItem[]): PosOrder {
@@ -114,19 +158,42 @@ function mapOrder(r: OrderRow, items: PosOrderItem[]): PosOrder {
     billId: r.bill_id,
     cancelReason: r.cancel_reason,
     createdAt: toIso(r.created_at),
+    paymentIntent: (r.payment_intent as PosOrder["paymentIntent"]) ?? "at_shop",
+    slipUrl: r.slip_url,
+    slipUploadedAt: toIsoOrNull(r.slip_uploaded_at),
+    slipVerifiedAt: toIsoOrNull(r.slip_verified_at),
+    slipRejectedReason: r.slip_rejected_reason,
+    orderType: (r.order_type as PosOrder["orderType"]) ?? "pickup",
+    deliveryAddress: r.delivery_address,
+    deliveryNote: r.delivery_note,
+    deliveryFee: r.delivery_fee ?? "0.00",
     items,
   };
 }
 
-export async function getShopByMenuToken(
-  token: string,
-): Promise<{ userId: string; shopName: string; onlineOrderingEnabled: boolean } | null> {
+export type PublicShopInfo = {
+  userId: string;
+  shopName: string;
+  onlineOrderingEnabled: boolean;
+  deliveryEnabled: boolean;
+  deliveryFee: string;
+  deliveryMinOrder: string;
+  deliveryAreaNote: string | null;
+};
+
+export async function getShopByMenuToken(token: string): Promise<PublicShopInfo | null> {
   const { rows } = await pool.query<{
     user_id: string;
     shop_name: string;
     online_ordering_enabled: boolean;
+    delivery_enabled: boolean;
+    delivery_fee: string;
+    delivery_min_order: string;
+    delivery_area_note: string | null;
   }>(
-    `SELECT s.user_id, u.shop_name, s.online_ordering_enabled
+    `SELECT s.user_id, u.shop_name, s.online_ordering_enabled,
+            s.delivery_enabled, s.delivery_fee::text AS delivery_fee,
+            s.delivery_min_order::text AS delivery_min_order, s.delivery_area_note
      FROM pos_shop_settings s
      JOIN users u ON u.id = s.user_id
      WHERE s.public_menu_token = $1`,
@@ -137,6 +204,10 @@ export async function getShopByMenuToken(
     userId: rows[0].user_id,
     shopName: rows[0].shop_name,
     onlineOrderingEnabled: rows[0].online_ordering_enabled,
+    deliveryEnabled: rows[0].delivery_enabled,
+    deliveryFee: rows[0].delivery_fee,
+    deliveryMinOrder: rows[0].delivery_min_order,
+    deliveryAreaNote: rows[0].delivery_area_note,
   };
 }
 
@@ -167,7 +238,13 @@ export type CreatePublicOrderInput = {
   customerPhone?: string;
   note?: string;
   pickupAtText?: string;
-  items: { productId: string; qty: number; modifierIds?: string[] }[];
+  /** ลูกค้าเลือกจะโอนก่อนหรือจ่ายที่ร้าน */
+  paymentIntent?: "at_shop" | "prepaid_transfer";
+  /** pickup = มารับเอง · delivery = ให้ไปส่ง (ต้องมีที่อยู่) */
+  orderType?: "pickup" | "delivery";
+  deliveryAddress?: string;
+  deliveryNote?: string;
+  items: { productId: string; qty: number; modifierIds?: string[]; note?: string }[];
 };
 
 /** Create a pre-order — prices resolved server-side, snapshot into order rows. */
@@ -210,13 +287,38 @@ export async function createPublicOrder(
       };
     });
 
-    const totalAmount = sumDecimals(...computed.map((c) => c.lineTotal));
+    const itemsTotal = sumDecimals(...computed.map((c) => c.lineTotal));
+
+    // เดลิเวอรี่: อ่านค่าส่ง/ยอดขั้นต่ำจากตั้งค่าร้าน (ไม่เชื่อ client)
+    let deliveryFee = "0.00";
+    if (input.orderType === "delivery") {
+      const { rows: cfg } = await client.query<{
+        delivery_enabled: boolean;
+        delivery_fee: string;
+        delivery_min_order: string;
+      }>(
+        `SELECT delivery_enabled, delivery_fee::text AS delivery_fee,
+                delivery_min_order::text AS delivery_min_order
+         FROM pos_shop_settings WHERE user_id = $1`,
+        [userId],
+      );
+      if (!cfg[0]?.delivery_enabled) throw new PosDeliveryUnavailableError();
+      if (!input.deliveryAddress?.trim()) throw new PosDeliveryUnavailableError();
+      if (toCents(itemsTotal) < toCents(cfg[0].delivery_min_order)) {
+        throw new PosDeliveryMinOrderError(cfg[0].delivery_min_order);
+      }
+      deliveryFee = centsToDecimalString(toCents(cfg[0].delivery_fee));
+    }
+
+    const totalAmount = sumDecimals(itemsTotal, deliveryFee);
     const orderNo = await nextOrderNo(client, userId);
 
     const { rows: orderRows } = await client.query<{ id: string; access_token: string }>(
       `INSERT INTO pos_orders
-         (user_id, order_no, customer_name, customer_phone, note, pickup_at_text, total_amount)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+         (user_id, order_no, customer_name, customer_phone, note, pickup_at_text,
+          total_amount, payment_intent, order_type, delivery_address, delivery_note,
+          delivery_fee)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING id, access_token`,
       [
         userId,
@@ -226,6 +328,11 @@ export async function createPublicOrder(
         input.note ?? null,
         input.pickupAtText ?? null,
         totalAmount,
+        input.paymentIntent ?? "at_shop",
+        input.orderType ?? "pickup",
+        input.deliveryAddress?.trim() || null,
+        input.deliveryNote?.trim() || null,
+        deliveryFee,
       ],
     );
     const orderId = orderRows[0].id;
@@ -233,10 +340,20 @@ export async function createPublicOrder(
     for (const c of computed) {
       const { rows: itemRows } = await client.query<{ id: string }>(
         `INSERT INTO pos_order_items
-           (order_id, product_id, product_name, unit_sell_price, quantity, line_total, sort_order)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+           (order_id, product_id, product_name, unit_sell_price, quantity, line_total,
+            sort_order, note)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING id`,
-        [orderId, c.product.id, c.product.name, c.unitSellPrice, c.line.qty, c.lineTotal, c.sortOrder],
+        [
+          orderId,
+          c.product.id,
+          c.product.name,
+          c.unitSellPrice,
+          c.line.qty,
+          c.lineTotal,
+          c.sortOrder,
+          c.line.note?.trim() || null,
+        ],
       );
       for (let i = 0; i < c.selected.length; i++) {
         const m = c.selected[i];
@@ -267,7 +384,7 @@ export async function createPublicOrder(
 export async function createStaffOrder(
   userId: string,
   input: {
-    items: { productId: string; qty: number; modifierIds?: string[] }[];
+    items: { productId: string; qty: number; modifierIds?: string[]; note?: string }[];
     customerName?: string;
     note?: string;
   },
@@ -328,8 +445,9 @@ export async function createStaffOrder(
     for (const c of computed) {
       const { rows: itemRows } = await client.query<{ id: string }>(
         `INSERT INTO pos_order_items
-           (order_id, product_id, product_name, unit_sell_price, quantity, line_total, sort_order)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+           (order_id, product_id, product_name, unit_sell_price, quantity, line_total,
+            sort_order, note)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING id`,
         [
           orderId,
@@ -339,6 +457,7 @@ export async function createStaffOrder(
           c.line.qty,
           c.lineTotal,
           c.sortOrder,
+          c.line.note?.trim() || null,
         ],
       );
       for (let i = 0; i < c.selected.length; i++) {
@@ -427,9 +546,10 @@ export async function createKitchenTicketFromBill(
       quantity: string;
       line_total: string;
       sort_order: number;
+      note: string | null;
     }>(
       `SELECT id, product_id, product_name, unit_sell_price::text,
-              quantity::text, line_total::text, sort_order
+              quantity::text, line_total::text, sort_order, note
        FROM pos_bill_items WHERE bill_id = $1
        ORDER BY sort_order ASC`,
       [billId],
@@ -438,10 +558,20 @@ export async function createKitchenTicketFromBill(
     for (const bi of billItems) {
       const { rows: itemRows } = await client.query<{ id: string }>(
         `INSERT INTO pos_order_items
-           (order_id, product_id, product_name, unit_sell_price, quantity, line_total, sort_order)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+           (order_id, product_id, product_name, unit_sell_price, quantity, line_total,
+            sort_order, note)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING id`,
-        [orderId, bi.product_id, bi.product_name, bi.unit_sell_price, bi.quantity, bi.line_total, bi.sort_order],
+        [
+          orderId,
+          bi.product_id,
+          bi.product_name,
+          bi.unit_sell_price,
+          bi.quantity,
+          bi.line_total,
+          bi.sort_order,
+          bi.note,
+        ],
       );
       await client.query(
         `INSERT INTO pos_order_item_modifiers
@@ -478,9 +608,10 @@ async function loadOrderItems(
       quantity: string;
       line_total: string;
       sort_order: number;
+      note: string | null;
     }>(
       `SELECT id, order_id, product_id, product_name,
-              unit_sell_price::text, quantity::text, line_total::text, sort_order
+              unit_sell_price::text, quantity::text, line_total::text, sort_order, note
        FROM pos_order_items
        WHERE order_id = ANY($1::uuid[])
        ORDER BY sort_order ASC`,
@@ -520,6 +651,7 @@ async function loadOrderItems(
       quantity: r.quantity,
       lineTotal: r.line_total,
       sortOrder: r.sort_order,
+      note: r.note,
       ...(mods?.names.length ? { modifiers: mods.names, modifierIds: mods.ids } : {}),
     };
     const arr = byOrder.get(r.order_id) ?? [];
@@ -532,19 +664,97 @@ async function loadOrderItems(
 /** Customer-facing lookup (safe fields only) + shop name for display. */
 export async function getOrderByAccessToken(
   accessToken: string,
-): Promise<(PosOrder & { shopName: string }) | null> {
-  const { rows } = await pool.query<OrderRow & { shop_name: string }>(
-    `SELECT o.id, o.order_no, o.status, o.customer_name, o.customer_phone, o.note,
+): Promise<
+  | (PosOrder & { shopName: string; hasFeedback: boolean; promptpayId: string | null })
+  | null
+> {
+  const { rows } = await pool.query<
+    OrderRow & { shop_name: string; has_feedback: boolean; promptpay_id: string | null }
+  >(
+    `SELECT o.id, o.order_no, o.status, o.channel, o.customer_name, o.customer_phone, o.note,
             o.pickup_at_text, o.total_amount::text AS total_amount, o.bill_id,
-            o.cancel_reason, o.created_at, u.shop_name
+            o.cancel_reason, o.created_at, o.payment_intent, o.slip_url,
+            o.slip_uploaded_at, o.slip_verified_at, o.slip_rejected_reason,
+            o.order_type, o.delivery_address, o.delivery_note,
+            o.delivery_fee::text AS delivery_fee,
+            u.shop_name, s.promptpay_id,
+            EXISTS (SELECT 1 FROM pos_order_feedback f WHERE f.order_id = o.id) AS has_feedback
      FROM pos_orders o
      JOIN users u ON u.id = o.user_id
+     LEFT JOIN pos_shop_settings s ON s.user_id = o.user_id
      WHERE o.access_token = $1`,
     [accessToken],
   );
   if (!rows[0]) return null;
   const items = await loadOrderItems([rows[0].id]);
-  return { ...mapOrder(rows[0], items.get(rows[0].id) ?? []), shopName: rows[0].shop_name };
+  return {
+    ...mapOrder(rows[0], items.get(rows[0].id) ?? []),
+    shopName: rows[0].shop_name,
+    hasFeedback: rows[0].has_feedback,
+    promptpayId: rows[0].promptpay_id,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// สลิปโอนเงิน (ลูกค้าโอนก่อน) — ไม่มีผลต่อบัญชี รายรับเกิดตอน closeBill เท่านั้น
+// ---------------------------------------------------------------------------
+
+export class PosSlipNotAllowedError extends Error {
+  constructor() {
+    super("slip not allowed for this order");
+    this.name = "PosSlipNotAllowedError";
+  }
+}
+
+/** ลูกค้าแนบสลิป (public — ยืนยันด้วย access_token) */
+export async function attachOrderSlip(
+  accessToken: string,
+  slipUrl: string,
+): Promise<{ orderId: string; userId: string; orderNo: string } | null> {
+  const { rows } = await pool.query<{
+    id: string;
+    user_id: string;
+    order_no: string;
+    status: string;
+  }>(
+    `SELECT id, user_id, order_no, status FROM pos_orders WHERE access_token = $1`,
+    [accessToken],
+  );
+  const order = rows[0];
+  if (!order) return null;
+  if (order.status === "cancelled" || order.status === "completed") {
+    throw new PosSlipNotAllowedError();
+  }
+
+  await pool.query(
+    `UPDATE pos_orders
+     SET slip_url = $2, slip_uploaded_at = now(), slip_verified_at = NULL,
+         slip_rejected_reason = NULL, payment_intent = 'prepaid_transfer',
+         updated_at = now()
+     WHERE id = $1`,
+    [order.id, slipUrl],
+  );
+  return { orderId: order.id, userId: order.user_id, orderNo: order.order_no };
+}
+
+/** พนักงานตรวจสลิป — approve = ยืนยันว่าเงินเข้าจริง (ยังไม่ลงบัญชี) */
+export async function reviewOrderSlip(
+  userId: string,
+  orderId: string,
+  input: { approve: boolean; reason?: string },
+): Promise<PosOrder | null> {
+  const { rows } = await pool.query<OrderRow>(
+    `UPDATE pos_orders
+     SET slip_verified_at = CASE WHEN $3 THEN now() ELSE NULL END,
+         slip_rejected_reason = CASE WHEN $3 THEN NULL ELSE $4 END,
+         updated_at = now()
+     WHERE id = $1 AND user_id = $2 AND slip_url IS NOT NULL
+     RETURNING ${ORDER_RETURN}`,
+    [orderId, userId, input.approve, input.reason ?? "สลิปไม่ถูกต้อง"],
+  );
+  if (!rows[0]) return null;
+  const items = await loadOrderItems([rows[0].id]);
+  return mapOrder(rows[0], items.get(rows[0].id) ?? []);
 }
 
 /** Staff queue. active=true → pending/accepted/cooking/ready (ยังไม่ส่งมอบ). */
@@ -609,6 +819,9 @@ export async function updatePosOrderStatus(
       [userId, orderId, input.status, cancelReason, input.billId ?? null],
     );
     await client.query("COMMIT");
+
+    // แจ้งเตือนลูกค้าบนมือถือ (fire-and-forget — ห้ามทำให้ flow พัง)
+    void pushOrderStatus(orderId, input.status, updated[0].order_no);
 
     const items = await loadOrderItems([orderId]);
     return mapOrder(updated[0], items.get(orderId) ?? []);

@@ -30,6 +30,13 @@ const updateSettingsSchema = z
     onlineOrderingEnabled: z.boolean().optional(),
     kitchenEnabled: z.boolean().optional(),
     goLive: z.literal(true).optional(),
+    deliveryEnabled: z.boolean().optional(),
+    deliveryFee: z.number().finite().gte(0).max(9_999.99).optional(),
+    deliveryMinOrder: z.number().finite().gte(0).max(99_999.99).optional(),
+    deliveryAreaNote: z
+      .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(200))
+      .nullable()
+      .optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field is required",

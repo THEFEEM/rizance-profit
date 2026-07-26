@@ -19,7 +19,8 @@ function applyPosCorsHeaders(res: NextResponse): NextResponse {
   const origin = getPosAppOrigin();
   res.headers.set("Access-Control-Allow-Origin", origin);
   res.headers.set("Access-Control-Allow-Credentials", "true");
-  res.headers.set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
+  // PUT required for recipe replace endpoints (products/:id/recipe, modifiers/:id/recipe)
+  res.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
   res.headers.set("Access-Control-Allow-Headers", "Content-Type");
   res.headers.set("Vary", "Origin");
   return res;

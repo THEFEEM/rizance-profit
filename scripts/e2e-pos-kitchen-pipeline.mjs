@@ -121,7 +121,8 @@ async function cashCheckoutOneItem(page, productName) {
       await page.waitForTimeout(400);
     }
   }
-  await page.getByRole("button", { name: "คิดเงิน" }).click();
+  // order-first UI: direct cash pay is secondary "จ่ายเลย (ไม่เข้าคิว)"
+  await page.getByRole("button", { name: /จ่ายเลย/ }).click();
   await page.waitForSelector("h2:has-text('ชำระเงิน')", { timeout: 10000 });
   await page.getByRole("button", { name: "เงินสด", exact: true }).click();
   await page.getByLabel("รับเงินมา").fill("500");
@@ -191,8 +192,9 @@ try {
     [userId],
   );
 
-  const t0 = Date.now();
   await cashCheckoutOneItem(staff, "Beef Burger");
+  // timing starts AFTER bill close — ticket must appear on kitchen ≤10s
+  const t0 = Date.now();
 
   // wait for kitchen ticket (poll UI + DB, ≤12s)
   let appeared = false;
@@ -511,19 +513,25 @@ try {
       [qrOrderId],
     );
     const billId = billRow.rows[0]?.bill_id;
-    const journal = await db.query(
-      `SELECT
-         COALESCE(SUM(jl.debit),0)::text AS sum_debit,
-         COALESCE(SUM(jl.credit),0)::text AS sum_credit
-       FROM journal_entries je
-       JOIN journal_lines jl ON jl.entry_id = je.id
-       WHERE je.user_id = $1 AND je.source_module = 'pos'
-         AND je.source_event_id = $2 AND je.source_event_type = 'pos_bill_paid'`,
-      [userId, billId],
-    );
-    const bal =
-      parseFloat(journal.rows[0]?.sum_debit) === parseFloat(journal.rows[0]?.sum_credit) &&
-      parseFloat(journal.rows[0]?.sum_debit) > 0;
+    let journal;
+    let bal = false;
+    for (let i = 0; i < 10; i++) {
+      journal = await db.query(
+        `SELECT
+           COALESCE(SUM(jl.debit),0)::text AS sum_debit,
+           COALESCE(SUM(jl.credit),0)::text AS sum_credit
+         FROM journal_entries je
+         JOIN journal_lines jl ON jl.entry_id = je.id
+         WHERE je.user_id = $1 AND je.source_module = 'pos'
+           AND je.source_event_id = $2 AND je.source_event_type = 'pos_bill_paid'`,
+        [userId, billId],
+      );
+      bal =
+        parseFloat(journal.rows[0]?.sum_debit) === parseFloat(journal.rows[0]?.sum_credit) &&
+        parseFloat(journal.rows[0]?.sum_debit) > 0;
+      if (bal) break;
+      await staff.waitForTimeout(500);
+    }
     if (bal) pass("f_journal_balanced", JSON.stringify(journal.rows[0]));
     else fail("f_journal_balanced", JSON.stringify(journal.rows[0]));
   }

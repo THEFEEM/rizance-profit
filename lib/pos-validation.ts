@@ -4,6 +4,10 @@ const cartLine = z.object({
   productId: z.string().uuid(),
   qty: z.number().positive(),
   modifierIds: z.array(z.string().uuid()).max(20).optional(),
+  /** โน้ตต่อรายการ เช่น "ไม่ใส่ผัก" — ไม่มีผลต่อราคา */
+  note: z
+    .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(200))
+    .optional(),
 });
 
 const paymentMethodEnum = z.enum(["cash", "promptpay", "thai_chuay_thai"]);
@@ -20,9 +24,25 @@ const billPayment = z.object({
     }),
 });
 
+const surcharge = z.object({
+  label: z.preprocess(
+    (v) => (typeof v === "string" ? v.trim() : v),
+    z.string().min(1).max(80),
+  ),
+  amount: z
+    .number()
+    .finite()
+    .gte(0)
+    .max(9_999_999.99)
+    .refine((n) => Math.abs(n * 100 - Math.round(n * 100)) < 1e-6, {
+      message: "Amount can have at most 2 decimal places",
+    }),
+});
+
 export const closePosBillSchema = z
   .object({
     items: z.array(cartLine).min(1),
+    surcharges: z.array(surcharge).max(3).optional(),
     paymentMethod: paymentMethodEnum.optional(),
     payments: z.array(billPayment).min(1).max(3).optional(),
     entryDate: z
@@ -266,6 +286,16 @@ export const publicOrderSchema = z.object({
   pickupAtText: z
     .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(40))
     .optional(),
+  /** ลูกค้าเลือกโอนก่อน หรือจ่ายที่ร้าน (default at_shop) */
+  paymentIntent: z.enum(["at_shop", "prepaid_transfer"]).optional(),
+  /** pickup = มารับเอง · delivery = ให้ไปส่ง */
+  orderType: z.enum(["pickup", "delivery"]).optional(),
+  deliveryAddress: z
+    .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(10).max(300))
+    .optional(),
+  deliveryNote: z
+    .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(200))
+    .optional(),
   items: z.array(cartLine).min(1).max(20),
 });
 
@@ -279,6 +309,14 @@ export const staffOrderSchema = z.object({
     .optional(),
   note: z
     .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(200))
+    .optional(),
+});
+
+/** ความเห็นลูกค้าหลังรับอาหาร (public — ยืนยันด้วย access_token ของออเดอร์) */
+export const orderFeedbackSchema = z.object({
+  rating: z.number().int().gte(1).lte(5),
+  comment: z
+    .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(500))
     .optional(),
 });
 

@@ -45,6 +45,7 @@ type BillItemRow = {
   line_total: string;
   line_cost: string;
   sort_order: number;
+  note: string | null;
 };
 
 type BillItemWithStockRow = BillItemRow & {
@@ -79,6 +80,7 @@ function mapBillItem(r: BillItemRow): PosBillItem {
     lineTotal: r.line_total,
     lineCost: r.line_cost,
     sortOrder: r.sort_order,
+    note: r.note,
   };
 }
 
@@ -138,7 +140,7 @@ const BILL_RETURN = `id, user_id, bill_no, status, total_amount::text, payment_m
 
 const ITEM_RETURN = `id, bill_id, product_id, product_name,
   unit_sell_price::text, unit_cost_price::text, quantity::text,
-  line_total::text, line_cost::text, sort_order`;
+  line_total::text, line_cost::text, sort_order, note`;
 
 export async function listPosBillsByDate(
   userId: string,
@@ -277,7 +279,7 @@ export async function voidPosBill(
     const { rows: itemRows } = await client.query<BillItemWithStockRow>(
       `SELECT bi.id, bi.bill_id, bi.product_id, bi.product_name,
               bi.unit_sell_price::text, bi.unit_cost_price::text, bi.quantity::text,
-              bi.line_total::text, bi.line_cost::text, bi.sort_order,
+              bi.line_total::text, bi.line_cost::text, bi.sort_order, bi.note,
               p.track_stock
        FROM pos_bill_items bi
        LEFT JOIN pos_products p ON p.id = bi.product_id AND p.user_id = $2

@@ -68,11 +68,15 @@ export type PosBillItem = {
   lineTotal: string;
   lineCost: string;
   sortOrder: number;
+  /** โน้ตต่อรายการ เช่น "ไม่ใส่ผัก" (snapshot ตอนขาย) */
+  note: string | null;
   modifiers?: PosBillItemModifier[];
 };
 
 export type ClosePosBillInput = {
-  items: { productId: string; qty: number; modifierIds?: string[] }[];
+  items: { productId: string; qty: number; modifierIds?: string[]; note?: string }[];
+  /** ค่าบริการเพิ่ม เช่น ค่าส่ง — กลายเป็นบรรทัดในบิล (ไม่มี product_id) */
+  surcharges?: { label: string; amount: number }[];
   /** Legacy single-method checkout (full amount). Ignored when `payments` present. */
   paymentMethod?: PosPaymentMethod;
   /** Split payment: 1..3 entries, Σ amount must equal the bill total exactly. */

@@ -11,6 +11,11 @@ export type PosShopSettings = {
   kitchenEnabled: boolean;
   /** NULL = ยังไม่เปิดร้านจริง (ยังล้างข้อมูลเทสได้) */
   liveAt: string | null;
+  /** เดลิเวอรี่ */
+  deliveryEnabled: boolean;
+  deliveryFee: string;
+  deliveryMinOrder: string;
+  deliveryAreaNote: string | null;
 };
 
 type SettingsRow = {
@@ -22,10 +27,16 @@ type SettingsRow = {
   online_ordering_enabled: boolean;
   kitchen_enabled: boolean;
   live_at: Date | string | null;
+  delivery_enabled: boolean;
+  delivery_fee: string;
+  delivery_min_order: string;
+  delivery_area_note: string | null;
 };
 
 const SETTINGS_RETURN = `default_payment_method, promptpay_id, receipt_header,
-  allow_negative_stock, public_menu_token, online_ordering_enabled, kitchen_enabled, live_at`;
+  allow_negative_stock, public_menu_token, online_ordering_enabled, kitchen_enabled, live_at,
+  delivery_enabled, delivery_fee::text AS delivery_fee,
+  delivery_min_order::text AS delivery_min_order, delivery_area_note`;
 
 function mapSettings(r: SettingsRow): PosShopSettings {
   return {
@@ -42,6 +53,10 @@ function mapSettings(r: SettingsRow): PosShopSettings {
         : r.live_at instanceof Date
           ? r.live_at.toISOString()
           : String(r.live_at),
+    deliveryEnabled: r.delivery_enabled,
+    deliveryFee: r.delivery_fee ?? "0.00",
+    deliveryMinOrder: r.delivery_min_order ?? "0.00",
+    deliveryAreaNote: r.delivery_area_note,
   };
 }
 
@@ -65,6 +80,10 @@ export type UpdatePosShopSettingsInput = {
   kitchenEnabled?: boolean;
   /** ทางเดียว: ตั้ง live_at ได้ครั้งแรกครั้งเดียว ปลดล็อกไม่ได้ผ่าน API */
   goLive?: boolean;
+  deliveryEnabled?: boolean;
+  deliveryFee?: number;
+  deliveryMinOrder?: number;
+  deliveryAreaNote?: string | null;
 };
 
 export async function upsertPosShopSettings(
@@ -82,7 +101,11 @@ export async function upsertPosShopSettings(
        COALESCE($4, 'cash'),
        COALESCE($7, false),
        COALESCE($8, false),
-       CASE WHEN $9 THEN now() ELSE NULL END
+       CASE WHEN $9 THEN now() ELSE NULL END,
+       COALESCE($10, false),
+       COALESCE($11, 0),
+       COALESCE($12, 0),
+       $13
      )
      ON CONFLICT (user_id) DO UPDATE SET
        promptpay_id            = CASE WHEN $5 THEN $2 ELSE pos_shop_settings.promptpay_id END,
@@ -93,6 +116,10 @@ export async function upsertPosShopSettings(
        -- one-way: เซ็ตได้เฉพาะตอนยัง NULL เท่านั้น
        live_at                 = COALESCE(pos_shop_settings.live_at,
                                           CASE WHEN $9 THEN now() ELSE NULL END),
+       delivery_enabled        = COALESCE($10, pos_shop_settings.delivery_enabled),
+       delivery_fee            = COALESCE($11, pos_shop_settings.delivery_fee),
+       delivery_min_order      = COALESCE($12, pos_shop_settings.delivery_min_order),
+       delivery_area_note      = CASE WHEN $14 THEN $13 ELSE pos_shop_settings.delivery_area_note END,
        updated_at              = now()
      RETURNING ${SETTINGS_RETURN}`,
     [
@@ -105,6 +132,11 @@ export async function upsertPosShopSettings(
       input.onlineOrderingEnabled ?? null,
       input.kitchenEnabled ?? null,
       input.goLive === true,
+      input.deliveryEnabled ?? null,
+      input.deliveryFee != null ? input.deliveryFee.toFixed(2) : null,
+      input.deliveryMinOrder != null ? input.deliveryMinOrder.toFixed(2) : null,
+      input.deliveryAreaNote ?? null,
+      input.deliveryAreaNote !== undefined,
     ],
   );
   if (!rows[0]) throw new Error("Could not upsert POS shop settings");
