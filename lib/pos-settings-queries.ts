@@ -7,6 +7,8 @@ export type PosShopSettings = {
   allowNegativeStock: boolean;
   publicMenuToken: string | null;
   onlineOrderingEnabled: boolean;
+  /** เปิดจอครัว — ปิดบิล walk-in แล้วสร้างตั๋วครัวอัตโนมัติ */
+  kitchenEnabled: boolean;
 };
 
 type SettingsRow = {
@@ -16,10 +18,11 @@ type SettingsRow = {
   allow_negative_stock: boolean;
   public_menu_token: string | null;
   online_ordering_enabled: boolean;
+  kitchen_enabled: boolean;
 };
 
 const SETTINGS_RETURN = `default_payment_method, promptpay_id, receipt_header,
-  allow_negative_stock, public_menu_token, online_ordering_enabled`;
+  allow_negative_stock, public_menu_token, online_ordering_enabled, kitchen_enabled`;
 
 function mapSettings(r: SettingsRow): PosShopSettings {
   return {
@@ -29,6 +32,7 @@ function mapSettings(r: SettingsRow): PosShopSettings {
     allowNegativeStock: r.allow_negative_stock,
     publicMenuToken: r.public_menu_token,
     onlineOrderingEnabled: r.online_ordering_enabled,
+    kitchenEnabled: r.kitchen_enabled,
   };
 }
 
@@ -49,6 +53,7 @@ export type UpdatePosShopSettingsInput = {
   receiptHeader?: string | null;
   defaultPaymentMethod?: "cash" | "promptpay";
   onlineOrderingEnabled?: boolean;
+  kitchenEnabled?: boolean;
 };
 
 export async function upsertPosShopSettings(
@@ -57,19 +62,22 @@ export async function upsertPosShopSettings(
 ): Promise<PosShopSettings> {
   const { rows } = await pool.query<SettingsRow>(
     `INSERT INTO pos_shop_settings
-       (user_id, promptpay_id, receipt_header, default_payment_method, online_ordering_enabled)
+       (user_id, promptpay_id, receipt_header, default_payment_method,
+        online_ordering_enabled, kitchen_enabled)
      VALUES (
        $1,
        $2,
        $3,
        COALESCE($4, 'cash'),
-       COALESCE($7, false)
+       COALESCE($7, false),
+       COALESCE($8, false)
      )
      ON CONFLICT (user_id) DO UPDATE SET
        promptpay_id            = CASE WHEN $5 THEN $2 ELSE pos_shop_settings.promptpay_id END,
        receipt_header          = CASE WHEN $6 THEN $3 ELSE pos_shop_settings.receipt_header END,
        default_payment_method  = COALESCE($4, pos_shop_settings.default_payment_method),
        online_ordering_enabled = COALESCE($7, pos_shop_settings.online_ordering_enabled),
+       kitchen_enabled         = COALESCE($8, pos_shop_settings.kitchen_enabled),
        updated_at              = now()
      RETURNING ${SETTINGS_RETURN}`,
     [
@@ -80,6 +88,7 @@ export async function upsertPosShopSettings(
       input.promptpayId !== undefined,
       input.receiptHeader !== undefined,
       input.onlineOrderingEnabled ?? null,
+      input.kitchenEnabled ?? null,
     ],
   );
   if (!rows[0]) throw new Error("Could not upsert POS shop settings");

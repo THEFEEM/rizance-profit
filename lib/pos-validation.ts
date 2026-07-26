@@ -211,7 +211,7 @@ export const publicOrderSchema = z.object({
 export type PublicOrderBody = z.infer<typeof publicOrderSchema>;
 
 export const updatePosOrderSchema = z.object({
-  status: z.enum(["accepted", "ready", "completed", "cancelled"]),
+  status: z.enum(["accepted", "cooking", "ready", "completed", "cancelled"]),
   cancelReason: z
     .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(200))
     .optional(),

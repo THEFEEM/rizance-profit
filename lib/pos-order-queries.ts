@@ -9,7 +9,16 @@ import { resolveCartModifiers, type SelectedModifier } from "@/lib/pos-modifier-
  * converts to a bill (closeBill) at pickup and links bill_id.
  */
 
-export type PosOrderStatus = "pending" | "accepted" | "ready" | "completed" | "cancelled";
+export type PosOrderStatus =
+  | "pending"
+  | "accepted"
+  | "cooking"
+  | "ready"
+  | "completed"
+  | "cancelled";
+
+/** qr = ลูกค้าสั่งเอง (จ่ายตอนรับ) · pos = ตั๋วครัวจากบิล walk-in ที่จ่ายแล้ว */
+export type PosOrderChannel = "qr" | "pos";
 
 export type PosOrderItemModifier = { modifierName: string; priceDelta: string };
 
@@ -30,6 +39,7 @@ export type PosOrder = {
   id: string;
   orderNo: string;
   status: PosOrderStatus;
+  channel: PosOrderChannel;
   customerName: string;
   customerPhone: string | null;
   note: string | null;
@@ -72,6 +82,7 @@ type OrderRow = {
   id: string;
   order_no: string;
   status: string;
+  channel: string;
   customer_name: string;
   customer_phone: string | null;
   note: string | null;
@@ -82,7 +93,7 @@ type OrderRow = {
   created_at: Date | string;
 };
 
-const ORDER_RETURN = `id, order_no, status, customer_name, customer_phone, note,
+const ORDER_RETURN = `id, order_no, status, channel, customer_name, customer_phone, note,
   pickup_at_text, total_amount::text AS total_amount, bill_id, cancel_reason, created_at`;
 
 function toIso(v: Date | string): string {
@@ -94,6 +105,7 @@ function mapOrder(r: OrderRow, items: PosOrderItem[]): PosOrder {
     id: r.id,
     orderNo: r.order_no,
     status: r.status as PosOrderStatus,
+    channel: (r.channel as PosOrderChannel) ?? "qr",
     customerName: r.customer_name,
     customerPhone: r.customer_phone,
     note: r.note,
@@ -247,6 +259,107 @@ export async function createPublicOrder(
   }
 }
 
+export class PosBillNotFoundForTicketError extends Error {
+  constructor() {
+    super("bill not found for kitchen ticket");
+    this.name = "PosBillNotFoundForTicketError";
+  }
+}
+
+/**
+ * ตั๋วครัวจากบิล walk-in ที่จ่ายแล้ว — channel 'pos', เริ่มที่ accepted (จ่ายแล้ว
+ * ไม่ต้องรอร้านยืนยัน) items ก็อปจาก snapshot ของบิล (ชื่อ/จำนวน/ตัวเลือก)
+ * Idempotent: บิลเดียวมีตั๋วได้ใบเดียว — เรียกซ้ำคืนใบเดิม
+ */
+export async function createKitchenTicketFromBill(
+  userId: string,
+  billId: string,
+): Promise<PosOrder> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // มีตั๋วอยู่แล้ว → คืนใบเดิม
+    const { rows: existing } = await client.query<OrderRow>(
+      `SELECT ${ORDER_RETURN} FROM pos_orders
+       WHERE user_id = $1 AND bill_id = $2`,
+      [userId, billId],
+    );
+    if (existing[0]) {
+      await client.query("COMMIT");
+      const items = await loadOrderItems([existing[0].id]);
+      return mapOrder(existing[0], items.get(existing[0].id) ?? []);
+    }
+
+    const { rows: bills } = await client.query<{
+      id: string;
+      bill_no: string;
+      total_amount: string;
+      status: string;
+    }>(
+      `SELECT id, bill_no, total_amount::text, status FROM pos_bills
+       WHERE id = $2 AND user_id = $1 AND status = 'paid'`,
+      [userId, billId],
+    );
+    if (!bills[0]) throw new PosBillNotFoundForTicketError();
+    const bill = bills[0];
+
+    const orderNo = await nextOrderNo(client, userId);
+    const { rows: orderRows } = await client.query<OrderRow>(
+      `INSERT INTO pos_orders
+         (user_id, order_no, status, channel, customer_name, total_amount, bill_id)
+       VALUES ($1, $2, 'accepted', 'pos', $3, $4, $5)
+       RETURNING ${ORDER_RETURN}`,
+      [userId, orderNo, `หน้าร้าน ${bill.bill_no}`, bill.total_amount, billId],
+    );
+    const orderId = orderRows[0].id;
+
+    // ก็อป items + ตัวเลือกจาก snapshot ของบิล
+    const { rows: billItems } = await client.query<{
+      id: string;
+      product_id: string | null;
+      product_name: string;
+      unit_sell_price: string;
+      quantity: string;
+      line_total: string;
+      sort_order: number;
+    }>(
+      `SELECT id, product_id, product_name, unit_sell_price::text,
+              quantity::text, line_total::text, sort_order
+       FROM pos_bill_items WHERE bill_id = $1
+       ORDER BY sort_order ASC`,
+      [billId],
+    );
+
+    for (const bi of billItems) {
+      const { rows: itemRows } = await client.query<{ id: string }>(
+        `INSERT INTO pos_order_items
+           (order_id, product_id, product_name, unit_sell_price, quantity, line_total, sort_order)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING id`,
+        [orderId, bi.product_id, bi.product_name, bi.unit_sell_price, bi.quantity, bi.line_total, bi.sort_order],
+      );
+      await client.query(
+        `INSERT INTO pos_order_item_modifiers
+           (order_item_id, modifier_id, modifier_name, price_delta, sort_order)
+         SELECT $1, bim.modifier_id, bim.modifier_name, bim.price_delta, bim.sort_order
+         FROM pos_bill_item_modifiers bim
+         WHERE bim.bill_item_id = $2`,
+        [itemRows[0].id, bi.id],
+      );
+    }
+
+    await client.query("COMMIT");
+    const items = await loadOrderItems([orderId]);
+    return mapOrder(orderRows[0], items.get(orderId) ?? []);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 async function loadOrderItems(
   orderIds: string[],
 ): Promise<Map<string, PosOrderItem[]>> {
@@ -330,13 +443,13 @@ export async function getOrderByAccessToken(
   return { ...mapOrder(rows[0], items.get(rows[0].id) ?? []), shopName: rows[0].shop_name };
 }
 
-/** Staff queue. active=true → pending/accepted/ready only. */
+/** Staff queue. active=true → pending/accepted/cooking/ready (ยังไม่ส่งมอบ). */
 export async function listPosOrders(
   userId: string,
   opts?: { activeOnly?: boolean; limit?: number },
 ): Promise<PosOrder[]> {
   const statusFilter = opts?.activeOnly
-    ? ` AND status IN ('pending', 'accepted', 'ready')`
+    ? ` AND status IN ('pending', 'accepted', 'cooking', 'ready')`
     : "";
   const { rows } = await pool.query<OrderRow>(
     `SELECT ${ORDER_RETURN}
@@ -352,7 +465,8 @@ export async function listPosOrders(
 
 const ALLOWED_TRANSITIONS: Record<PosOrderStatus, PosOrderStatus[]> = {
   pending: ["accepted", "cancelled"],
-  accepted: ["ready", "cancelled"],
+  accepted: ["cooking", "ready", "cancelled"],
+  cooking: ["ready", "cancelled"],
   ready: ["completed", "cancelled"],
   completed: [],
   cancelled: [],
