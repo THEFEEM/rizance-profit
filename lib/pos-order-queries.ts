@@ -61,6 +61,10 @@ export type PosOrder = {
   orderType: "pickup" | "delivery";
   deliveryAddress: string | null;
   deliveryNote: string | null;
+  /** พิกัดที่ลูกค้าแชร์มา (ถ้ามี) — ใช้นำทางแทนที่อยู่ตัวอักษร */
+  deliveryLat: string | null;
+  deliveryLng: string | null;
+  deliveryAccuracyM: string | null;
   /** ค่าส่ง (รวมอยู่ใน totalAmount แล้ว) */
   deliveryFee: string;
   items: PosOrderItem[];
@@ -128,13 +132,19 @@ type OrderRow = {
   order_type: string;
   delivery_address: string | null;
   delivery_note: string | null;
+  delivery_lat: string | null;
+  delivery_lng: string | null;
+  delivery_accuracy_m: string | null;
   delivery_fee: string;
 };
 
 const ORDER_RETURN = `id, order_no, status, channel, customer_name, customer_phone, note,
   pickup_at_text, total_amount::text AS total_amount, bill_id, cancel_reason, created_at,
   payment_intent, slip_url, slip_uploaded_at, slip_verified_at, slip_rejected_reason,
-  order_type, delivery_address, delivery_note, delivery_fee::text AS delivery_fee`;
+  order_type, delivery_address, delivery_note,
+  delivery_lat::text AS delivery_lat, delivery_lng::text AS delivery_lng,
+  delivery_accuracy_m::text AS delivery_accuracy_m,
+  delivery_fee::text AS delivery_fee`;
 
 function toIso(v: Date | string): string {
   return v instanceof Date ? v.toISOString() : String(v);
@@ -166,6 +176,9 @@ function mapOrder(r: OrderRow, items: PosOrderItem[]): PosOrder {
     orderType: (r.order_type as PosOrder["orderType"]) ?? "pickup",
     deliveryAddress: r.delivery_address,
     deliveryNote: r.delivery_note,
+    deliveryLat: r.delivery_lat,
+    deliveryLng: r.delivery_lng,
+    deliveryAccuracyM: r.delivery_accuracy_m,
     deliveryFee: r.delivery_fee ?? "0.00",
     items,
   };
@@ -244,6 +257,9 @@ export type CreatePublicOrderInput = {
   orderType?: "pickup" | "delivery";
   deliveryAddress?: string;
   deliveryNote?: string;
+  deliveryLat?: number;
+  deliveryLng?: number;
+  deliveryAccuracyM?: number;
   items: { productId: string; qty: number; modifierIds?: string[]; note?: string }[];
 };
 
@@ -303,7 +319,11 @@ export async function createPublicOrder(
         [userId],
       );
       if (!cfg[0]?.delivery_enabled) throw new PosDeliveryUnavailableError();
-      if (!input.deliveryAddress?.trim()) throw new PosDeliveryUnavailableError();
+      // ต้องรู้ว่าจะส่งที่ไหน: พิกัดที่แชร์มา หรือที่อยู่ตัวอักษร อย่างน้อยหนึ่งอย่าง
+      const hasGeo = input.deliveryLat != null && input.deliveryLng != null;
+      if (!hasGeo && !input.deliveryAddress?.trim()) {
+        throw new PosDeliveryUnavailableError();
+      }
       if (toCents(itemsTotal) < toCents(cfg[0].delivery_min_order)) {
         throw new PosDeliveryMinOrderError(cfg[0].delivery_min_order);
       }
@@ -317,8 +337,8 @@ export async function createPublicOrder(
       `INSERT INTO pos_orders
          (user_id, order_no, customer_name, customer_phone, note, pickup_at_text,
           total_amount, payment_intent, order_type, delivery_address, delivery_note,
-          delivery_fee)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          delivery_fee, delivery_lat, delivery_lng, delivery_accuracy_m)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        RETURNING id, access_token`,
       [
         userId,
@@ -333,6 +353,9 @@ export async function createPublicOrder(
         input.deliveryAddress?.trim() || null,
         input.deliveryNote?.trim() || null,
         deliveryFee,
+        input.deliveryLat ?? null,
+        input.deliveryLng ?? null,
+        input.deliveryAccuracyM ?? null,
       ],
     );
     const orderId = orderRows[0].id;
@@ -676,6 +699,8 @@ export async function getOrderByAccessToken(
             o.cancel_reason, o.created_at, o.payment_intent, o.slip_url,
             o.slip_uploaded_at, o.slip_verified_at, o.slip_rejected_reason,
             o.order_type, o.delivery_address, o.delivery_note,
+            o.delivery_lat::text AS delivery_lat, o.delivery_lng::text AS delivery_lng,
+            o.delivery_accuracy_m::text AS delivery_accuracy_m,
             o.delivery_fee::text AS delivery_fee,
             u.shop_name, s.promptpay_id,
             EXISTS (SELECT 1 FROM pos_order_feedback f WHERE f.order_id = o.id) AS has_feedback

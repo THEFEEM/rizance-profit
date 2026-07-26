@@ -291,8 +291,12 @@ export const publicOrderSchema = z.object({
   /** pickup = มารับเอง · delivery = ให้ไปส่ง */
   orderType: z.enum(["pickup", "delivery"]).optional(),
   deliveryAddress: z
-    .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(10).max(300))
+    .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(3).max(300))
     .optional(),
+  /** พิกัดที่ลูกค้าแชร์ (ถ้ามี ไม่ต้องพิมพ์ที่อยู่) */
+  deliveryLat: z.number().finite().gte(-90).lte(90).optional(),
+  deliveryLng: z.number().finite().gte(-180).lte(180).optional(),
+  deliveryAccuracyM: z.number().finite().gte(0).max(100_000).optional(),
   deliveryNote: z
     .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(200))
     .optional(),
