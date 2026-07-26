@@ -93,7 +93,8 @@ export async function upsertPosShopSettings(
   const { rows } = await pool.query<SettingsRow>(
     `INSERT INTO pos_shop_settings
        (user_id, promptpay_id, receipt_header, default_payment_method,
-        online_ordering_enabled, kitchen_enabled, live_at)
+        online_ordering_enabled, kitchen_enabled, live_at,
+        delivery_enabled, delivery_fee, delivery_min_order, delivery_area_note)
      VALUES (
        $1,
        $2,
@@ -103,8 +104,8 @@ export async function upsertPosShopSettings(
        COALESCE($8, false),
        CASE WHEN $9 THEN now() ELSE NULL END,
        COALESCE($10, false),
-       COALESCE($11, 0),
-       COALESCE($12, 0),
+       COALESCE($11::numeric, 0),
+       COALESCE($12::numeric, 0),
        $13
      )
      ON CONFLICT (user_id) DO UPDATE SET
@@ -117,8 +118,8 @@ export async function upsertPosShopSettings(
        live_at                 = COALESCE(pos_shop_settings.live_at,
                                           CASE WHEN $9 THEN now() ELSE NULL END),
        delivery_enabled        = COALESCE($10, pos_shop_settings.delivery_enabled),
-       delivery_fee            = COALESCE($11, pos_shop_settings.delivery_fee),
-       delivery_min_order      = COALESCE($12, pos_shop_settings.delivery_min_order),
+       delivery_fee            = COALESCE($11::numeric, pos_shop_settings.delivery_fee),
+       delivery_min_order      = COALESCE($12::numeric, pos_shop_settings.delivery_min_order),
        delivery_area_note      = CASE WHEN $14 THEN $13 ELSE pos_shop_settings.delivery_area_note END,
        updated_at              = now()
      RETURNING ${SETTINGS_RETURN}`,
