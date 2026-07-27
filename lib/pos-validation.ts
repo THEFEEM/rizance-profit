@@ -375,6 +375,31 @@ export const updatePosOrderSchema = z.object({
   billId: z.string().uuid().optional(),
 });
 
+/** ทะเบียนคนส่ง (ลิงก์ /r/<token> แยกรายคน) */
+const riderName = z.preprocess(
+  (v) => (typeof v === "string" ? v.trim() : v),
+  z.string().min(1).max(80),
+);
+const riderPhone = z.preprocess(
+  (v) => (typeof v === "string" ? v.trim() : v),
+  z.string().max(20),
+);
+
+export const riderCreateSchema = z.object({
+  name: riderName,
+  phone: riderPhone.nullish().transform((v) => (v ? String(v) : null)),
+});
+
+export const riderUpdateSchema = z.object({
+  name: riderName.optional(),
+  phone: riderPhone.nullish().transform((v) => (v ? String(v) : null)).optional(),
+  isActive: z.boolean().optional(),
+  /** ออกลิงก์ใหม่ — ลิงก์เดิมใช้ไม่ได้ทันที (ทำมือถือหาย/ลาออก) */
+  rotateToken: z.boolean().optional(),
+  /** ร้านยืนยันว่ารับเงินสดจากคนส่งครบแล้ว */
+  settleCash: z.boolean().optional(),
+});
+
 export type CreatePosProductInput = z.infer<typeof createPosProductSchema>;
 export type UpdatePosProductInput = z.infer<typeof updatePosProductSchema>;
 export type CreatePosCategoryInput = z.infer<typeof createPosCategorySchema>;

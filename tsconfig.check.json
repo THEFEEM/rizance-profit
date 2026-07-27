@@ -5,6 +5,7 @@
     "lib/pos-ingredient-queries.ts",
     "lib/pos-validation.ts",
     "lib/pos-order-queries.ts",
+    "lib/pos-rider-queries.ts",
     "lib/pos-close-bill-queries.ts",
     "lib/pos-settings-queries.ts",
     "lib/pos-admin-queries.ts",

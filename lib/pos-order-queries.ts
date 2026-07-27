@@ -67,6 +67,13 @@ export type PosOrder = {
   deliveryAccuracyM: string | null;
   /** ค่าส่ง (รวมอยู่ใน totalAmount แล้ว) */
   deliveryFee: string;
+  /** คนส่ง — ใครกด "รับงาน" ไปแล้ว (null = ยังไม่มีใครรับ) */
+  riderId: string | null;
+  riderName: string | null;
+  pickedUpAt: string | null;
+  deliveredAt: string | null;
+  /** เงินสดปลายทางถูกเอามาคืนหน้าร้านแล้วเมื่อไหร่ (reconciliation เท่านั้น) */
+  cashSettledAt: string | null;
   items: PosOrderItem[];
 };
 
@@ -136,6 +143,10 @@ type OrderRow = {
   delivery_lng: string | null;
   delivery_accuracy_m: string | null;
   delivery_fee: string;
+  rider_id: string | null;
+  picked_up_at: Date | string | null;
+  delivered_at: Date | string | null;
+  cash_settled_at: Date | string | null;
 };
 
 const ORDER_RETURN = `id, order_no, status, channel, customer_name, customer_phone, note,
@@ -144,7 +155,8 @@ const ORDER_RETURN = `id, order_no, status, channel, customer_name, customer_pho
   order_type, delivery_address, delivery_note,
   delivery_lat::text AS delivery_lat, delivery_lng::text AS delivery_lng,
   delivery_accuracy_m::text AS delivery_accuracy_m,
-  delivery_fee::text AS delivery_fee`;
+  delivery_fee::text AS delivery_fee,
+  rider_id, picked_up_at, delivered_at, cash_settled_at`;
 
 function toIso(v: Date | string): string {
   return v instanceof Date ? v.toISOString() : String(v);
@@ -180,8 +192,28 @@ function mapOrder(r: OrderRow, items: PosOrderItem[]): PosOrder {
     deliveryLng: r.delivery_lng,
     deliveryAccuracyM: r.delivery_accuracy_m,
     deliveryFee: r.delivery_fee ?? "0.00",
+    riderId: r.rider_id ?? null,
+    riderName: null,
+    pickedUpAt: toIsoOrNull(r.picked_up_at ?? null),
+    deliveredAt: toIsoOrNull(r.delivered_at ?? null),
+    cashSettledAt: toIsoOrNull(r.cash_settled_at ?? null),
     items,
   };
+}
+
+/** เติมชื่อคนส่งลงในออเดอร์ที่มี rider_id (query แยกเพื่อไม่ให้ ORDER_RETURN ต้อง join) */
+async function attachRiderNames(orders: PosOrder[]): Promise<PosOrder[]> {
+  const ids = [...new Set(orders.map((o) => o.riderId).filter((v): v is string => !!v))];
+  if (ids.length === 0) return orders;
+  const { rows } = await pool.query<{ id: string; name: string }>(
+    `SELECT id, name FROM pos_riders WHERE id = ANY($1::uuid[])`,
+    [ids],
+  );
+  const byId = new Map(rows.map((r) => [r.id, r.name]));
+  for (const o of orders) {
+    if (o.riderId) o.riderName = byId.get(o.riderId) ?? null;
+  }
+  return orders;
 }
 
 export type PublicShopInfo = {
@@ -799,7 +831,7 @@ export async function listPosOrders(
     [userId, Math.min(opts?.limit ?? 100, 200)],
   );
   const items = await loadOrderItems(rows.map((r) => r.id));
-  return rows.map((r) => mapOrder(r, items.get(r.id) ?? []));
+  return attachRiderNames(rows.map((r) => mapOrder(r, items.get(r.id) ?? [])));
 }
 
 const ALLOWED_TRANSITIONS: Record<PosOrderStatus, PosOrderStatus[]> = {
@@ -847,6 +879,21 @@ export async function updatePosOrderStatus(
 
     // แจ้งเตือนลูกค้าบนมือถือ (fire-and-forget — ห้ามทำให้ flow พัง)
     void pushOrderStatus(orderId, input.status, updated[0].order_no);
+
+    // งานส่งพร้อมออกรถ → เตือนคนส่งทุกคน (dynamic import: rider-queries import ไฟล์นี้กลับ)
+    if (input.status === "ready" && updated[0].order_type === "delivery") {
+      const row = updated[0];
+      void import("@/lib/pos-rider-queries")
+        .then((m) =>
+          m.pushRidersNewJob(
+            userId,
+            row.order_no,
+            row.total_amount,
+            row.payment_intent !== "prepaid_transfer",
+          ),
+        )
+        .catch(() => {});
+    }
 
     const items = await loadOrderItems([orderId]);
     return mapOrder(updated[0], items.get(orderId) ?? []);
