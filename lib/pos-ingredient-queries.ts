@@ -27,6 +27,14 @@ export type PosIngredient = {
   trackStock: boolean;
   stockQty: string;
   lowStockThreshold: string | null;
+  /** หมวด (เนื้อ/ขนมปัง/ผัก/ซอส/บรรจุภัณฑ์) — ใช้จัดกลุ่มตอนไปตลาด */
+  category: string | null;
+  /** ต้นทุนเฉลี่ยถ่วงน้ำหนัก ต่อ 1 หน่วยซื้อ */
+  avgCost: string | null;
+  /** ราคาต่อ 1 หน่วยซื้อ ครั้งล่าสุดที่ซื้อจริง */
+  lastPurchasePrice: string | null;
+  lastPurchasedAt: string | null;
+  supplierName: string | null;
 };
 
 export type PosRecipeLine = {
@@ -48,11 +56,18 @@ type IngredientRow = {
   track_stock: boolean;
   stock_qty: string;
   low_stock_threshold: string | null;
+  category: string | null;
+  avg_cost: string | null;
+  last_purchase_price: string | null;
+  last_purchased_at: Date | string | null;
+  supplier_name: string | null;
 };
 
 const INGREDIENT_RETURN = `id, name, purchase_quantity::text AS purchase_quantity,
   purchase_unit, purchase_price::text AS purchase_price, track_stock,
-  stock_qty::text AS stock_qty, low_stock_threshold::text AS low_stock_threshold`;
+  stock_qty::text AS stock_qty, low_stock_threshold::text AS low_stock_threshold,
+  category, avg_cost::text AS avg_cost,
+  last_purchase_price::text AS last_purchase_price, last_purchased_at, supplier_name`;
 
 /** ต้นทุนต่อ 1 หน่วยซื้อ (สตางค์-safe, ปัดที่ 4 ตำแหน่งเพื่อความแม่นของสูตร) */
 function costPerPurchaseUnit(purchasePrice: string, purchaseQuantity: string): string {
@@ -72,6 +87,16 @@ function mapIngredient(r: IngredientRow): PosIngredient {
     trackStock: r.track_stock,
     stockQty: r.stock_qty,
     lowStockThreshold: r.low_stock_threshold,
+    category: r.category,
+    avgCost: r.avg_cost,
+    lastPurchasePrice: r.last_purchase_price,
+    lastPurchasedAt:
+      r.last_purchased_at == null
+        ? null
+        : r.last_purchased_at instanceof Date
+          ? r.last_purchased_at.toISOString()
+          : String(r.last_purchased_at),
+    supplierName: r.supplier_name,
   };
 }
 
@@ -103,6 +128,8 @@ export type UpsertIngredientInput = {
   purchasePrice: number;
   trackStock?: boolean;
   lowStockThreshold?: number | null;
+  category?: string | null;
+  supplierName?: string | null;
 };
 
 export async function createPosIngredient(
@@ -112,8 +139,9 @@ export async function createPosIngredient(
   const { rows } = await pool.query<IngredientRow>(
     `INSERT INTO ingredients
        (user_id, name, purchase_quantity, purchase_unit, purchase_price,
-        track_stock, low_stock_threshold)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+        track_stock, low_stock_threshold, category, supplier_name,
+        avg_cost, last_purchase_price)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
      RETURNING ${INGREDIENT_RETURN}`,
     [
       userId,
@@ -123,6 +151,11 @@ export async function createPosIngredient(
       input.purchasePrice.toFixed(2),
       input.trackStock ?? true,
       input.lowStockThreshold ?? null,
+      input.category?.trim() || null,
+      input.supplierName?.trim() || null,
+      input.purchaseQuantity > 0
+        ? (input.purchasePrice / input.purchaseQuantity).toFixed(4)
+        : null,
     ],
   );
   return mapIngredient(rows[0]);
@@ -150,6 +183,9 @@ export async function updatePosIngredient(
   if (input.trackStock !== undefined) push("track_stock", input.trackStock);
   if (input.lowStockThreshold !== undefined)
     push("low_stock_threshold", input.lowStockThreshold);
+  if (input.category !== undefined) push("category", input.category?.trim() || null);
+  if (input.supplierName !== undefined)
+    push("supplier_name", input.supplierName?.trim() || null);
 
   if (sets.length === 0) {
     const { rows } = await pool.query<IngredientRow>(
@@ -591,6 +627,151 @@ export async function restockIngredient(
 
     await client.query("COMMIT");
     return { ingredient: mapIngredient(updated[0]), expenseEntryId };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// โหมดไปตลาด — รับของทั้งตะกร้าใน transaction เดียว
+// ---------------------------------------------------------------------------
+
+export type MarketTripLine = {
+  ingredientId: string;
+  /** จำนวนที่ซื้อ (หน่วยซื้อ) */
+  quantity: number;
+  /** ราคารวมของบรรทัดนี้ (ไม่ใส่ = ไม่รู้ราคา ใช้ราคาล่าสุดมาประมาณ) */
+  lineCost?: number;
+};
+
+export type MarketTripInput = {
+  lines: MarketTripLine[];
+  /** ของนอกลิสต์ที่ไม่ได้ track เช่น ถุงกระดาษ ทิชชู่ — ลงเป็นรายจ่ายอย่างเดียว */
+  extraItems?: { label: string; amount: number }[];
+  paymentMethod?: "cash" | "transfer";
+  note?: string;
+};
+
+export type MarketTripResult = {
+  received: number;
+  totalCost: string;
+  expenseEntryId: string | null;
+};
+
+/**
+ * รับของจากการไปตลาด 1 รอบ = 1 รายการรายจ่าย (ไม่ใช่รายการละบรรทัด)
+ * ทำครบใน transaction เดียว: เพิ่มสต๊อก · ลง movement · อัปเดตราคาล่าสุด+เฉลี่ย · ลงรายจ่าย
+ */
+export async function restockIngredientsBatch(
+  userId: string,
+  input: MarketTripInput,
+): Promise<MarketTripResult> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // ล็อกทุกแถวที่จะแตะ (เรียง id กัน deadlock)
+    const ids = [...new Set(input.lines.map((l) => l.ingredientId))].sort();
+    const { rows: locked } = await client.query<IngredientRow>(
+      `SELECT ${INGREDIENT_RETURN} FROM ingredients
+       WHERE user_id = $1 AND id = ANY($2::uuid[])
+       ORDER BY id
+       FOR UPDATE`,
+      [userId, ids],
+    );
+    if (locked.length !== ids.length) throw new PosIngredientNotFoundError();
+    const byId = new Map(locked.map((r) => [r.id, r]));
+
+    // ยอดรวมทั้งทริป (สตางค์-safe)
+    let totalCents = 0;
+    for (const l of input.lines) totalCents += l.lineCost ? toCents(l.lineCost) : 0;
+    for (const e of input.extraItems ?? []) totalCents += toCents(e.amount);
+
+    // 1) รายจ่าย 1 รายการต่อ 1 ทริป
+    let expenseEntryId: string | null = null;
+    if (totalCents > 0) {
+      const itemCount = input.lines.length + (input.extraItems?.length ?? 0);
+      const label =
+        input.note?.trim() ||
+        `ซื้อวัตถุดิบ ${itemCount} รายการ` +
+          ((input.extraItems?.length ?? 0) > 0
+            ? ` (รวม ${input.extraItems!.map((e) => e.label).join(", ")})`
+            : "");
+      const { rows: exp } = await client.query<{ id: string }>(
+        `INSERT INTO expense_entries
+           (user_id, amount, category, payment_method, note, entry_date)
+         VALUES ($1, $2, 'materials', $3, $4, $5::date)
+         RETURNING id`,
+        [
+          userId,
+          centsToDecimalString(totalCents),
+          input.paymentMethod ?? "cash",
+          label.slice(0, 255),
+          today(),
+        ],
+      );
+      expenseEntryId = exp[0].id;
+    }
+
+    // 2) รับเข้าทีละบรรทัด
+    for (const line of input.lines) {
+      if (line.quantity <= 0) continue;
+      const before = byId.get(line.ingredientId)!;
+      const stockBefore = Number(before.stock_qty) || 0;
+      const unitCost = line.lineCost ? line.lineCost / line.quantity : null;
+
+      // ค่าเฉลี่ยถ่วงน้ำหนัก — ของเก่าที่เหลือ + ของใหม่ที่เพิ่งซื้อ
+      let avgCost = before.avg_cost == null ? null : Number(before.avg_cost);
+      if (unitCost != null) {
+        const base = avgCost ?? unitCost;
+        const totalQty = Math.max(stockBefore, 0) + line.quantity;
+        avgCost =
+          totalQty > 0
+            ? (Math.max(stockBefore, 0) * base + line.quantity * unitCost) / totalQty
+            : unitCost;
+      }
+
+      await client.query(
+        `UPDATE ingredients
+         SET stock_qty = stock_qty + $3,
+             track_stock = true,
+             avg_cost = COALESCE($4, avg_cost),
+             last_purchase_price = COALESCE($5, last_purchase_price),
+             last_purchased_at = CASE WHEN $5 IS NULL THEN last_purchased_at ELSE now() END,
+             updated_at = now()
+         WHERE id = $1 AND user_id = $2`,
+        [
+          line.ingredientId,
+          userId,
+          line.quantity,
+          avgCost == null ? null : avgCost.toFixed(4),
+          unitCost == null ? null : unitCost.toFixed(2),
+        ],
+      );
+
+      await client.query(
+        `INSERT INTO ingredient_stock_movements
+           (user_id, ingredient_id, expense_entry_id, movement_type, qty_change, note)
+         VALUES ($1, $2, $3, 'restock', $4, $5)`,
+        [
+          userId,
+          line.ingredientId,
+          expenseEntryId,
+          line.quantity,
+          line.lineCost ? `฿${line.lineCost.toFixed(2)}` : "ไม่ระบุราคา",
+        ],
+      );
+    }
+
+    await client.query("COMMIT");
+    return {
+      received: input.lines.filter((l) => l.quantity > 0).length,
+      totalCost: centsToDecimalString(totalCents),
+      expenseEntryId,
+    };
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;

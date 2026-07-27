@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "skipLibCheck": true },
+  "include": [
+    "lib/pos-ingredient-queries.ts",
+    "lib/pos-validation.ts",
+    "lib/pos-order-queries.ts",
+    "lib/pos-close-bill-queries.ts",
+    "lib/pos-settings-queries.ts",
+    "lib/pos-admin-queries.ts",
+    "lib/pos-feedback-queries.ts",
+    "app/api/pos/**/*.ts",
+    "app/api/public/**/*.ts",
+    "types/**/*.ts",
+    "next-env.d.ts"
+  ],
+  "exclude": ["node_modules"]
+}

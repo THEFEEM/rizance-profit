@@ -224,6 +224,16 @@ const ingredientName = z.preprocess(
   z.string().min(1).max(120),
 );
 
+const ingredientCategory = z
+  .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(40))
+  .nullable()
+  .optional();
+
+const supplierName = z
+  .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(120))
+  .nullable()
+  .optional();
+
 export const createPosIngredientSchema = z.object({
   name: ingredientName,
   purchaseQuantity: positiveQty,
@@ -231,6 +241,37 @@ export const createPosIngredientSchema = z.object({
   purchasePrice: moneyNonNegative,
   trackStock: z.boolean().default(true),
   lowStockThreshold: z.number().finite().gte(0).nullable().optional(),
+  category: ingredientCategory,
+  supplierName: supplierName,
+});
+
+/** ไปตลาด 1 รอบ — รับของหลายตัว + ของนอกลิสต์ ในครั้งเดียว */
+export const marketTripSchema = z.object({
+  lines: z
+    .array(
+      z.object({
+        ingredientId: z.string().uuid(),
+        quantity: positiveQty,
+        lineCost: moneyNonNegative.optional(),
+      }),
+    )
+    .max(60),
+  extraItems: z
+    .array(
+      z.object({
+        label: z.preprocess(
+          (v) => (typeof v === "string" ? v.trim() : v),
+          z.string().min(1).max(80),
+        ),
+        amount: moneyNonNegative,
+      }),
+    )
+    .max(20)
+    .optional(),
+  paymentMethod: z.enum(["cash", "transfer"]).optional(),
+  note: z
+    .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(200))
+    .optional(),
 });
 
 export const updatePosIngredientSchema = z
@@ -241,6 +282,8 @@ export const updatePosIngredientSchema = z
     purchasePrice: moneyNonNegative.optional(),
     trackStock: z.boolean().optional(),
     lowStockThreshold: z.number().finite().gte(0).nullable().optional(),
+    category: ingredientCategory,
+    supplierName: supplierName,
   })
   .refine((d) => Object.keys(d).length > 0, { message: "At least one field is required" });
 
