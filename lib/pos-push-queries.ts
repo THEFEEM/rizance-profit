@@ -72,6 +72,84 @@ export async function savePushSubscription(
   return true;
 }
 
+// ── ฝั่งพนักงาน (ร้าน) ───────────────────────────────────────────
+
+/** เก็บ subscription มือถือ/เบราว์เซอร์ของร้าน (กี่เครื่องก็ได้ต่อ user) */
+export async function saveStaffPushSub(
+  userId: string,
+  sub: PushSubscriptionInput,
+): Promise<void> {
+  await pool.query(
+    `INSERT INTO pos_staff_push_subs (user_id, endpoint, p256dh, auth)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (user_id, endpoint) DO UPDATE
+       SET p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth`,
+    [userId, sub.endpoint, sub.keys.p256dh, sub.keys.auth],
+  );
+}
+
+/**
+ * ยิง push หาทุกเครื่องของร้าน — ใช้ตอนออเดอร์ใหม่เข้า + ลูกค้าทักแชท
+ * fire-and-forget เหมือนตัวอื่น · endpoint ตาย (404/410) ลบทิ้ง
+ */
+export async function pushStaff(
+  userId: string,
+  payload: { title: string; body: string; tag: string },
+): Promise<void> {
+  if (!ensureConfigured()) {
+    console.warn("[pos-push] pushStaff skipped — VAPID not configured");
+    return;
+  }
+  try {
+    const { rows } = await pool.query<{
+      id: string;
+      endpoint: string;
+      p256dh: string;
+      auth: string;
+    }>(
+      `SELECT id, endpoint, p256dh, auth FROM pos_staff_push_subs WHERE user_id = $1`,
+      [userId],
+    );
+    if (rows.length === 0) {
+      console.info("[pos-push] webpush skip — no subs", { table: "pos_staff_push_subs" });
+      return;
+    }
+
+    const base = process.env.NEXT_PUBLIC_POS_APP_URL?.trim() || "https://pos.rizance.app";
+    const json = JSON.stringify({ ...payload, url: `${base}/orders` });
+
+    const stale: string[] = [];
+    let ok = 0;
+    await Promise.all(
+      rows.map(async (r) => {
+        try {
+          await webpush.sendNotification(
+            { endpoint: r.endpoint, keys: { p256dh: r.p256dh, auth: r.auth } },
+            json,
+            { TTL: 1800, urgency: "high" },
+          );
+          ok += 1;
+        } catch (err) {
+          const code = (err as { statusCode?: number }).statusCode;
+          if (code === 404 || code === 410) stale.push(r.id);
+          else console.warn("[pos-push] webpush send error", { table: "pos_staff_push_subs", code, err });
+        }
+      }),
+    );
+    console.info("[pos-push] webpush done", {
+      table: "pos_staff_push_subs",
+      targets: rows.length,
+      ok,
+      stale: stale.length,
+    });
+    if (stale.length > 0) {
+      await pool.query(`DELETE FROM pos_staff_push_subs WHERE id = ANY($1::uuid[])`, [stale]);
+    }
+  } catch (err) {
+    console.warn("[pos-push] pushStaff failed", err);
+  }
+}
+
 const STATUS_MESSAGES: Record<string, { title: string; body: string }> = {
   accepted: { title: "ร้านรับออเดอร์แล้ว", body: "กำลังเตรียมของให้นะครับ" },
   cooking: { title: "กำลังทำอาหารอยู่", body: "อีกไม่นานพร้อมรับแล้ว" },
@@ -108,7 +186,10 @@ export async function pushOrderStatus(
        WHERE s.order_id = $1`,
       [orderId],
     );
-    if (rows.length === 0) return;
+    if (rows.length === 0) {
+      console.info("[pos-push] webpush skip — no subs", { table: "pos_order_push_subs", status });
+      return;
+    }
 
     const base = process.env.NEXT_PUBLIC_POS_APP_URL?.trim() || "https://pos.rizance.app";
     const token = accessToken ?? rows[0].access_token;
@@ -121,6 +202,7 @@ export async function pushOrderStatus(
     });
 
     const stale: string[] = [];
+    let ok = 0;
     await Promise.all(
       rows.map(async (r) => {
         try {
@@ -129,18 +211,28 @@ export async function pushOrderStatus(
             payload,
             { TTL: 1800, urgency: "high" },
           );
+          ok += 1;
         } catch (err) {
           const code = (err as { statusCode?: number }).statusCode;
           // 404/410 = subscription หมดอายุ → ลบทิ้ง
           if (code === 404 || code === 410) stale.push(r.id);
+          else console.warn("[pos-push] webpush send error", { table: "pos_order_push_subs", code, err });
         }
       }),
     );
+    console.info("[pos-push] webpush done", {
+      table: "pos_order_push_subs",
+      status,
+      targets: rows.length,
+      ok,
+      stale: stale.length,
+    });
 
     if (stale.length > 0) {
       await pool.query(`DELETE FROM pos_order_push_subs WHERE id = ANY($1::uuid[])`, [stale]);
     }
-  } catch {
+  } catch (err) {
     // แจ้งเตือนเป็น nice-to-have — ไม่ให้กระทบ flow หลัก
+    console.warn("[pos-push] pushOrderStatus failed", err);
   }
 }

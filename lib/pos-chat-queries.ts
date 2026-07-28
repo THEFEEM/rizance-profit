@@ -1,6 +1,6 @@
 import webpush from "web-push";
 import { pool } from "@/lib/db";
-import { ensurePushReady } from "@/lib/pos-push-queries";
+import { ensurePushReady, pushStaff } from "@/lib/pos-push-queries";
 
 /**
  * แชทในออเดอร์ — ลูกค้า ↔ ร้าน ↔ คนส่ง (สไตล์ Grab)
@@ -107,8 +107,9 @@ export async function addOrderMessage(
 /**
  * push ข้อความใหม่:
  *   ร้าน/คนส่งพิมพ์ → เด้งหาลูกค้า (subs ของออเดอร์)
- *   ลูกค้าพิมพ์     → เด้งหาคนส่งที่รับงานนี้ (subs ของ rider)
- * ฝั่งจอร้านใช้ polling + เสียงอยู่แล้ว ไม่ต้อง push
+ *   ลูกค้าพิมพ์     → เด้งหาพนักงานร้าน (pos_staff_push_subs)
+ *                     + คนส่งที่รับงานนี้ (ถ้ามี claim)
+ * ฝั่งจอร้านยังมี polling + เสียง/badge ควบคู่กับ web push
  */
 async function notifyNewMessage(orderId: string, msg: OrderMessage): Promise<void> {
   // สำคัญ: ตั้งค่า VAPID ก่อนยิงเสมอ — instance ใหม่ของ serverless ยังไม่ถูกตั้งค่า
@@ -122,6 +123,19 @@ async function notifyNewMessage(orderId: string, msg: OrderMessage): Promise<voi
     console.info("[pos-chat] notifyNewMessage", { orderId, sender: msg.sender });
 
     if (msg.sender === "customer") {
+      // → มือถือร้านทุกเครื่อง (แม้ปิดจอ/สลับแอป)
+      const { rows: ownerRows } = await pool.query<{
+        user_id: string;
+        order_no: string;
+      }>(`SELECT user_id, order_no FROM pos_orders WHERE id = $1`, [orderId]);
+      if (ownerRows[0]) {
+        void pushStaff(ownerRows[0].user_id, {
+          title: `💬 ลูกค้าทักแชท · ${ownerRows[0].order_no}`,
+          body: preview,
+          tag: `chat-staff-${orderId}`,
+        });
+      }
+
       // → คนส่งที่รับงานนี้
       const { rows } = await pool.query<{
         id: string;

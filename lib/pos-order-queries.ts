@@ -424,6 +424,18 @@ export async function createPublicOrder(
     }
 
     await client.query("COMMIT");
+
+    // เด้งมือถือร้าน — ออเดอร์ใหม่เข้า (fire-and-forget)
+    void import("@/lib/pos-push-queries")
+      .then((m) =>
+        m.pushStaff(userId, {
+          title: `🔔 ออเดอร์ใหม่ · ${orderNo}`,
+          body: `${input.customerName?.trim() || "ลูกค้า QR"} · ฿${totalAmount}${input.orderType === "delivery" ? " · เดลิเวอรี่ 🛵" : ""}`,
+          tag: `new-order-${orderRows[0].id}`,
+        }),
+      )
+      .catch(() => {});
+
     return { orderNo, accessToken: orderRows[0].access_token, totalAmount };
   } catch (err) {
     await client.query("ROLLBACK");
