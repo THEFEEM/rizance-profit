@@ -9,7 +9,7 @@ import {
   type PosOrder,
 } from "@/lib/pos-order-queries";
 import { closePosBill } from "@/lib/pos-close-bill-queries";
-import { isPushConfigured } from "@/lib/pos-push-queries";
+import { ensurePushReady } from "@/lib/pos-push-queries";
 
 /**
  * โหมดไรเดอร์ — คนไปส่งเข้าผ่านลิงก์ส่วนตัว /r/<access_token> ไม่มี session/JWT
@@ -267,14 +267,18 @@ export async function claimRiderJob(rider: Rider, orderId: string): Promise<void
   );
   if (rowCount) return;
 
-  // ไม่สำเร็จ → บอกให้ชัดว่าเพราะอะไร
-  const { rows } = await pool.query<{ rider_name: string | null; status: string }>(
-    `SELECT r.name AS rider_name, o.status
+  // ไม่สำเร็จ → บอกให้ชัดว่าเพราะอะไร (pickup/อื่น = ไม่มีงานนี้ → 404)
+  const { rows } = await pool.query<{
+    rider_name: string | null;
+    status: string;
+    order_type: string;
+  }>(
+    `SELECT r.name AS rider_name, o.status, o.order_type
      FROM pos_orders o LEFT JOIN pos_riders r ON r.id = o.rider_id
      WHERE o.id = $2 AND o.user_id = $1`,
     [rider.userId, orderId],
   );
-  if (!rows[0]) throw new PosOrderNotFoundError();
+  if (!rows[0] || rows[0].order_type !== "delivery") throw new PosOrderNotFoundError();
   if (rows[0].rider_name) throw new RiderJobTakenError(rows[0].rider_name);
   throw new PosOrderTransitionError();
 }
@@ -360,7 +364,7 @@ export async function pushRidersNewJob(
   totalAmount: string,
   isCod: boolean,
 ): Promise<void> {
-  if (!isPushConfigured()) return;
+  if (!ensurePushReady()) return;
   try {
     const { rows } = await pool.query<{
       id: string;

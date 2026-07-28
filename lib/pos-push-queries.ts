@@ -25,6 +25,14 @@ export function vapidPublicKey(): string | null {
 
 let configured = false;
 
+/**
+ * ตั้งค่า VAPID ให้ webpush singleton — โมดูลอื่นที่จะยิง push เอง
+ * (แชท, งานคนส่ง) ต้องเรียกตัวนี้ก่อนเสมอ ไม่งั้น sendNotification ล้มเงียบ
+ */
+export function ensurePushReady(): boolean {
+  return ensureConfigured();
+}
+
 function ensureConfigured(): boolean {
   if (!isPushConfigured()) return false;
   if (!configured) {

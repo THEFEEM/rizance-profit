@@ -1,6 +1,6 @@
 import webpush from "web-push";
 import { pool } from "@/lib/db";
-import { isPushConfigured } from "@/lib/pos-push-queries";
+import { ensurePushReady } from "@/lib/pos-push-queries";
 
 /**
  * แชทในออเดอร์ — ลูกค้า ↔ ร้าน ↔ คนส่ง (สไตล์ Grab)
@@ -111,10 +111,15 @@ export async function addOrderMessage(
  * ฝั่งจอร้านใช้ polling + เสียงอยู่แล้ว ไม่ต้อง push
  */
 async function notifyNewMessage(orderId: string, msg: OrderMessage): Promise<void> {
-  if (!isPushConfigured()) return;
+  // สำคัญ: ตั้งค่า VAPID ก่อนยิงเสมอ — instance ใหม่ของ serverless ยังไม่ถูกตั้งค่า
+  if (!ensurePushReady()) {
+    console.warn("[pos-chat] notifyNewMessage skipped — VAPID not configured");
+    return;
+  }
   try {
     const base = process.env.NEXT_PUBLIC_POS_APP_URL?.trim() || "https://pos.rizance.app";
     const preview = msg.body ?? (msg.kind === "proof" ? "📷 รูปหลักฐานการส่ง" : "📷 รูปภาพ");
+    console.info("[pos-chat] notifyNewMessage", { orderId, sender: msg.sender });
 
     if (msg.sender === "customer") {
       // → คนส่งที่รับงานนี้
@@ -178,8 +183,9 @@ async function notifyNewMessage(orderId: string, msg: OrderMessage): Promise<voi
       })),
       "pos_order_push_subs",
     );
-  } catch {
-    // push เป็น nice-to-have
+  } catch (err) {
+    // push เป็น nice-to-have — แต่ log ไว้เพื่อจับ cold-start / VAPID miss
+    console.warn("[pos-chat] notifyNewMessage failed", err);
   }
 }
 
@@ -191,18 +197,25 @@ async function fanout(
   }[],
   table: "pos_order_push_subs" | "pos_rider_push_subs",
 ): Promise<void> {
-  if (targets.length === 0) return;
+  if (targets.length === 0) {
+    console.info("[pos-chat] webpush skip — no subs", { table });
+    return;
+  }
   const stale: string[] = [];
+  let ok = 0;
   await Promise.all(
     targets.map(async (t) => {
       try {
         await webpush.sendNotification(t.sub, t.payload, { TTL: 1800, urgency: "high" });
+        ok += 1;
       } catch (err) {
         const code = (err as { statusCode?: number }).statusCode;
         if (code === 404 || code === 410) stale.push(t.id);
+        else console.warn("[pos-chat] webpush send error", { table, code, err });
       }
     }),
   );
+  console.info("[pos-chat] webpush done", { table, targets: targets.length, ok, stale: stale.length });
   if (stale.length > 0) {
     await pool.query(`DELETE FROM ${table} WHERE id = ANY($1::uuid[])`, [stale]);
   }

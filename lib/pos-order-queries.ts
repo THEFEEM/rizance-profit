@@ -74,6 +74,8 @@ export type PosOrder = {
   deliveredAt: string | null;
   /** เงินสดปลายทางถูกเอามาคืนหน้าร้านแล้วเมื่อไหร่ (reconciliation เท่านั้น) */
   cashSettledAt: string | null;
+  /** จำนวนข้อความจากลูกค้าในแชท (เฉพาะ listPosOrders — ใช้ทำ badge/เสียงเตือน) */
+  customerMsgCount?: number;
   items: PosOrderItem[];
 };
 
@@ -833,8 +835,11 @@ export async function listPosOrders(
   const statusFilter = opts?.activeOnly
     ? ` AND status IN ('pending', 'accepted', 'cooking', 'ready')`
     : "";
-  const { rows } = await pool.query<OrderRow>(
-    `SELECT ${ORDER_RETURN}
+  const { rows } = await pool.query<OrderRow & { customer_msg_count: string }>(
+    `SELECT ${ORDER_RETURN},
+            (SELECT COUNT(*) FROM pos_order_messages m
+             WHERE m.order_id = pos_orders.id AND m.sender = 'customer')::text
+              AS customer_msg_count
      FROM pos_orders
      WHERE user_id = $1${statusFilter}
      ORDER BY created_at ASC
@@ -842,7 +847,12 @@ export async function listPosOrders(
     [userId, Math.min(opts?.limit ?? 100, 200)],
   );
   const items = await loadOrderItems(rows.map((r) => r.id));
-  return attachRiderNames(rows.map((r) => mapOrder(r, items.get(r.id) ?? [])));
+  return attachRiderNames(
+    rows.map((r) => ({
+      ...mapOrder(r, items.get(r.id) ?? []),
+      customerMsgCount: Number(r.customer_msg_count) || 0,
+    })),
+  );
 }
 
 const ALLOWED_TRANSITIONS: Record<PosOrderStatus, PosOrderStatus[]> = {
