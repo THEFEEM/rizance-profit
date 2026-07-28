@@ -720,11 +720,21 @@ async function loadOrderItems(
 export async function getOrderByAccessToken(
   accessToken: string,
 ): Promise<
-  | (PosOrder & { shopName: string; hasFeedback: boolean; promptpayId: string | null })
+  | (PosOrder & {
+      shopName: string;
+      hasFeedback: boolean;
+      promptpayId: string | null;
+      shopPhone: string | null;
+    })
   | null
 > {
   const { rows } = await pool.query<
-    OrderRow & { shop_name: string; has_feedback: boolean; promptpay_id: string | null }
+    OrderRow & {
+      shop_name: string;
+      has_feedback: boolean;
+      promptpay_id: string | null;
+      shop_phone: string | null;
+    }
   >(
     `SELECT o.id, o.order_no, o.status, o.channel, o.customer_name, o.customer_phone, o.note,
             o.pickup_at_text, o.total_amount::text AS total_amount, o.bill_id,
@@ -734,7 +744,7 @@ export async function getOrderByAccessToken(
             o.delivery_lat::text AS delivery_lat, o.delivery_lng::text AS delivery_lng,
             o.delivery_accuracy_m::text AS delivery_accuracy_m,
             o.delivery_fee::text AS delivery_fee,
-            u.shop_name, s.promptpay_id,
+            u.shop_name, s.promptpay_id, s.shop_phone,
             EXISTS (SELECT 1 FROM pos_order_feedback f WHERE f.order_id = o.id) AS has_feedback
      FROM pos_orders o
      JOIN users u ON u.id = o.user_id
@@ -749,6 +759,7 @@ export async function getOrderByAccessToken(
     shopName: rows[0].shop_name,
     hasFeedback: rows[0].has_feedback,
     promptpayId: rows[0].promptpay_id,
+    shopPhone: rows[0].shop_phone,
   };
 }
 

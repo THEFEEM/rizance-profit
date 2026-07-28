@@ -16,6 +16,8 @@ export type PosShopSettings = {
   deliveryFee: string;
   deliveryMinOrder: string;
   deliveryAreaNote: string | null;
+  /** เบอร์โทรร้าน — โชว์ปุ่ม "โทรหาร้าน" บนหน้าสถานะออเดอร์ลูกค้า */
+  shopPhone: string | null;
 };
 
 type SettingsRow = {
@@ -31,12 +33,13 @@ type SettingsRow = {
   delivery_fee: string;
   delivery_min_order: string;
   delivery_area_note: string | null;
+  shop_phone: string | null;
 };
 
 const SETTINGS_RETURN = `default_payment_method, promptpay_id, receipt_header,
   allow_negative_stock, public_menu_token, online_ordering_enabled, kitchen_enabled, live_at,
   delivery_enabled, delivery_fee::text AS delivery_fee,
-  delivery_min_order::text AS delivery_min_order, delivery_area_note`;
+  delivery_min_order::text AS delivery_min_order, delivery_area_note, shop_phone`;
 
 function mapSettings(r: SettingsRow): PosShopSettings {
   return {
@@ -57,6 +60,7 @@ function mapSettings(r: SettingsRow): PosShopSettings {
     deliveryFee: r.delivery_fee ?? "0.00",
     deliveryMinOrder: r.delivery_min_order ?? "0.00",
     deliveryAreaNote: r.delivery_area_note,
+    shopPhone: r.shop_phone,
   };
 }
 
@@ -84,6 +88,7 @@ export type UpdatePosShopSettingsInput = {
   deliveryFee?: number;
   deliveryMinOrder?: number;
   deliveryAreaNote?: string | null;
+  shopPhone?: string | null;
 };
 
 export async function upsertPosShopSettings(
@@ -94,7 +99,7 @@ export async function upsertPosShopSettings(
     `INSERT INTO pos_shop_settings
        (user_id, promptpay_id, receipt_header, default_payment_method,
         online_ordering_enabled, kitchen_enabled, live_at,
-        delivery_enabled, delivery_fee, delivery_min_order, delivery_area_note)
+        delivery_enabled, delivery_fee, delivery_min_order, delivery_area_note, shop_phone)
      VALUES (
        $1,
        $2,
@@ -106,7 +111,8 @@ export async function upsertPosShopSettings(
        COALESCE($10, false),
        COALESCE($11::numeric, 0),
        COALESCE($12::numeric, 0),
-       $13
+       $13,
+       $15
      )
      ON CONFLICT (user_id) DO UPDATE SET
        promptpay_id            = CASE WHEN $5 THEN $2 ELSE pos_shop_settings.promptpay_id END,
@@ -121,6 +127,7 @@ export async function upsertPosShopSettings(
        delivery_fee            = COALESCE($11::numeric, pos_shop_settings.delivery_fee),
        delivery_min_order      = COALESCE($12::numeric, pos_shop_settings.delivery_min_order),
        delivery_area_note      = CASE WHEN $14 THEN $13 ELSE pos_shop_settings.delivery_area_note END,
+       shop_phone              = CASE WHEN $16 THEN $15 ELSE pos_shop_settings.shop_phone END,
        updated_at              = now()
      RETURNING ${SETTINGS_RETURN}`,
     [
@@ -138,6 +145,8 @@ export async function upsertPosShopSettings(
       input.deliveryMinOrder != null ? input.deliveryMinOrder.toFixed(2) : null,
       input.deliveryAreaNote ?? null,
       input.deliveryAreaNote !== undefined,
+      input.shopPhone ?? null,
+      input.shopPhone !== undefined,
     ],
   );
   if (!rows[0]) throw new Error("Could not upsert POS shop settings");

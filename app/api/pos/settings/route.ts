@@ -37,6 +37,13 @@ const updateSettingsSchema = z
       .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(200))
       .nullable()
       .optional(),
+    shopPhone: z
+      .preprocess(
+        (v) => (typeof v === "string" ? v.replace(/[\s-]/g, "") : v),
+        z.string().regex(/^0\d{8,9}$/, "invalid phone"),
+      )
+      .nullable()
+      .optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field is required",
