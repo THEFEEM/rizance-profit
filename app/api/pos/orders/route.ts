@@ -71,6 +71,22 @@ export async function POST(req: NextRequest) {
     if (err instanceof PosModifierRuleError) {
       return posErrorResponse("modifier_required", 400);
     }
-    throw err;
+
+    /**
+     * เดิม error ที่ไม่รู้จักถูก throw ต่อ → Next ตอบ 500 เปล่าๆ (unknown_error)
+     * ทำให้วินิจฉัยจากหน้าร้านไม่ได้เลย ตอนนี้: log เต็มลง Vercel + ส่งโค้ดที่ระบุตัวได้กลับไป
+     * (โค้ด PG เช่น 42703 = ไม่มีคอลัมน์นี้ · 42P01 = ไม่มีตารางนี้ → มักหมายถึง migration ยังไม่รัน)
+     */
+    const pg = err as { code?: string; message?: string; detail?: string; table?: string; column?: string };
+    console.error("[pos-orders] createStaffOrder failed", {
+      userId,
+      pgCode: pg?.code,
+      message: pg?.message,
+      detail: pg?.detail,
+      table: pg?.table,
+      column: pg?.column,
+      items: staff.data.items.length,
+    });
+    return posErrorResponse(pg?.code ? `db_${pg.code}` : "server_error", 500);
   }
 }

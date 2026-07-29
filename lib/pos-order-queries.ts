@@ -258,26 +258,48 @@ export async function getShopByMenuToken(token: string): Promise<PublicShopInfo 
   };
 }
 
+/**
+ * เลขคิวถัดไป "Q<yymmdd>-NNN" — self-healing
+ *
+ * ⚠️ บทเรียนจริง (29 ก.ค. 69): counter หลุดไปต่ำกว่าเลขที่ใช้แล้ว (6 vs 69) เพราะ
+ * มีการลบ/รีเซ็ต pos_order_counters ทิ้งโดยที่ pos_orders ยังอยู่ → INSERT ชน
+ * UNIQUE (user_id, order_no) ทุกครั้ง → 500 → ร้านขายไม่ได้เลยทั้งวัน
+ *
+ * กันไว้ด้วยการยกพื้นเป็น MAX(เลขที่ใช้จริงวันนี้) ก่อนบวกหนึ่งเสมอ
+ * ต้นทุน: subquery หนึ่งครั้งต่อออเดอร์ ใช้ index UNIQUE (user_id, order_no) → ถูกมาก
+ * และ UPDATE ล็อกแถว counter อยู่แล้ว จึงยังกันสั่งพร้อมกันได้เหมือนเดิม
+ */
 async function nextOrderNo(client: PoolClient, userId: string): Promise<string> {
   const counterDate = today();
+  const prefix = `Q${counterDate.replace(/-/g, "").slice(2)}`;
+
   await client.query(
     `INSERT INTO pos_order_counters (user_id, counter_date, last_seq)
      VALUES ($1, $2::date, 0)
      ON CONFLICT (user_id, counter_date) DO NOTHING`,
     [userId, counterDate],
   );
-  await client.query(
-    `SELECT last_seq FROM pos_order_counters
-     WHERE user_id = $1 AND counter_date = $2::date FOR UPDATE`,
-    [userId, counterDate],
-  );
+
   const { rows } = await client.query<{ last_seq: number }>(
-    `UPDATE pos_order_counters SET last_seq = last_seq + 1
-     WHERE user_id = $1 AND counter_date = $2::date
-     RETURNING last_seq`,
-    [userId, counterDate],
+    `UPDATE pos_order_counters c
+     SET last_seq = GREATEST(
+           c.last_seq,
+           COALESCE((
+             SELECT MAX(split_part(o.order_no, '-', 2)::int)
+             FROM pos_orders o
+             WHERE o.user_id = $1
+               AND o.order_no LIKE $3 || '-%'
+               -- กัน cast พังถ้ามีเลขรูปแบบอื่นหลงเข้ามา
+               AND o.order_no ~ '^Q[0-9]{6}-[0-9]+$'
+           ), 0)
+         ) + 1
+     WHERE c.user_id = $1 AND c.counter_date = $2::date
+     RETURNING c.last_seq`,
+    [userId, counterDate, prefix],
   );
-  return `Q${counterDate.replace(/-/g, "").slice(2)}-${String(rows[0].last_seq).padStart(3, "0")}`;
+  if (!rows[0]) throw new Error("order counter row missing after upsert");
+
+  return `${prefix}-${String(rows[0].last_seq).padStart(3, "0")}`;
 }
 
 export type CreatePublicOrderInput = {
