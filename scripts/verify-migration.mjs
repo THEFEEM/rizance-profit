@@ -27,7 +27,10 @@ for (const file of [".env.local", ".env"]) {
   }
 }
 
-const client = new pg.Client(pgClientOptions(process.env.DATABASE_URL));
+// read-only — ตรวจ prod ได้ ไม่ต้องตั้ง ALLOW_PROD_DB
+const client = new pg.Client(
+  pgClientOptions(process.env.DATABASE_URL, { allowProduction: true }),
+);
 await client.connect();
 
 const check = process.argv[2] ?? "0046";
