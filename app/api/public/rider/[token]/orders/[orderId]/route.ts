@@ -5,6 +5,7 @@ import {
   PosOrderTransitionError,
 } from "@/lib/pos-order-queries";
 import {
+  PosOrderLinkFailedError,
   PosPaymentMismatchError,
   PosProductNotFoundError,
 } from "@/lib/pos-close-bill-queries";
@@ -83,6 +84,10 @@ export async function POST(
     }
     if (err instanceof PosPaymentMismatchError) {
       return NextResponse.json({ error: "payment_mismatch" }, { status: 400 });
+    }
+    // ผูกบิลเข้าออเดอร์ไม่ได้ (ออเดอร์ถูกยกเลิก/มีบิลแล้ว) → ทั้งบิล rollback
+    if (err instanceof PosOrderLinkFailedError) {
+      return NextResponse.json({ error: "order_link_failed" }, { status: 409 });
     }
     throw err;
   }

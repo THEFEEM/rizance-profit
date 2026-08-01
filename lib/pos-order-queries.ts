@@ -74,6 +74,8 @@ export type PosOrder = {
   deliveredAt: string | null;
   /** เงินสดปลายทางถูกเอามาคืนหน้าร้านแล้วเมื่อไหร่ (reconciliation เท่านั้น) */
   cashSettledAt: string | null;
+  /** before = เก็บเงินก่อนเริ่มทำ · after = เก็บตอนลูกค้ามารับ */
+  paymentTiming: "before" | "after";
   /** จำนวนข้อความจากลูกค้าในแชท (เฉพาะ listPosOrders — ใช้ทำ badge/เสียงเตือน) */
   customerMsgCount?: number;
   items: PosOrderItem[];
@@ -120,6 +122,21 @@ export class PosOrderTransitionError extends Error {
   }
 }
 
+/**
+ * ยกเลิกออเดอร์ที่เก็บเงินไปแล้วไม่ได้ — ต้องยกเลิกบิลก่อน
+ *
+ * ⚠️ ทำไมต้องกัน: ถ้าปล่อยให้ยกเลิกได้ รายได้จะค้างในงบโดยไม่มีอาหารส่งมอบ
+ * (สต็อกก็ถูกตัดไปแล้ว) การยกเลิกบิลมี audit trail + คืนสต็อกให้ครบ
+ * เดิมไม่เป็นปัญหาเพราะบิลเกิดตอน ready เป็นขั้นสุดท้าย — แต่พอมี "เก็บเงินก่อนทำ"
+ * ลำดับกลายเป็น จ่าย → เปลี่ยนใจ → ยกเลิก จึงต้องบังคับให้ยกเลิกบิลก่อน
+ */
+export class PosOrderHasBillError extends Error {
+  constructor(public billId: string) {
+    super("cannot cancel a paid order — void the bill first");
+    this.name = "PosOrderHasBillError";
+  }
+}
+
 type OrderRow = {
   id: string;
   order_no: string;
@@ -149,6 +166,7 @@ type OrderRow = {
   picked_up_at: Date | string | null;
   delivered_at: Date | string | null;
   cash_settled_at: Date | string | null;
+  payment_timing: string;
 };
 
 const ORDER_RETURN = `id, order_no, status, channel, customer_name, customer_phone, note,
@@ -158,7 +176,7 @@ const ORDER_RETURN = `id, order_no, status, channel, customer_name, customer_pho
   delivery_lat::text AS delivery_lat, delivery_lng::text AS delivery_lng,
   delivery_accuracy_m::text AS delivery_accuracy_m,
   delivery_fee::text AS delivery_fee,
-  rider_id, picked_up_at, delivered_at, cash_settled_at`;
+  rider_id, picked_up_at, delivered_at, cash_settled_at, payment_timing`;
 
 function toIso(v: Date | string): string {
   return v instanceof Date ? v.toISOString() : String(v);
@@ -199,6 +217,7 @@ function mapOrder(r: OrderRow, items: PosOrderItem[]): PosOrder {
     pickedUpAt: toIsoOrNull(r.picked_up_at ?? null),
     deliveredAt: toIsoOrNull(r.delivered_at ?? null),
     cashSettledAt: toIsoOrNull(r.cash_settled_at ?? null),
+    paymentTiming: (r.payment_timing as PosOrder["paymentTiming"]) ?? "after",
     items,
   };
 }
@@ -478,6 +497,8 @@ export async function createStaffOrder(
     items: { productId: string; qty: number; modifierIds?: string[]; note?: string }[];
     customerName?: string;
     note?: string;
+    /** ไม่ส่ง = ใช้ค่าเริ่มต้นของร้าน */
+    paymentTiming?: "before" | "after";
   },
 ): Promise<PosOrder> {
   const client = await pool.connect();
@@ -518,10 +539,21 @@ export async function createStaffOrder(
     const totalAmount = sumDecimals(...computed.map((c) => c.lineTotal));
     const orderNo = await nextOrderNo(client, userId);
 
+    // จังหวะเก็บเงิน: ใช้ที่ส่งมา ถ้าไม่ส่ง → ค่าเริ่มต้นของร้าน (ไม่เชื่อ client)
+    let timing = input.paymentTiming ?? null;
+    if (!timing) {
+      const { rows: cfg } = await client.query<{ default_payment_timing: string }>(
+        `SELECT default_payment_timing FROM pos_shop_settings WHERE user_id = $1`,
+        [userId],
+      );
+      timing = cfg[0]?.default_payment_timing === "before" ? "before" : "after";
+    }
+
     const { rows: orderRows } = await client.query<OrderRow>(
       `INSERT INTO pos_orders
-         (user_id, order_no, status, channel, customer_name, note, total_amount)
-       VALUES ($1, $2, 'accepted', 'pos', $3, $4, $5)
+         (user_id, order_no, status, channel, customer_name, note, total_amount,
+          payment_timing)
+       VALUES ($1, $2, 'accepted', 'pos', $3, $4, $5, $6)
        RETURNING ${ORDER_RETURN}`,
       [
         userId,
@@ -529,6 +561,7 @@ export async function createStaffOrder(
         input.customerName?.trim() || "หน้าร้าน",
         input.note?.trim() || null,
         totalAmount,
+        timing,
       ],
     );
     const orderId = orderRows[0].id;
@@ -861,6 +894,28 @@ export async function reviewOrderSlip(
   return mapOrder(rows[0], items.get(rows[0].id) ?? []);
 }
 
+/**
+ * สลับจังหวะเก็บเงินรายออเดอร์ — ทำได้เฉพาะตอนยังไม่มีบิล
+ * (มีบิลแล้วแปลว่าเก็บเงินไปแล้ว การเปลี่ยนจังหวะไม่มีความหมาย)
+ */
+export async function setOrderPaymentTiming(
+  userId: string,
+  orderId: string,
+  timing: "before" | "after",
+): Promise<PosOrder> {
+  const { rows } = await pool.query<OrderRow>(
+    `UPDATE pos_orders
+     SET payment_timing = $3, updated_at = now()
+     WHERE id = $2 AND user_id = $1 AND bill_id IS NULL
+       AND status NOT IN ('completed', 'cancelled')
+     RETURNING ${ORDER_RETURN}`,
+    [userId, orderId, timing],
+  );
+  if (!rows[0]) throw new PosOrderNotFoundError();
+  const items = await loadOrderItems([orderId]);
+  return mapOrder(rows[0], items.get(orderId) ?? []);
+}
+
 /** Staff queue. active=true → pending/accepted/cooking/ready (ยังไม่ส่งมอบ). */
 export async function listPosOrders(
   userId: string,
@@ -915,6 +970,18 @@ export async function updatePosOrderStatus(
     const current = rows[0].status as PosOrderStatus;
     if (!ALLOWED_TRANSITIONS[current].includes(input.status)) {
       throw new PosOrderTransitionError();
+    }
+
+    // รู A: เก็บเงินแล้วห้ามยกเลิกออเดอร์เฉยๆ — ต้องยกเลิกบิลก่อน (คืนสต็อก + ตัดรายได้ออก)
+    // บิลที่ void แล้วไม่บล็อก — รายได้/สต็อกถูกย้อนแล้ว ยกเลิกออเดอร์ได้ตามเช็คลิสต์ข้อ 8
+    if (input.status === "cancelled" && rows[0].bill_id) {
+      const { rows: linkedBill } = await client.query<{ status: string }>(
+        `SELECT status FROM pos_bills WHERE id = $1 AND user_id = $2`,
+        [rows[0].bill_id, userId],
+      );
+      if (linkedBill[0]?.status === "paid") {
+        throw new PosOrderHasBillError(rows[0].bill_id);
+      }
     }
 
     const cancelReason =

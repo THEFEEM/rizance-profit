@@ -87,6 +87,14 @@ export class PosProductNotFoundError extends Error {
   }
 }
 
+/** ผูกบิลเข้าออเดอร์ไม่สำเร็จ (ออเดอร์ถูกยกเลิก หรือมีบิลอยู่แล้ว) → ทั้งบิล rollback */
+export class PosOrderLinkFailedError extends Error {
+  constructor() {
+    super("could not link bill to order");
+    this.name = "PosOrderLinkFailedError";
+  }
+}
+
 export class PosEmptyCartError extends Error {
   constructor() {
     super("pos cart empty");
@@ -451,6 +459,27 @@ export async function closePosBill(
     const mappedBill = mapBill(linkedBillRows[0]);
 
     await postPosBillJournal(client, mappedBill, insertedItems, payments);
+
+    /**
+     * รู B — ผูกบิลกลับเข้าออเดอร์ "ใน transaction เดียวกัน"
+     *
+     * ⚠️ เกิดขึ้นจริง 29 ก.ค. 69: closePosBill (transaction ของตัวเอง) สำเร็จ
+     * แต่ updatePosOrderStatus({billId}) ที่เรียกแยกกันภายหลังล้ม → ได้บิลที่ไม่มี
+     * ออเดอร์ผูก 3 ใบ (Q260729-034/035/036) เสี่ยงเก็บเงินซ้ำ
+     *
+     * ตอนนี้ผูกในนี้เลย: ถ้าผูกไม่ได้ทั้งบิลจะ ROLLBACK ไม่มีสภาพครึ่งทาง
+     * ไม่แตะ status — ให้ฝั่งเรียกจัดการแยก (เก็บเงินก่อนทำยังต้องทำอาหารต่อ)
+     */
+    if (input.linkOrderId) {
+      const { rowCount } = await client.query(
+        `UPDATE pos_orders
+         SET bill_id = $3, updated_at = now()
+         WHERE id = $2 AND user_id = $1 AND bill_id IS NULL
+           AND status NOT IN ('cancelled')`,
+        [userId, input.linkOrderId, mappedBill.id],
+      );
+      if (!rowCount) throw new PosOrderLinkFailedError();
+    }
 
     await client.query("COMMIT");
 

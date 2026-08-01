@@ -44,6 +44,7 @@ const updateSettingsSchema = z
       )
       .nullable()
       .optional(),
+    defaultPaymentTiming: z.enum(["before", "after"]).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field is required",

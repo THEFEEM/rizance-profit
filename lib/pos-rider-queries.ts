@@ -8,7 +8,7 @@ import {
   updatePosOrderStatus,
   type PosOrder,
 } from "@/lib/pos-order-queries";
-import { closePosBill } from "@/lib/pos-close-bill-queries";
+import { closePosBill, PosOrderLinkFailedError } from "@/lib/pos-close-bill-queries";
 import { ensurePushReady } from "@/lib/pos-push-queries";
 
 /**
@@ -309,6 +309,8 @@ export async function deliverRiderJob(
   if (!order || order.orderType !== "delivery") throw new PosOrderNotFoundError();
   if (order.riderId !== rider.id) throw new PosOrderNotFoundError();
   if (order.status !== "ready") throw new PosOrderTransitionError();
+  // ร้านเก็บเงินไปแล้ว (bill_id ถูกผูก) → ห้ามปิดบิลซ้ำ (ข้อ 21)
+  if (order.billId) throw new PosOrderLinkFailedError();
 
   const method = order.slipVerifiedAt ? "promptpay" : "cash";
   const total = Math.round(parseFloat(order.totalAmount) * 100) / 100;
@@ -325,12 +327,14 @@ export async function deliverRiderJob(
       })),
     surcharges: fee > 0 ? [{ label: "ค่าส่งเดลิเวอรี่", amount: fee }] : undefined,
     payments: [{ method, amount: total }],
+    // ผูกบิลในทรานแซกชันเดียวกับการปิดบิล — เส้นทางคนส่งก็ต้องกันบิลกำพร้าเหมือนหน้าร้าน
+    // (เดิมผูกทีหลังผ่าน updatePosOrderStatus({billId}) ซึ่งเป็นสาเหตุของบิลกำพร้า 29 ก.ค.)
+    linkOrderId: orderId,
   });
 
-  await updatePosOrderStatus(rider.userId, orderId, {
-    status: "completed",
-    billId: result.bill.id,
-  });
+  // สำคัญ: อย่าส่ง billId เข้า updatePosOrderStatus — ผูกไปแล้วใน closePosBill
+  // (COALESCE(billId, bill_id) จะทับบิลเดิมถ้าส่งมา → บิลเก่ากลายเป็นกำพร้า)
+  await updatePosOrderStatus(rider.userId, orderId, { status: "completed" });
   await pool.query(
     `UPDATE pos_orders SET delivered_at = now(), updated_at = now() WHERE id = $1`,
     [orderId],
@@ -379,10 +383,14 @@ export async function pushRidersNewJob(
        WHERE r.user_id = $1 AND r.is_active = true`,
       [userId],
     );
-    if (rows.length === 0) return;
+    if (rows.length === 0) {
+      console.info("[pos-push] webpush skip — no subs", { table: "pos_rider_push_subs" });
+      return;
+    }
 
     const base = process.env.NEXT_PUBLIC_POS_APP_URL?.trim() || "https://pos.rizance.app";
     const stale: string[] = [];
+    let ok = 0;
 
     await Promise.all(
       rows.map(async (r) => {
@@ -399,17 +407,25 @@ export async function pushRidersNewJob(
             }),
             { TTL: 1800, urgency: "high" },
           );
+          ok += 1;
         } catch (err) {
           const code = (err as { statusCode?: number }).statusCode;
           if (code === 404 || code === 410) stale.push(r.id);
+          else console.warn("[pos-push] webpush send error", { table: "pos_rider_push_subs", code, err });
         }
       }),
     );
+    console.info("[pos-push] webpush done", {
+      table: "pos_rider_push_subs",
+      targets: rows.length,
+      ok,
+      stale: stale.length,
+    });
 
     if (stale.length > 0) {
       await pool.query(`DELETE FROM pos_rider_push_subs WHERE id = ANY($1::uuid[])`, [stale]);
     }
-  } catch {
-    // nice-to-have
+  } catch (err) {
+    console.warn("[pos-push] pushRidersNewJob failed", err);
   }
 }

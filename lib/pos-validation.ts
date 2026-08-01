@@ -49,6 +49,8 @@ export const closePosBillSchema = z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/)
       .optional(),
+    /** ผูกบิลเข้าออเดอร์ใน transaction เดียว (กันบิลกำพร้า) */
+    linkOrderId: z.string().uuid().optional(),
   })
   .refine((d) => d.paymentMethod !== undefined || (d.payments?.length ?? 0) > 0, {
     message: "paymentMethod or payments is required",
@@ -350,6 +352,8 @@ export type PublicOrderBody = z.infer<typeof publicOrderSchema>;
 
 /** ออเดอร์หน้าร้าน (พนักงานจดให้) — ยังไม่จ่าย */
 export const staffOrderSchema = z.object({
+  /** ไม่ส่ง = ใช้ค่าเริ่มต้นจังหวะเก็บเงินของร้าน */
+  paymentTiming: z.enum(["before", "after"]).optional(),
   items: z.array(cartLine).min(1).max(50),
   customerName: z
     .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(80))
@@ -373,6 +377,13 @@ export const updatePosOrderSchema = z.object({
     .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(200))
     .optional(),
   billId: z.string().uuid().optional(),
+  /** สลับจังหวะเก็บเงินรายออเดอร์ (before = เก็บก่อนทำ · after = เก็บตอนรับ) */
+  paymentTiming: z.enum(["before", "after"]).optional(),
+});
+
+/** เปลี่ยนจังหวะเก็บเงินรายออเดอร์อย่างเดียว ไม่แตะสถานะ */
+export const setPaymentTimingSchema = z.object({
+  paymentTiming: z.enum(["before", "after"]),
 });
 
 /** ทะเบียนคนส่ง (ลิงก์ /r/<token> แยกรายคน) */

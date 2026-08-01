@@ -4,6 +4,7 @@ import { closePosBillSchema, listPosBillsQuerySchema } from "@/lib/pos-validatio
 import { listPosBillsByDate } from "@/lib/pos-bill-queries";
 import {
   PosEmptyCartError,
+  PosOrderLinkFailedError,
   PosPaymentMismatchError,
   PosProductNotFoundError,
   closePosBill,
@@ -80,6 +81,10 @@ export async function POST(req: NextRequest) {
     }
     if (err instanceof PosModifierRuleError) {
       return posErrorResponse("modifier_required", 400);
+    }
+    // ผูกบิลเข้าออเดอร์ไม่ได้ → ทั้งบิล rollback แล้ว ไม่มีสภาพครึ่งทาง
+    if (err instanceof PosOrderLinkFailedError) {
+      return posErrorResponse("order_link_failed", 409);
     }
     throw err;
   }

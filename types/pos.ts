@@ -82,6 +82,11 @@ export type ClosePosBillInput = {
   /** Split payment: 1..3 entries, Σ amount must equal the bill total exactly. */
   payments?: { method: PosPaymentMethod; amount: number }[];
   entryDate?: string;
+  /**
+   * ผูกบิลนี้เข้าออเดอร์ใน transaction เดียวกัน (กันบิลกำพร้า)
+   * ผูกไม่ได้ = ทั้งบิล rollback
+   */
+  linkOrderId?: string;
 };
 
 export type PosModifier = {
