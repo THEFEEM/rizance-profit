@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Sparkles, ArrowRight, Check, TrendingUp, Bell } from "lucide-react";
+import { Sparkles, Check, TrendingUp, Bell } from "lucide-react";
 import { EXAMPLES } from "./data";
 import { btnGhost, btnPrimary } from "./shared/ui";
+import { InstallAppButton } from "./InstallAppButton";
 
 const heroIn =
   "opacity-0 animate-rz-fade-up motion-reduce:animate-none motion-reduce:opacity-100";
@@ -79,9 +79,7 @@ export function HeroSection() {
             className={`mb-6 flex flex-wrap items-center justify-center gap-4 lg:justify-start ${heroIn}`}
             style={{ animationDelay: "260ms" }}
           >
-            <Link href="/register" className={btnPrimary}>
-              เริ่มใช้ฟรี <ArrowRight size={15} />
-            </Link>
+            <InstallAppButton label="ติดตั้งแอป — ฟรี" className={btnPrimary} />
             <a href="#features" className={btnGhost}>
               ดูวิธีใช้งาน
             </a>
@@ -90,7 +88,7 @@ export function HeroSection() {
             className={`flex items-center justify-center gap-2 text-[13px] text-[var(--rz-muted)] lg:justify-start ${heroIn}`}
             style={{ animationDelay: "320ms" }}
           >
-            ไม่ต้องผูกบัตร <span className="h-1 w-1 rounded-full bg-[var(--rz-muted)]" /> เริ่มใช้ได้ใน 30 วินาที
+            ติดตั้งลงเครื่องแล้วสมัครในแอป <span className="h-1 w-1 rounded-full bg-[var(--rz-muted)]" /> ไม่ต้องผูกบัตร
           </div>
         </div>
 

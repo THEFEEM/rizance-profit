@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import { Reveal } from "./shared/Reveal";
 import { btnGhost, btnPrimary, sectionPad, wrap } from "./shared/ui";
+import { InstallAppButton } from "./InstallAppButton";
 
 export function FinalCta() {
   return (
@@ -21,9 +21,7 @@ export function FinalCta() {
               เริ่มพิมพ์ประโยคแรก แล้วให้ Rizq จัดการที่เหลือ
             </p>
             <div className="relative flex flex-wrap items-center justify-center gap-4">
-              <Link href="/register" className={btnPrimary}>
-                เริ่มใช้ฟรีวันนี้ <ArrowRight size={15} />
-              </Link>
+              <InstallAppButton label="ติดตั้งแอป — ฟรี" className={btnPrimary} />
               <Link href="/pricing" className={btnGhost}>
                 ดูแพ็กเกจทั้งหมด
               </Link>

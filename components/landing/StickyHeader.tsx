@@ -3,8 +3,9 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { Menu, X, ArrowRight } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { btnPrimary, focusRing } from "./shared/ui";
+import { InstallAppButton } from "./InstallAppButton";
 
 const NAV = [
   { label: "ฟีเจอร์", href: "#features" },
@@ -68,9 +69,7 @@ export function StickyHeader() {
             >
               เข้าสู่ระบบ
             </Link>
-            <Link href="/register" className={btnPrimary}>
-              เริ่มใช้ฟรี <ArrowRight size={15} />
-            </Link>
+            <InstallAppButton label="ติดตั้งแอป" className={btnPrimary} />
             <button
               type="button"
               className={`flex text-[var(--rz-text)] md:hidden ${focusRing} rounded-md`}
