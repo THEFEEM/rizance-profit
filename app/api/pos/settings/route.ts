@@ -51,6 +51,8 @@ const updateSettingsSchema = z
       .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(200))
       .nullable()
       .optional(),
+    /** 0 = ตัดวันเที่ยงคืน · 1-11 = ชั่วโมงที่ถือว่าขึ้นวันใหม่ */
+    dayCutoffHour: z.number().int().gte(0).lte(11).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field is required",

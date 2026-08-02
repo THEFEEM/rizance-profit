@@ -21,6 +21,41 @@ export function todayAt(instant: Date): string {
   return isoDateFmt.format(instant);
 }
 
+const hourFmt = new Intl.DateTimeFormat("en-GB", {
+  timeZone: APP_TZ,
+  hour: "2-digit",
+  hour12: false,
+});
+
+/** ชั่วโมงปัจจุบันในโซนไทย (0-23) */
+export function hourAt(instant: Date): number {
+  return Number(hourFmt.format(instant));
+}
+
+/**
+ * "วันขาย" (business date) — วันที่ที่ยอดควรถูกบันทึก
+ *
+ * ที่มา (3 ส.ค. 2569): ร้านรับออเดอร์ก่อนเที่ยงคืนแต่เก็บเงินไม่ทัน บิลถูกลงวันถัดไป
+ * → ยอดวันจริงขาด วันถัดไปเกิน ต้องเลื่อน entry_date ด้วย SQL
+ *
+ * cutoffHour = ชั่วโมงที่ถือว่า "ขึ้นวันใหม่" (0 = ปิดใช้งาน ตัดเที่ยงคืนตามปกติ)
+ * เช่น cutoff = 3 → บิลที่ปิด 00:30 ของวันที่ 3 จะนับเป็นยอดของวันที่ 2
+ *
+ * ใช้ปฏิทินโซนไทยเป็นฐาน แล้วถอย 1 วันเมื่อชั่วโมงยังไม่ถึง cutoff
+ * (ไม่ยุ่งกับ UTC เพื่อไม่ให้พลาดเรื่องโซนเวลาซ้อนกัน)
+ */
+export function businessDateAt(instant: Date, cutoffHour: number): string {
+  const calendar = todayAt(instant);
+  if (!Number.isFinite(cutoffHour) || cutoffHour <= 0) return calendar;
+  const hour = hourAt(instant);
+  return hour < cutoffHour ? addDays(calendar, -1) : calendar;
+}
+
+/** วันขายของ "ตอนนี้" */
+export function businessDate(cutoffHour: number): string {
+  return businessDateAt(new Date(), cutoffHour);
+}
+
 /** What Postgres CURRENT_DATE would be if the server clock is UTC. */
 export function utcCalendarDate(instant: Date): string {
   return instant.toISOString().slice(0, 10);

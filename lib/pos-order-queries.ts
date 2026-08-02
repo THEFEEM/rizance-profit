@@ -1,6 +1,7 @@
 import type { PoolClient } from "pg";
 import { pool } from "@/lib/db";
-import { today } from "@/lib/date";
+import { getDayCutoffHour } from "@/lib/pos-settings-queries";
+import { businessDate } from "@/lib/date";
 import { centsToDecimalString, sumDecimals, toCents } from "@/lib/money";
 import { resolveCartModifiers, type SelectedModifier } from "@/lib/pos-modifier-queries";
 import { pushOrderStatus } from "@/lib/pos-push-queries";
@@ -289,7 +290,9 @@ export async function getShopByMenuToken(token: string): Promise<PublicShopInfo 
  * และ UPDATE ล็อกแถว counter อยู่แล้ว จึงยังกันสั่งพร้อมกันได้เหมือนเดิม
  */
 async function nextOrderNo(client: PoolClient, userId: string): Promise<string> {
-  const counterDate = today();
+  // ใช้ "วันขาย" ไม่ใช่วันปฏิทิน — ไม่งั้นเลขคิวรีเซ็ตกลางกะตอนเที่ยงคืน
+  // (ร้านที่ขายถึง 02:00 จะมี Q...-001 ซ้ำสองรอบในกะเดียว สับสนตอนเรียกคิว)
+  const counterDate = businessDate(await getDayCutoffHour(userId, client));
   const prefix = `Q${counterDate.replace(/-/g, "").slice(2)}`;
 
   await client.query(

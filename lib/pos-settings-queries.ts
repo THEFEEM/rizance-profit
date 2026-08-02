@@ -20,6 +20,8 @@ export type PosShopSettings = {
   shopPhone: string | null;
   /** จังหวะเก็บเงินเริ่มต้นของออเดอร์หน้าร้าน (before = เก็บก่อนทำ) */
   defaultPaymentTiming: "before" | "after";
+  /** ชั่วโมงตัดวันขาย (0 = ตัดเที่ยงคืน) — บิลที่ปิดก่อนเวลานี้นับเป็นยอดวันก่อน */
+  dayCutoffHour: number;
   /** รูป Thai QR ของร้าน (static — ฝังยอดไม่ได้) null = ไม่โชว์แท็บ "QR ร้าน" */
   shopQrUrl: string | null;
   /** ข้อความใต้ QR เช่น ชื่อบัญชี/รหัสร้านค้า */
@@ -43,13 +45,14 @@ type SettingsRow = {
   default_payment_timing: string;
   shop_qr_url: string | null;
   shop_qr_note: string | null;
+  day_cutoff_hour: number;
 };
 
 const SETTINGS_RETURN = `default_payment_method, promptpay_id, receipt_header,
   allow_negative_stock, public_menu_token, online_ordering_enabled, kitchen_enabled, live_at,
   delivery_enabled, delivery_fee::text AS delivery_fee,
   delivery_min_order::text AS delivery_min_order, delivery_area_note, shop_phone, default_payment_timing,
-  shop_qr_url, shop_qr_note`;
+  shop_qr_url, shop_qr_note, day_cutoff_hour`;
 
 function mapSettings(r: SettingsRow): PosShopSettings {
   return {
@@ -74,6 +77,7 @@ function mapSettings(r: SettingsRow): PosShopSettings {
     defaultPaymentTiming: r.default_payment_timing === "before" ? "before" : "after",
     shopQrUrl: r.shop_qr_url,
     shopQrNote: r.shop_qr_note,
+    dayCutoffHour: Number(r.day_cutoff_hour ?? 0),
   };
 }
 
@@ -105,6 +109,7 @@ export type UpdatePosShopSettingsInput = {
   defaultPaymentTiming?: "before" | "after";
   shopQrUrl?: string | null;
   shopQrNote?: string | null;
+  dayCutoffHour?: number;
 };
 
 export async function upsertPosShopSettings(
@@ -116,7 +121,7 @@ export async function upsertPosShopSettings(
        (user_id, promptpay_id, receipt_header, default_payment_method,
         online_ordering_enabled, kitchen_enabled, live_at,
         delivery_enabled, delivery_fee, delivery_min_order, delivery_area_note, shop_phone,
-        default_payment_timing, shop_qr_url, shop_qr_note)
+        default_payment_timing, shop_qr_url, shop_qr_note, day_cutoff_hour)
      VALUES (
        $1,
        $2,
@@ -132,7 +137,8 @@ export async function upsertPosShopSettings(
        $15,
        COALESCE($17, 'after'),
        $18,
-       $20
+       $20,
+       COALESCE($22, 0)
      )
      ON CONFLICT (user_id) DO UPDATE SET
        promptpay_id            = CASE WHEN $5 THEN $2 ELSE pos_shop_settings.promptpay_id END,
@@ -151,6 +157,7 @@ export async function upsertPosShopSettings(
        default_payment_timing  = COALESCE($17, pos_shop_settings.default_payment_timing),
        shop_qr_url             = CASE WHEN $19 THEN $18 ELSE pos_shop_settings.shop_qr_url END,
        shop_qr_note            = CASE WHEN $21 THEN $20 ELSE pos_shop_settings.shop_qr_note END,
+       day_cutoff_hour         = COALESCE($22, pos_shop_settings.day_cutoff_hour),
        updated_at              = now()
      RETURNING ${SETTINGS_RETURN}`,
     [
@@ -175,8 +182,27 @@ export async function upsertPosShopSettings(
       input.shopQrUrl !== undefined,
       input.shopQrNote ?? null,
       input.shopQrNote !== undefined,
+      input.dayCutoffHour ?? null,
     ],
   );
   if (!rows[0]) throw new Error("Could not upsert POS shop settings");
   return mapSettings(rows[0]);
+}
+
+/**
+ * ชั่วโมงตัดวันขายของร้าน (0 = ตัดเที่ยงคืนตามปกติ)
+ * แยกเป็น query เบาๆ เพราะทุก path ที่สร้างบิล/ออเดอร์ต้องใช้ และต้องใช้ได้ทั้งใน
+ * transaction ที่กำลังเปิดอยู่ (ส่ง client เข้ามา) และแบบเดี่ยว
+ */
+export async function getDayCutoffHour(
+  userId: string,
+  client?: { query: typeof pool.query },
+): Promise<number> {
+  const q = client ?? pool;
+  const { rows } = await q.query<{ day_cutoff_hour: number }>(
+    `SELECT day_cutoff_hour FROM pos_shop_settings WHERE user_id = $1`,
+    [userId],
+  );
+  const h = Number(rows[0]?.day_cutoff_hour ?? 0);
+  return Number.isFinite(h) && h > 0 && h <= 11 ? h : 0;
 }

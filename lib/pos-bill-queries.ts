@@ -1,6 +1,7 @@
 import type { PoolClient } from "pg";
 import { pool } from "@/lib/db";
-import { today, todayAt } from "@/lib/date";
+import { getDayCutoffHour } from "@/lib/pos-settings-queries";
+import { businessDate, businessDateAt } from "@/lib/date";
 import { isPosPlanAllowed } from "@/lib/pos-config";
 import { lockShopUser } from "@/lib/shop-profit-withdrawal-queries";
 import { voidPosBillJournal } from "@/lib/pos-posting-adapter";
@@ -270,9 +271,13 @@ export async function voidPosBill(
       throw new PosBillNotVoidableError();
     }
 
+    // หน้าต่างยกเลิก = "วันขายเดียวกัน" ไม่ใช่วันปฏิทินเดียวกัน
+    // เดิม: บิลที่ปิด 00:30 จะยกเลิกได้แค่ถึงเที่ยงคืนถัดไป ทั้งที่กะยังไม่จบ
+    // ตอนนี้: ร้านที่ตั้ง cutoff 03:00 ยกเลิกบิลของกะเดียวกันได้จนกะปิดจริง
+    const cutoff = await getDayCutoffHour(userId, client);
     const paidInstant =
       bill.created_at instanceof Date ? bill.created_at : new Date(bill.created_at);
-    if (todayAt(paidInstant) !== today()) {
+    if (businessDateAt(paidInstant, cutoff) !== businessDate(cutoff)) {
       throw new PosVoidWindowExpiredError();
     }
 

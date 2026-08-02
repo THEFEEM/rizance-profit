@@ -1,6 +1,7 @@
 import type { PoolClient } from "pg";
 import { pool } from "@/lib/db";
-import { today } from "@/lib/date";
+import { getDayCutoffHour } from "@/lib/pos-settings-queries";
+import { businessDate } from "@/lib/date";
 import { centsToDecimalString, sumDecimals, toCents } from "@/lib/money";
 import { isPosPlanAllowed } from "@/lib/pos-config";
 import { resolveActivePlan } from "@/lib/subscription-plan";
@@ -226,7 +227,10 @@ export async function closePosBill(
     throw new PosEmptyCartError();
   }
 
-  const entryDate = input.entryDate ?? today();
+  // วันที่บันทึกยอด = "วันขาย" ตาม cutoff ของร้าน (ไม่ใช่วันปฏิทินดิบ)
+  // ร้านที่ปิดหลังเที่ยงคืนจะได้ยอดลงวันที่ถูกต้องเอง ไม่ต้องเลื่อนด้วย SQL
+  const entryDate =
+    input.entryDate ?? businessDate(await getDayCutoffHour(userId));
   const client = await pool.connect();
   const negativeStockProductIds: string[] = [];
 
