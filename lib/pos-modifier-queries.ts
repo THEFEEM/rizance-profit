@@ -243,6 +243,97 @@ export async function createPosModifier(
   }
 }
 
+/**
+ * ลบตัวเลือก/กลุ่ม — ทำได้เมื่อ "ไม่เคยถูกใช้" เท่านั้น
+ *
+ * ⚠️ ทำไมต้องกัน: pos_bill_items / pos_order_item_modifiers snapshot ชื่อ+ราคาไว้แล้ว
+ * ประวัติบิลจึงไม่เพี้ยนถ้าลบ — แต่ modifier_id เป็น FK ที่จะกลายเป็น NULL
+ * ทำให้ "แก้บิล/ทำซ้ำออเดอร์" อ้างกลับไม่ได้ และรายงานตัวเลือกขายดีจะขาดข้อมูล
+ * → ที่เคยขายแล้วให้กด OFF (ซ่อนจากเมนู) ไม่ต้องลบ
+ */
+export class PosModifierInUseError extends Error {
+  constructor(
+    public reason: "sold" | "in_order" | "linked_products" | "has_modifiers",
+    public count: number,
+  ) {
+    super(`modifier in use: ${reason}`);
+    this.name = "PosModifierInUseError";
+  }
+}
+
+/** ตัวเลือกเป็นของร้านนี้ไหม — เช็คผ่านกลุ่มเหมือน updatePosModifier */
+async function isPosModifierOwned(userId: string, modifierId: string): Promise<boolean> {
+  const { rows } = await pool.query(
+    `SELECT 1 FROM pos_modifiers m
+     WHERE m.id = $2
+       AND m.group_id IN (SELECT id FROM pos_modifier_groups WHERE user_id = $1)`,
+    [userId, modifierId],
+  );
+  return rows.length > 0;
+}
+
+export async function deletePosModifier(
+  userId: string,
+  modifierId: string,
+): Promise<boolean> {
+  if (!(await isPosModifierOwned(userId, modifierId))) return false;
+
+  // เคยขายไปแล้วไหม (มีในบิล)
+  const { rows: sold } = await pool.query<{ n: string }>(
+    `SELECT COUNT(*)::text AS n FROM pos_bill_item_modifiers WHERE modifier_id = $1`,
+    [modifierId],
+  );
+  if (Number(sold[0]?.n ?? 0) > 0) {
+    throw new PosModifierInUseError("sold", Number(sold[0].n));
+  }
+
+  // อยู่ในออเดอร์ที่ยังไม่ปิดไหม
+  const { rows: inOrder } = await pool.query<{ n: string }>(
+    `SELECT COUNT(*)::text AS n
+     FROM pos_order_item_modifiers m
+     JOIN pos_order_items i ON i.id = m.order_item_id
+     JOIN pos_orders o ON o.id = i.order_id
+     WHERE m.modifier_id = $1 AND o.status NOT IN ('completed', 'cancelled')`,
+    [modifierId],
+  );
+  if (Number(inOrder[0]?.n ?? 0) > 0) {
+    throw new PosModifierInUseError("in_order", Number(inOrder[0].n));
+  }
+
+  const { rowCount } = await pool.query(`DELETE FROM pos_modifiers WHERE id = $1`, [
+    modifierId,
+  ]);
+  return Boolean(rowCount);
+}
+
+export async function deletePosModifierGroup(
+  userId: string,
+  groupId: string,
+): Promise<boolean> {
+  if (!(await isModifierGroupOwned(userId, groupId))) return false;
+
+  const { rows: linked } = await pool.query<{ n: string }>(
+    `SELECT COUNT(*)::text AS n FROM pos_product_modifier_groups WHERE group_id = $1`,
+    [groupId],
+  );
+  if (Number(linked[0]?.n ?? 0) > 0) {
+    throw new PosModifierInUseError("linked_products", Number(linked[0].n));
+  }
+
+  const { rows: mods } = await pool.query<{ n: string }>(
+    `SELECT COUNT(*)::text AS n FROM pos_modifiers WHERE group_id = $1`,
+    [groupId],
+  );
+  if (Number(mods[0]?.n ?? 0) > 0) {
+    throw new PosModifierInUseError("has_modifiers", Number(mods[0].n));
+  }
+
+  const { rowCount } = await pool.query(`DELETE FROM pos_modifier_groups WHERE id = $1`, [
+    groupId,
+  ]);
+  return Boolean(rowCount);
+}
+
 export async function updatePosModifier(
   userId: string,
   modifierId: string,

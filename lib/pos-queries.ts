@@ -319,6 +319,35 @@ export async function createPosCategory(
   }
 }
 
+/**
+ * ลบหมวดหมู่ — ทำได้เมื่อไม่มีสินค้าผูกอยู่
+ *
+ * นโยบาย: ไม่ยอมให้ลบทั้งที่มีสินค้าผูก เพราะสินค้าจะหลุดไปกองรวมโดยที่ร้านไม่รู้ตัว
+ * → คืนจำนวนสินค้าไปให้ UI บอกว่า "ย้ายออกก่อน" (หรือกด OFF หมวดไว้เฉยๆ ก็ได้)
+ */
+export class PosCategoryInUseError extends Error {
+  constructor(public productCount: number) {
+    super("category still has products");
+    this.name = "PosCategoryInUseError";
+  }
+}
+
+export async function deletePosCategory(userId: string, categoryId: string): Promise<boolean> {
+  const { rows: used } = await pool.query<{ n: string }>(
+    `SELECT COUNT(*)::text AS n FROM pos_products
+     WHERE user_id = $1 AND category_id = $2`,
+    [userId, categoryId],
+  );
+  const count = Number(used[0]?.n ?? 0);
+  if (count > 0) throw new PosCategoryInUseError(count);
+
+  const { rowCount } = await pool.query(
+    `DELETE FROM pos_categories WHERE id = $2 AND user_id = $1`,
+    [userId, categoryId],
+  );
+  return Boolean(rowCount);
+}
+
 export async function updatePosCategory(
   userId: string,
   categoryId: string,

@@ -45,6 +45,12 @@ const updateSettingsSchema = z
       .nullable()
       .optional(),
     defaultPaymentTiming: z.enum(["before", "after"]).optional(),
+    /** ตั้ง null = ลบรูป QR ร้าน (แท็บจะหายไปเอง) */
+    shopQrUrl: z.string().url().max(1000).nullable().optional(),
+    shopQrNote: z
+      .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(200))
+      .nullable()
+      .optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field is required",

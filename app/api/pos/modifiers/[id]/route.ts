@@ -5,7 +5,9 @@ import {
   requirePosSessionAndPlan,
 } from "@/lib/pos-auth";
 import {
+  PosModifierInUseError,
   PosModifierNameExistsError,
+  deletePosModifier,
   updatePosModifier,
 } from "@/lib/pos-modifier-queries";
 import { updatePosModifierSchema } from "@/lib/pos-validation";
@@ -36,6 +38,31 @@ export async function PATCH(
   } catch (err) {
     if (err instanceof PosModifierNameExistsError) {
       return posErrorResponse("modifier_name_exists", 409);
+    }
+    throw err;
+  }
+}
+
+/** DELETE /api/pos/modifiers/:id — ลบได้เมื่อยังไม่เคยขายและไม่อยู่ในออเดอร์ที่เปิดอยู่ */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const userId = await requirePosSessionAndPlan(req);
+  if (userId instanceof NextResponse) return userId;
+
+  const { id } = await params;
+
+  try {
+    const ok = await deletePosModifier(userId, id);
+    if (!ok) return posNotFoundResponse();
+    return NextResponse.json({ data: { deleted: true } });
+  } catch (err) {
+    if (err instanceof PosModifierInUseError) {
+      return NextResponse.json(
+        { error: "modifier_in_use", reason: err.reason, count: err.count },
+        { status: 409 },
+      );
     }
     throw err;
   }
