@@ -6,6 +6,7 @@ import { isPosPlanAllowed } from "@/lib/pos-config";
 import { lockShopUser } from "@/lib/shop-profit-withdrawal-queries";
 import { voidPosBillJournal } from "@/lib/pos-posting-adapter";
 import { restoreIngredientsForVoidedBill } from "@/lib/pos-ingredient-queries";
+import { reversePointsForBill } from "@/lib/pos-member-queries";
 import { resolveActivePlan } from "@/lib/subscription-plan";
 import { PosPlanRequiredError } from "@/lib/pos-close-bill-queries";
 import type {
@@ -341,6 +342,14 @@ export async function voidPosBill(
     }
 
     await voidPosBillJournal(client, { id: bill.id, billNo: bill.bill_no });
+
+    /**
+     * ถอนแต้มคืน (0068) — ใน transaction เดียวกับการยกเลิก
+     * ปลอดภัยจากการทำซ้ำเพราะด้านบนล็อกบิลด้วย FOR UPDATE แล้วบังคับ status = 'paid'
+     * บิลจึงเข้าทางนี้ได้ครั้งเดียวตลอดอายุ
+     * ⚠️ ไม่แตะเงิน: ยอดบิล/income_entries/journal จัดการไปแล้วด้านบน แต้มแยกขาด
+     */
+    await reversePointsForBill(client, userId, billId);
 
     await client.query(
       `UPDATE pos_bills

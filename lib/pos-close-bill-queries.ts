@@ -9,6 +9,11 @@ import { lockShopUser } from "@/lib/shop-profit-withdrawal-queries";
 import { postPosBillJournal } from "@/lib/pos-posting-adapter";
 import { resolveCartModifiers, type SelectedModifier } from "@/lib/pos-modifier-queries";
 import { deductIngredientsForBill } from "@/lib/pos-ingredient-queries";
+import {
+  PosInvalidPhoneError,
+  earnPointsForBill,
+  upsertPosMember,
+} from "@/lib/pos-member-queries";
 import type {
   ClosePosBillInput,
   ClosePosBillResult,
@@ -162,11 +167,23 @@ async function assertPosSubscription(client: PoolClient, userId: string): Promis
   }
 }
 
+/**
+ * เลขบิลถัดไป — self-healing เหมือน nextOrderNo
+ *
+ * ⚠️ บทเรียน 29 ก.ค. 69: pos_order_counters หลุดไปต่ำกว่าเลขที่ใช้แล้ว (6 vs 69)
+ * → INSERT ชน UNIQUE (user_id, bill_no) → 500 → ร้านขายไม่ได้ทั้งวัน
+ * pos_bill_counters มีช่องโหว่แบบเดียวกันเป๊ะ จึงยกพื้นเป็น MAX(เลขที่ใช้จริง) ก่อนบวกหนึ่ง
+ *
+ * ยิ่งจำเป็นหลังมี day cutoff: บิลที่ปิดหลังเที่ยงคืนไปใช้ counter ของ "วันก่อน"
+ * ซึ่งมีเลขใช้ไปแล้วเยอะ ถ้า counter ไม่ตรงจะชนทันที
+ */
 async function nextBillNo(
   client: PoolClient,
   userId: string,
   counterDate: string,
 ): Promise<string> {
+  const prefix = counterDate.replace(/-/g, "");
+
   await client.query(
     `INSERT INTO pos_bill_counters (user_id, counter_date, last_seq)
      VALUES ($1, $2::date, 0)
@@ -174,21 +191,23 @@ async function nextBillNo(
     [userId, counterDate],
   );
 
-  const { rows: locked } = await client.query<{ last_seq: number }>(
-    `SELECT last_seq FROM pos_bill_counters
-     WHERE user_id = $1 AND counter_date = $2::date
-     FOR UPDATE`,
-    [userId, counterDate],
-  );
-  if (!locked[0]) throw new Error("pos bill counter missing");
-
   const { rows: updated } = await client.query<{ last_seq: number }>(
-    `UPDATE pos_bill_counters
-     SET last_seq = last_seq + 1
-     WHERE user_id = $1 AND counter_date = $2::date
-     RETURNING last_seq`,
-    [userId, counterDate],
+    `UPDATE pos_bill_counters c
+     SET last_seq = GREATEST(
+           c.last_seq,
+           COALESCE((
+             SELECT MAX(split_part(b.bill_no, '-', 2)::int)
+             FROM pos_bills b
+             WHERE b.user_id = $1
+               AND b.bill_no LIKE $3 || '-%'
+               AND b.bill_no ~ '^[0-9]{8}-[0-9]+$'
+           ), 0)
+         ) + 1
+     WHERE c.user_id = $1 AND c.counter_date = $2::date
+     RETURNING c.last_seq`,
+    [userId, counterDate, prefix],
   );
+  if (!updated[0]) throw new Error("pos bill counter missing after upsert");
 
   return formatBillNo(counterDate, updated[0].last_seq);
 }
@@ -485,6 +504,55 @@ export async function closePosBill(
       if (!rowCount) throw new PosOrderLinkFailedError();
     }
 
+    /**
+     * สมาชิก + แต้ม (0068) — ใน transaction เดียวกับบิล
+     *
+     * ⚠️ แต้มไม่ใช่เงิน: แตะแค่ pos_members / pos_point_events / pos_bills.member_id
+     * ไม่มี income_entries ไม่มี journal ไม่แตะ total_amount
+     * → invariant Σ line_total = total_amount = debit = credit ยังจริงทุกตัวอักษร
+     *
+     * ที่มาของเบอร์: พนักงานกรอกตอนเก็บเงิน (memberPhone) หรือ
+     * ลูกค้าติ๊กสะสมแต้มตอนสั่ง QR (pos_orders.member_id ผูกไว้แล้ว)
+     */
+    let pointsEarned = 0;
+    let memberPoints: number | undefined;
+    try {
+      let memberId: string | null = null;
+      if (input.memberPhone) {
+        const member = await upsertPosMember(
+          userId,
+          { phone: input.memberPhone },
+          client,
+        );
+        memberId = member.id;
+      } else if (input.linkOrderId) {
+        const { rows } = await client.query<{ member_id: string | null }>(
+          `SELECT member_id FROM pos_orders WHERE id = $2 AND user_id = $1`,
+          [userId, input.linkOrderId],
+        );
+        memberId = rows[0]?.member_id ?? null;
+      }
+      if (memberId) {
+        pointsEarned = await earnPointsForBill(client, userId, {
+          memberId,
+          billId: mappedBill.id,
+          totalAmount: mappedBill.totalAmount,
+        });
+        const { rows } = await client.query<{ points: number }>(
+          `SELECT points FROM pos_members WHERE id = $2 AND user_id = $1`,
+          [userId, memberId],
+        );
+        memberPoints = rows[0]?.points;
+      }
+    } catch (err) {
+      // เบอร์ผิดรูปแบบไม่ควรทำให้ "เก็บเงินไม่สำเร็จ" — แต้มเป็นของแถม เงินคือของจริง
+      if (err instanceof PosInvalidPhoneError) {
+        pointsEarned = 0;
+      } else {
+        throw err;
+      }
+    }
+
     await client.query("COMMIT");
 
     return {
@@ -492,6 +560,8 @@ export async function closePosBill(
       items: insertedItems,
       payments: insertedPayments,
       negativeStockProductIds,
+      pointsEarned,
+      memberPoints,
     };
   } catch (err) {
     await client.query("ROLLBACK");

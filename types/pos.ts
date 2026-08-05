@@ -87,6 +87,11 @@ export type ClosePosBillInput = {
    * ผูกไม่ได้ = ทั้งบิล rollback
    */
   linkOrderId?: string;
+  /**
+   * เบอร์สมาชิกที่จะให้แต้มจากบิลนี้ (ไม่บังคับ)
+   * ⚠️ แต้มไม่ใช่เงิน — ไม่แตะ total_amount / income_entries / journal
+   */
+  memberPhone?: string;
 };
 
 export type PosModifier = {
@@ -113,6 +118,9 @@ export type ClosePosBillResult = {
   items: PosBillItem[];
   payments: PosBillPayment[];
   negativeStockProductIds: string[];
+  /** แต้มที่ให้จากบิลนี้ (0 = ร้านปิดใช้แต้ม / ไม่มีสมาชิก / ยอดไม่ถึง 1 แต้ม) */
+  pointsEarned?: number;
+  memberPoints?: number;
 };
 
 export type PosCategory = {

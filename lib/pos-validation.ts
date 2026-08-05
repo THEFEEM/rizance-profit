@@ -51,6 +51,11 @@ export const closePosBillSchema = z
       .optional(),
     /** ผูกบิลเข้าออเดอร์ใน transaction เดียว (กันบิลกำพร้า) */
     linkOrderId: z.string().uuid().optional(),
+    /** เบอร์สมาชิกสะสมแต้ม (ไม่บังคับ) — แต้มไม่ใช่เงิน ไม่กระทบยอดบิล */
+    memberPhone: z.preprocess(
+      (v) => (typeof v === "string" ? v.trim() : v),
+      z.string().min(9).max(20).optional(),
+    ),
   })
   .refine((d) => d.paymentMethod !== undefined || (d.payments?.length ?? 0) > 0, {
     message: "paymentMethod or payments is required",
@@ -136,6 +141,22 @@ export const updatePosProductSchema = z
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field is required",
   });
+
+/**
+ * Batch reorder payload. Capped at 500 tiles — a POS menu that large is a data
+ * problem, not a UI one, and an uncapped array is a free DoS.
+ */
+export const reorderPosProductsSchema = z.object({
+  order: z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        sortOrder: z.number().int().min(0).max(100_000),
+      }),
+    )
+    .min(1)
+    .max(500),
+});
 
 // --- Modifiers -------------------------------------------------------------
 

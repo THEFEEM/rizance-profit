@@ -5,6 +5,7 @@ import { businessDate } from "@/lib/date";
 import { centsToDecimalString, sumDecimals, toCents } from "@/lib/money";
 import { resolveCartModifiers, type SelectedModifier } from "@/lib/pos-modifier-queries";
 import { pushOrderStatus } from "@/lib/pos-push-queries";
+import { PosInvalidPhoneError, upsertPosMember } from "@/lib/pos-member-queries";
 
 /**
  * QR pre-orders — reservations only. No stock/income/journal here; staff
@@ -437,6 +438,37 @@ export async function createPublicOrder(
       ],
     );
     const orderId = orderRows[0].id;
+
+    /**
+     * ผูกสมาชิกจากเบอร์ที่ลูกค้ากรอกตอนสั่ง QR (0068)
+     *
+     * ทำเฉพาะเมื่อร้านเปิดสะสมแต้ม — ลูกค้าที่กรอกเบอร์เพื่อให้ร้านโทรกลับ
+     * ได้แต้มไปเลยโดยไม่ต้องกรอกอะไรเพิ่ม แต้มเข้าจริงตอนปิดบิล
+     * (closePosBill อ่าน pos_orders.member_id ผ่าน linkOrderId)
+     *
+     * ⚠️ ไม่แตะยอดออเดอร์/บิล/บัญชี · เบอร์รูปแบบผิดก็เพียงไม่ผูก ออเดอร์ยังสร้างสำเร็จ
+     */
+    if (input.customerPhone) {
+      const { rows: pointCfg } = await client.query<{ points_enabled: boolean }>(
+        `SELECT points_enabled FROM pos_shop_settings WHERE user_id = $1`,
+        [userId],
+      );
+      if (pointCfg[0]?.points_enabled) {
+        try {
+          const member = await upsertPosMember(
+            userId,
+            { phone: input.customerPhone, name: input.customerName?.trim() || null },
+            client,
+          );
+          await client.query(
+            `UPDATE pos_orders SET member_id = $3 WHERE id = $2 AND user_id = $1`,
+            [userId, orderId, member.id],
+          );
+        } catch (err) {
+          if (!(err instanceof PosInvalidPhoneError)) throw err;
+        }
+      }
+    }
 
     for (const c of computed) {
       const { rows: itemRows } = await client.query<{ id: string }>(

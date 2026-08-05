@@ -250,6 +250,29 @@ export async function updatePosProduct(
 }
 
 /**
+ * Batch-set sort_order for the given products in one statement.
+ * Only rows owned by `userId` are touched, so a foreign id in the payload is a
+ * silent no-op instead of a leak. Returns how many rows were actually updated —
+ * the caller compares against the payload length to detect a stale client list.
+ */
+export async function reorderPosProducts(
+  userId: string,
+  order: { id: string; sortOrder: number }[],
+): Promise<number> {
+  if (order.length === 0) return 0;
+  const ids = order.map((o) => o.id);
+  const sorts = order.map((o) => o.sortOrder);
+  const { rowCount } = await pool.query(
+    `UPDATE pos_products p
+     SET sort_order = v.sort_order, updated_at = now()
+     FROM (SELECT * FROM unnest($2::uuid[], $3::int[]) AS t(id, sort_order)) v
+     WHERE p.id = v.id AND p.user_id = $1`,
+    [userId, ids, sorts],
+  );
+  return rowCount ?? 0;
+}
+
+/**
  * Current image_url of an owned product.
  * Returns `undefined` when the product does not exist / is not owned,
  * `null` when it exists but has no image.

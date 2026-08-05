@@ -26,6 +26,12 @@ export type PosShopSettings = {
   shopQrUrl: string | null;
   /** ข้อความใต้ QR เช่น ชื่อบัญชี/รหัสร้านค้า */
   shopQrNote: string | null;
+  /** ระบบสมาชิก/สะสมแต้ม (0068) — แต้มไม่ใช่เงิน ไม่กระทบบัญชี */
+  pointsEnabled: boolean;
+  /** ใช้เงินกี่บาทได้ 1 แต้ม (10 = ซื้อ 100 ได้ 10 แต้ม) */
+  bahtPerPoint: number;
+  /** ข้อความรางวัลที่โชว์บนบัตรสมาชิก เช่น "100 แต้ม = เฟรนฟรายฟรี" */
+  rewardNote: string | null;
 };
 
 type SettingsRow = {
@@ -46,13 +52,16 @@ type SettingsRow = {
   shop_qr_url: string | null;
   shop_qr_note: string | null;
   day_cutoff_hour: number;
+  points_enabled: boolean;
+  baht_per_point: number;
+  reward_note: string | null;
 };
 
 const SETTINGS_RETURN = `default_payment_method, promptpay_id, receipt_header,
   allow_negative_stock, public_menu_token, online_ordering_enabled, kitchen_enabled, live_at,
   delivery_enabled, delivery_fee::text AS delivery_fee,
   delivery_min_order::text AS delivery_min_order, delivery_area_note, shop_phone, default_payment_timing,
-  shop_qr_url, shop_qr_note, day_cutoff_hour`;
+  shop_qr_url, shop_qr_note, day_cutoff_hour, points_enabled, baht_per_point, reward_note`;
 
 function mapSettings(r: SettingsRow): PosShopSettings {
   return {
@@ -78,6 +87,9 @@ function mapSettings(r: SettingsRow): PosShopSettings {
     shopQrUrl: r.shop_qr_url,
     shopQrNote: r.shop_qr_note,
     dayCutoffHour: Number(r.day_cutoff_hour ?? 0),
+    pointsEnabled: r.points_enabled ?? false,
+    bahtPerPoint: Number(r.baht_per_point ?? 10),
+    rewardNote: r.reward_note ?? null,
   };
 }
 
@@ -110,6 +122,9 @@ export type UpdatePosShopSettingsInput = {
   shopQrUrl?: string | null;
   shopQrNote?: string | null;
   dayCutoffHour?: number;
+  pointsEnabled?: boolean;
+  bahtPerPoint?: number;
+  rewardNote?: string | null;
 };
 
 export async function upsertPosShopSettings(
@@ -121,7 +136,8 @@ export async function upsertPosShopSettings(
        (user_id, promptpay_id, receipt_header, default_payment_method,
         online_ordering_enabled, kitchen_enabled, live_at,
         delivery_enabled, delivery_fee, delivery_min_order, delivery_area_note, shop_phone,
-        default_payment_timing, shop_qr_url, shop_qr_note, day_cutoff_hour)
+        default_payment_timing, shop_qr_url, shop_qr_note, day_cutoff_hour,
+        points_enabled, baht_per_point, reward_note)
      VALUES (
        $1,
        $2,
@@ -138,7 +154,10 @@ export async function upsertPosShopSettings(
        COALESCE($17, 'after'),
        $18,
        $20,
-       COALESCE($22, 0)
+       COALESCE($22, 0),
+       COALESCE($23, false),
+       COALESCE($24, 10),
+       $25
      )
      ON CONFLICT (user_id) DO UPDATE SET
        promptpay_id            = CASE WHEN $5 THEN $2 ELSE pos_shop_settings.promptpay_id END,
@@ -158,6 +177,9 @@ export async function upsertPosShopSettings(
        shop_qr_url             = CASE WHEN $19 THEN $18 ELSE pos_shop_settings.shop_qr_url END,
        shop_qr_note            = CASE WHEN $21 THEN $20 ELSE pos_shop_settings.shop_qr_note END,
        day_cutoff_hour         = COALESCE($22, pos_shop_settings.day_cutoff_hour),
+       points_enabled          = COALESCE($23, pos_shop_settings.points_enabled),
+       baht_per_point          = COALESCE($24, pos_shop_settings.baht_per_point),
+       reward_note             = CASE WHEN $26 THEN $25 ELSE pos_shop_settings.reward_note END,
        updated_at              = now()
      RETURNING ${SETTINGS_RETURN}`,
     [
@@ -183,6 +205,10 @@ export async function upsertPosShopSettings(
       input.shopQrNote ?? null,
       input.shopQrNote !== undefined,
       input.dayCutoffHour ?? null,
+      input.pointsEnabled ?? null,
+      input.bahtPerPoint ?? null,
+      input.rewardNote ?? null,
+      input.rewardNote !== undefined,
     ],
   );
   if (!rows[0]) throw new Error("Could not upsert POS shop settings");

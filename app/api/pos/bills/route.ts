@@ -55,6 +55,9 @@ export async function POST(req: NextRequest) {
         data: {
           bill: result.bill,
           items: result.items,
+          // แต้มสมาชิก — ของแถม ไม่ใช่ยอดเงิน (ดู 0068)
+          pointsEarned: result.pointsEarned ?? 0,
+          memberPoints: result.memberPoints,
           warnings:
             result.negativeStockProductIds.length > 0
               ? {
