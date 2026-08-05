@@ -51,3 +51,10 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# ห้ามขึ้น git: cert/key + รายงาน diagnostic ที่มี token
+scripts/tmp-push-certs/
+docs/pos-network-diagnostic/
+*.pfx
+*.p12
+*.key
