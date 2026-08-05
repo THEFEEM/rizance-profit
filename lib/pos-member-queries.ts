@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import type { PoolClient } from "pg";
 import { pool } from "@/lib/db";
 
@@ -133,6 +134,9 @@ export async function getPosMemberByToken(token: string): Promise<{
   shopName: string;
   rewardNote: string | null;
   bahtPerPoint: number;
+  cardTheme: string;
+  /** แต้มที่ต้องมีก่อนจะกดแลกรางวัลได้ */
+  redeemPoints: number;
   events: PosPointEvent[];
 } | null> {
   const { rows } = await pool.query<
@@ -141,12 +145,15 @@ export async function getPosMemberByToken(token: string): Promise<{
       shop_name: string;
       reward_note: string | null;
       baht_per_point: number;
+      card_theme: string | null;
+      redeem_points: number;
     }
   >(
     `SELECT m.id, m.phone, m.name, m.points, m.total_spent::text, m.visit_count,
             m.last_visit_at, m.access_token, m.created_at,
             m.user_id, u.shop_name,
-            s.reward_note, COALESCE(s.baht_per_point, 10) AS baht_per_point
+            s.reward_note, COALESCE(s.baht_per_point, 10) AS baht_per_point,
+            s.card_theme, COALESCE(s.redeem_points, 100) AS redeem_points
      FROM pos_members m
      JOIN users u ON u.id = m.user_id
      LEFT JOIN pos_shop_settings s ON s.user_id = m.user_id
@@ -179,6 +186,8 @@ export async function getPosMemberByToken(token: string): Promise<{
     shopName: r.shop_name,
     rewardNote: r.reward_note,
     bahtPerPoint: r.baht_per_point,
+    cardTheme: r.card_theme ?? "ink",
+    redeemPoints: r.redeem_points,
     events: eventRows.map((e) => ({
       id: e.id,
       delta: e.delta,
@@ -332,51 +341,204 @@ export async function reversePointsForBill(
   );
 }
 
+// --- แลกแต้มด้วย QR (0070) --------------------------------------------------
+
+export class PosRedeemCodeInvalidError extends Error {
+  constructor(public readonly kind: "not_found" | "used" | "expired") {
+    super(kind);
+  }
+}
+
+/** ตัวอักษรที่ไม่ชวนอ่านผิด: ตัด 0/O/1/I/L ออก — คนต้องพิมพ์โค้ดนี้ด้วยมือได้ */
+const CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+const CODE_LEN = 6;
+const CODE_TTL_MS = 5 * 60 * 1000;
+
+function randomCode(): string {
+  const bytes = randomBytes(CODE_LEN);
+  let out = "";
+  for (let i = 0; i < CODE_LEN; i++) {
+    out += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
+  }
+  return out;
+}
+
+export type PosRedeemCode = {
+  code: string;
+  points: number;
+  rewardNote: string | null;
+  expiresAt: string;
+};
+
 /**
- * ตัดแต้มเมื่อลูกค้าแลกของ (พนักงานกดหน้าร้าน)
+ * ลูกค้ากด "แลกรางวัล" บนบัตร → ได้โค้ดใช้ครั้งเดียว อายุ 5 นาที
  *
- * ⚠️ ไม่ลดยอดบิลและไม่แตะบัญชี — ของแถมส่งมือ
- * ถ้าวันหนึ่งจะให้แต้มเป็นส่วนลดเงินจริง ต้องออกแบบ journal ก่อน
- * (ลดรายได้ vs ค่าใช้จ่ายการตลาด) เป็นการตัดสินใจทางบัญชี ไม่ใช่ทาง UI
+ * ⚠️ ยังไม่ตัดแต้มที่ขั้นนี้ — แต้มหักตอน POS สแกนสำเร็จเท่านั้น
+ *    (ถ้าตัดตอนสร้างโค้ด ลูกค้ากดเล่นแล้วไม่ไปแลก แต้มจะหายฟรี)
+ *
+ * โค้ดเก่าที่ยังไม่ใช้ของสมาชิกคนนี้ถูกทำให้หมดอายุทันที — กันมีหลายโค้ดลอยอยู่พร้อมกัน
  */
-export async function redeemPoints(
+export async function createRedeemCode(
   userId: string,
   memberId: string,
-  points: number,
-  note?: string,
-): Promise<PosMember> {
+): Promise<PosRedeemCode> {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const { rows } = await client.query<{ points: number }>(
+
+    const { rows: cfg } = await client.query<{
+      redeem_points: number;
+      reward_note: string | null;
+      points_enabled: boolean;
+    }>(
+      `SELECT COALESCE(redeem_points, 100) AS redeem_points, reward_note, points_enabled
+       FROM pos_shop_settings WHERE user_id = $1`,
+      [userId],
+    );
+    if (!cfg[0]?.points_enabled) {
+      await client.query("ROLLBACK");
+      throw new Error("points_disabled");
+    }
+    const needed = cfg[0].redeem_points;
+
+    const { rows: mem } = await client.query<{ points: number }>(
       `SELECT points FROM pos_members
        WHERE id = $2 AND user_id = $1 AND is_active = true
        FOR UPDATE`,
       [userId, memberId],
     );
-    if (!rows[0]) {
+    if (!mem[0]) {
       await client.query("ROLLBACK");
       throw new Error("member_not_found");
     }
-    if (rows[0].points < points) {
-      const have = rows[0].points;
+    if (mem[0].points < needed) {
+      const have = mem[0].points;
       await client.query("ROLLBACK");
       throw new PosNotEnoughPointsError(have);
     }
 
+    // โค้ดเก่าที่ยังไม่ใช้ → ปิดทิ้ง (ให้เหลือใบเดียวที่ใช้ได้จริง)
+    await client.query(
+      `UPDATE pos_redeem_codes SET expires_at = now()
+       WHERE member_id = $2 AND user_id = $1 AND used_at IS NULL AND expires_at > now()`,
+      [userId, memberId],
+    );
+
+    const expiresAt = new Date(Date.now() + CODE_TTL_MS);
+    // ชนโค้ดซ้ำมีโอกาสน้อยมาก (31^6) แต่ retry ไว้กันเหนียว
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const code = randomCode();
+      try {
+        await client.query(
+          `INSERT INTO pos_redeem_codes
+             (user_id, member_id, code, points, reward_note, expires_at)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [userId, memberId, code, needed, cfg[0].reward_note, expiresAt],
+        );
+        await client.query("COMMIT");
+        return {
+          code,
+          points: needed,
+          rewardNote: cfg[0].reward_note,
+          expiresAt: expiresAt.toISOString(),
+        };
+      } catch (err) {
+        const pgCode = (err as { code?: string }).code;
+        if (pgCode !== "23505") throw err; // ไม่ใช่ unique violation → โยนต่อ
+      }
+    }
+    await client.query("ROLLBACK");
+    throw new Error("code_generation_failed");
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * POS สแกน/กรอกโค้ด → เผาโค้ด + ตัดแต้ม ใน transaction เดียว
+ *
+ * ⚠️ ไม่ลดยอดบิลและไม่แตะบัญชี — ของแถมส่งมือ (ดูหมายเหตุใน 0068)
+ *    ถ้าวันหนึ่งจะให้แต้มเป็นส่วนลดเงินจริง ต้องออกแบบ journal ก่อน
+ *    (ลดรายได้ vs ค่าใช้จ่ายการตลาด) เป็นการตัดสินใจทางบัญชี ไม่ใช่ทาง UI
+ *
+ * กันใช้ซ้ำด้วย FOR UPDATE + เช็ค used_at ในล็อกเดียวกัน — สแกนพร้อมกัน 2 เครื่อง
+ * จะมีเครื่องเดียวที่ผ่าน
+ */
+export async function consumeRedeemCode(
+  userId: string,
+  rawCode: string,
+): Promise<{ member: PosMember; points: number; rewardNote: string | null }> {
+  const code = rawCode.trim().toUpperCase();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const { rows } = await client.query<{
+      id: string;
+      member_id: string;
+      points: number;
+      reward_note: string | null;
+      used_at: Date | null;
+      expired: boolean;
+    }>(
+      `SELECT id, member_id, points, reward_note, used_at, (expires_at <= now()) AS expired
+       FROM pos_redeem_codes
+       WHERE user_id = $1 AND code = $2
+       FOR UPDATE`,
+      [userId, code],
+    );
+    const row = rows[0];
+    if (!row) {
+      await client.query("ROLLBACK");
+      throw new PosRedeemCodeInvalidError("not_found");
+    }
+    if (row.used_at) {
+      await client.query("ROLLBACK");
+      throw new PosRedeemCodeInvalidError("used");
+    }
+    if (row.expired) {
+      await client.query("ROLLBACK");
+      throw new PosRedeemCodeInvalidError("expired");
+    }
+
+    const { rows: mem } = await client.query<{ points: number }>(
+      `SELECT points FROM pos_members
+       WHERE id = $2 AND user_id = $1 AND is_active = true
+       FOR UPDATE`,
+      [userId, row.member_id],
+    );
+    if (!mem[0]) {
+      await client.query("ROLLBACK");
+      throw new Error("member_not_found");
+    }
+    if (mem[0].points < row.points) {
+      const have = mem[0].points;
+      await client.query("ROLLBACK");
+      throw new PosNotEnoughPointsError(have);
+    }
+
+    await client.query(`UPDATE pos_redeem_codes SET used_at = now() WHERE id = $1`, [row.id]);
     await client.query(
       `INSERT INTO pos_point_events (user_id, member_id, delta, reason, note)
        VALUES ($1, $2, $3, 'redeem', $4)`,
-      [userId, memberId, -points, note?.slice(0, 200) ?? null],
+      [userId, row.member_id, -row.points, row.reward_note?.slice(0, 200) ?? `โค้ด ${code}`],
     );
     const { rows: updated } = await client.query<MemberRow>(
       `UPDATE pos_members SET points = points - $3, updated_at = now()
        WHERE id = $2 AND user_id = $1
        RETURNING ${MEMBER_RETURN}`,
-      [userId, memberId, points],
+      [userId, row.member_id, row.points],
     );
+
     await client.query("COMMIT");
-    return mapMember(updated[0]);
+    return {
+      member: mapMember(updated[0]),
+      points: row.points,
+      rewardNote: row.reward_note,
+    };
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});
     throw err;

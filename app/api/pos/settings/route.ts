@@ -60,6 +60,10 @@ const updateSettingsSchema = z
       .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(200))
       .nullable()
       .optional(),
+    /** preset เท่านั้น — ให้เลือกสีอิสระจะได้บัตรที่อ่านไม่ออก */
+    cardTheme: z.enum(["ink", "emerald", "sunset", "grape", "ocean", "charcoal"]).optional(),
+    /** แต้มที่ต้องมีก่อนบัตรจะขึ้นปุ่มแลกรางวัล */
+    redeemPoints: z.number().int().gte(1).lte(100_000).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field is required",

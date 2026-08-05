@@ -23,6 +23,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ token: string 
       shopName: found.shopName,
       rewardNote: found.rewardNote,
       bahtPerPoint: found.bahtPerPoint,
+      cardTheme: found.cardTheme,
+      redeemPoints: found.redeemPoints,
       member: {
         name: found.member.name,
         // ปิดเบอร์กลาง กันคนอื่นเห็นเบอร์เต็มถ้าลูกค้าเปิดจอให้ดู
