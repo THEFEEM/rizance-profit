@@ -270,6 +270,37 @@ export async function upsertPosCombo(
   }
 }
 
+/**
+ * รูปคอมโบปัจจุบัน
+ * undefined = ไม่มีคอมโบนี้/ไม่ใช่ของร้านนี้ · null = มีแต่ยังไม่มีรูป
+ * (แยกสองกรณีเพื่อให้ route ตอบ 404 กับ 200 ได้ถูก)
+ */
+export async function getPosComboImageUrl(
+  userId: string,
+  comboId: string,
+): Promise<string | null | undefined> {
+  const { rows } = await pool.query<{ image_url: string | null }>(
+    `SELECT image_url FROM pos_combos WHERE id = $2 AND user_id = $1`,
+    [userId, comboId],
+  );
+  if (!rows[0]) return undefined;
+  return rows[0].image_url;
+}
+
+export async function setPosComboImageUrl(
+  userId: string,
+  comboId: string,
+  imageUrl: string | null,
+): Promise<PosCombo | null> {
+  const { rowCount } = await pool.query(
+    `UPDATE pos_combos SET image_url = $3, updated_at = now()
+     WHERE id = $2 AND user_id = $1`,
+    [userId, comboId, imageUrl],
+  );
+  if (!rowCount) return null;
+  return getPosCombo(userId, comboId);
+}
+
 export async function deletePosCombo(userId: string, comboId: string): Promise<boolean> {
   const { rowCount } = await pool.query(
     `DELETE FROM pos_combos WHERE id = $2 AND user_id = $1`,

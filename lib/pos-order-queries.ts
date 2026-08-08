@@ -36,6 +36,9 @@ export type PosOrderItem = {
   sortOrder: number;
   /** โน้ตต่อรายการ เช่น "ไม่ใส่ผัก" */
   note: string | null;
+  /** บรรทัดนี้มาจากคอมโบใบไหน (0071) — ครัวต้องรู้ว่าเป็นชุด ไม่ใช่ของแยก */
+  comboId?: string | null;
+  comboName?: string | null;
   modifiers?: PosOrderItemModifier[];
   /** ids needed by staff to convert to a bill via closeBill */
   modifierIds?: string[];
@@ -905,9 +908,12 @@ async function loadOrderItems(
       line_total: string;
       sort_order: number;
       note: string | null;
+      combo_id: string | null;
+      combo_name: string | null;
     }>(
       `SELECT id, order_id, product_id, product_name,
-              unit_sell_price::text, quantity::text, line_total::text, sort_order, note
+              unit_sell_price::text, quantity::text, line_total::text, sort_order, note,
+              combo_id, combo_name
        FROM pos_order_items
        WHERE order_id = ANY($1::uuid[])
        ORDER BY sort_order ASC`,
@@ -948,6 +954,8 @@ async function loadOrderItems(
       lineTotal: r.line_total,
       sortOrder: r.sort_order,
       note: r.note,
+      comboId: r.combo_id,
+      comboName: r.combo_name,
       ...(mods?.names.length ? { modifiers: mods.names, modifierIds: mods.ids } : {}),
     };
     const arr = byOrder.get(r.order_id) ?? [];
