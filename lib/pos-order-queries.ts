@@ -6,6 +6,7 @@ import { centsToDecimalString, sumDecimals, toCents } from "@/lib/money";
 import { resolveCartModifiers, type SelectedModifier } from "@/lib/pos-modifier-queries";
 import { pushOrderStatus } from "@/lib/pos-push-queries";
 import { PosInvalidPhoneError, upsertPosMember } from "@/lib/pos-member-queries";
+import { expandComboToLines } from "@/lib/pos-combo-queries";
 
 /**
  * QR pre-orders — reservations only. No stock/income/journal here; staff
@@ -340,6 +341,8 @@ export type CreatePublicOrderInput = {
   deliveryLng?: number;
   deliveryAccuracyM?: number;
   items: { productId: string; qty: number; modifierIds?: string[]; note?: string }[];
+  /** คอมโบ (0071) — ราคาและรายการอ่านจาก DB ฝั่งเซิร์ฟเวอร์ */
+  combos?: { comboId: string; qty: number }[];
 };
 
 /** Create a pre-order — prices resolved server-side, snapshot into order rows. */
@@ -351,7 +354,40 @@ export async function createPublicOrder(
   try {
     await client.query("BEGIN");
 
-    const productIds = [...new Set(input.items.map((i) => i.productId))];
+    /**
+     * คอมโบ → บรรทัดสินค้าจริง (0071) — ตรรกะเดียวกับตอนปิดบิลเป๊ะ
+     * ต้องกางที่นี่ด้วย ไม่งั้นออเดอร์ QR สั่งคอมโบไม่ได้ (ซึ่งเป็นทางหลักของลูกค้า)
+     */
+    const comboExpanded: {
+      productId: string;
+      qty: number;
+      unitSellPrice: string;
+      lineTotal: string;
+      listUnitPrice: string;
+      comboId: string;
+      comboName: string;
+    }[] = [];
+    for (const c of input.combos ?? []) {
+      const ex = await expandComboToLines(client, userId, c.comboId, c.qty);
+      for (const l of ex.lines) {
+        comboExpanded.push({
+          productId: l.productId,
+          qty: l.quantity * c.qty,
+          unitSellPrice: l.sellUnitPrice,
+          lineTotal: l.lineTotal,
+          listUnitPrice: l.listUnitPrice,
+          comboId: c.comboId,
+          comboName: ex.comboName,
+        });
+      }
+    }
+
+    const productIds = [
+      ...new Set([
+        ...input.items.map((i) => i.productId),
+        ...comboExpanded.map((c) => c.productId),
+      ]),
+    ];
     const { rows: productRows } = await client.query<{
       id: string;
       name: string;
@@ -366,21 +402,55 @@ export async function createPublicOrder(
 
     const modifiersByLine = await resolveCartModifiers(client, userId, input.items);
 
-    const computed = input.items.map((line, sortOrder) => {
+    type ComputedOrderLine = {
+      product: { id: string; name: string; sell_price: string };
+      qty: number;
+      note: string | null;
+      selected: SelectedModifier[];
+      unitSellPrice: string;
+      lineTotal: string;
+      sortOrder: number;
+      listUnitPrice: string | null;
+      comboId: string | null;
+      comboName: string | null;
+    };
+
+    const computed: ComputedOrderLine[] = input.items.map((line, sortOrder) => {
       const product = products.get(line.productId)!;
       const selected: SelectedModifier[] = modifiersByLine.get(sortOrder) ?? [];
       const unitCents =
         toCents(product.sell_price) + selected.reduce((s, m) => s + toCents(m.priceDelta), 0);
       const lineCents = Math.round((unitCents * Math.round(line.qty * 1000)) / 1000);
       return {
-        line,
         product,
+        qty: line.qty,
+        note: line.note?.trim() || null,
         selected,
         unitSellPrice: centsToDecimalString(unitCents),
         lineTotal: centsToDecimalString(lineCents),
         sortOrder,
+        listUnitPrice: null,
+        comboId: null,
+        comboName: null,
       };
     });
+
+    comboExpanded.forEach((c, i) => {
+      computed.push({
+        product: products.get(c.productId)!,
+        qty: c.qty,
+        note: null,
+        selected: [],
+        unitSellPrice: c.unitSellPrice,
+        lineTotal: c.lineTotal,
+        sortOrder: input.items.length + i,
+        listUnitPrice: c.listUnitPrice,
+        comboId: c.comboId,
+        comboName: c.comboName,
+      });
+    });
+
+    if (computed.length === 0) throw new PosOrderProductError();
 
     const itemsTotal = sumDecimals(...computed.map((c) => c.lineTotal));
 
@@ -474,18 +544,20 @@ export async function createPublicOrder(
       const { rows: itemRows } = await client.query<{ id: string }>(
         `INSERT INTO pos_order_items
            (order_id, product_id, product_name, unit_sell_price, quantity, line_total,
-            sort_order, note)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            sort_order, note, combo_id, combo_name)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING id`,
         [
           orderId,
           c.product.id,
           c.product.name,
           c.unitSellPrice,
-          c.line.qty,
+          c.qty,
           c.lineTotal,
           c.sortOrder,
-          c.line.note?.trim() || null,
+          c.note,
+          c.comboId,
+          c.comboName,
         ],
       );
       for (let i = 0; i < c.selected.length; i++) {
@@ -530,6 +602,8 @@ export async function createStaffOrder(
   userId: string,
   input: {
     items: { productId: string; qty: number; modifierIds?: string[]; note?: string }[];
+    /** คอมโบ (0071) — ราคาอ่านจาก DB ฝั่งเซิร์ฟเวอร์ */
+    combos?: { comboId: string; qty: number }[];
     customerName?: string;
     note?: string;
     /** ไม่ส่ง = ใช้ค่าเริ่มต้นของร้าน */
@@ -540,7 +614,37 @@ export async function createStaffOrder(
   try {
     await client.query("BEGIN");
 
-    const productIds = [...new Set(input.items.map((i) => i.productId))];
+    // คอมโบ → บรรทัดสินค้าจริง (0071) — ตรรกะเดียวกับ createPublicOrder และตอนปิดบิล
+    const comboExpanded: {
+      productId: string;
+      qty: number;
+      unitSellPrice: string;
+      lineTotal: string;
+      listUnitPrice: string;
+      comboId: string;
+      comboName: string;
+    }[] = [];
+    for (const c of input.combos ?? []) {
+      const ex = await expandComboToLines(client, userId, c.comboId, c.qty);
+      for (const l of ex.lines) {
+        comboExpanded.push({
+          productId: l.productId,
+          qty: l.quantity * c.qty,
+          unitSellPrice: l.sellUnitPrice,
+          lineTotal: l.lineTotal,
+          listUnitPrice: l.listUnitPrice,
+          comboId: c.comboId,
+          comboName: ex.comboName,
+        });
+      }
+    }
+
+    const productIds = [
+      ...new Set([
+        ...input.items.map((i) => i.productId),
+        ...comboExpanded.map((c) => c.productId),
+      ]),
+    ];
     const { rows: productRows } = await client.query<{
       id: string;
       name: string;
@@ -555,21 +659,52 @@ export async function createStaffOrder(
 
     const modifiersByLine = await resolveCartModifiers(client, userId, input.items);
 
-    const computed = input.items.map((line, sortOrder) => {
+    type StaffLine = {
+      product: { id: string; name: string; sell_price: string };
+      qty: number;
+      note: string | null;
+      selected: SelectedModifier[];
+      unitSellPrice: string;
+      lineTotal: string;
+      sortOrder: number;
+      comboId: string | null;
+      comboName: string | null;
+    };
+
+    const computed: StaffLine[] = input.items.map((line, sortOrder) => {
       const product = products.get(line.productId)!;
       const selected: SelectedModifier[] = modifiersByLine.get(sortOrder) ?? [];
       const unitCents =
         toCents(product.sell_price) + selected.reduce((s, m) => s + toCents(m.priceDelta), 0);
       const lineCents = Math.round((unitCents * Math.round(line.qty * 1000)) / 1000);
       return {
-        line,
         product,
+        qty: line.qty,
+        note: line.note?.trim() || null,
         selected,
         unitSellPrice: centsToDecimalString(unitCents),
         lineTotal: centsToDecimalString(lineCents),
         sortOrder,
+        comboId: null,
+        comboName: null,
       };
     });
+
+    comboExpanded.forEach((c, i) => {
+      computed.push({
+        product: products.get(c.productId)!,
+        qty: c.qty,
+        note: null,
+        selected: [],
+        unitSellPrice: c.unitSellPrice,
+        lineTotal: c.lineTotal,
+        sortOrder: input.items.length + i,
+        comboId: c.comboId,
+        comboName: c.comboName,
+      });
+    });
+
+    if (computed.length === 0) throw new PosOrderProductError();
 
     const totalAmount = sumDecimals(...computed.map((c) => c.lineTotal));
     const orderNo = await nextOrderNo(client, userId);
@@ -605,18 +740,20 @@ export async function createStaffOrder(
       const { rows: itemRows } = await client.query<{ id: string }>(
         `INSERT INTO pos_order_items
            (order_id, product_id, product_name, unit_sell_price, quantity, line_total,
-            sort_order, note)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            sort_order, note, combo_id, combo_name)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING id`,
         [
           orderId,
           c.product.id,
           c.product.name,
           c.unitSellPrice,
-          c.line.qty,
+          c.qty,
           c.lineTotal,
           c.sortOrder,
-          c.line.note?.trim() || null,
+          c.note,
+          c.comboId,
+          c.comboName,
         ],
       );
       for (let i = 0; i < c.selected.length; i++) {

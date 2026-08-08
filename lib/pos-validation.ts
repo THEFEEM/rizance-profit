@@ -376,7 +376,11 @@ export const publicOrderSchema = z.object({
   deliveryNote: z
     .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(200))
     .optional(),
-  items: z.array(cartLine).min(1).max(20),
+  items: z.array(cartLine).max(20),
+  /** คอมโบ (0071) — client ส่งได้แค่ id + จำนวนชุด */
+  combos: z.array(cartCombo).max(20).optional(),
+}).refine((d) => d.items.length > 0 || (d.combos?.length ?? 0) > 0, {
+  message: "ตะกร้าว่าง — ต้องมีสินค้าหรือคอมโบอย่างน้อย 1 รายการ",
 });
 
 export type PublicOrderBody = z.infer<typeof publicOrderSchema>;
@@ -385,13 +389,16 @@ export type PublicOrderBody = z.infer<typeof publicOrderSchema>;
 export const staffOrderSchema = z.object({
   /** ไม่ส่ง = ใช้ค่าเริ่มต้นจังหวะเก็บเงินของร้าน */
   paymentTiming: z.enum(["before", "after"]).optional(),
-  items: z.array(cartLine).min(1).max(50),
+  items: z.array(cartLine).max(50),
+  combos: z.array(cartCombo).max(20).optional(),
   customerName: z
     .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(80))
     .optional(),
   note: z
     .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(200))
     .optional(),
+}).refine((d) => d.items.length > 0 || (d.combos?.length ?? 0) > 0, {
+  message: "ตะกร้าว่าง — ต้องมีสินค้าหรือคอมโบอย่างน้อย 1 รายการ",
 });
 
 /** ความเห็นลูกค้าหลังรับอาหาร (public — ยืนยันด้วย access_token ของออเดอร์) */
