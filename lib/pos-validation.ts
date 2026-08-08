@@ -39,9 +39,16 @@ const surcharge = z.object({
     }),
 });
 
+/** คอมโบในตะกร้า — client บอกได้แค่ "ใบไหน กี่ชุด" ราคาเซิร์ฟเวอร์กำหนดเอง */
+const cartCombo = z.object({
+  comboId: z.string().uuid(),
+  qty: z.number().int().min(1).max(99),
+});
+
 export const closePosBillSchema = z
   .object({
-    items: z.array(cartLine).min(1),
+    items: z.array(cartLine),
+    combos: z.array(cartCombo).max(20).optional(),
     surcharges: z.array(surcharge).max(3).optional(),
     paymentMethod: paymentMethodEnum.optional(),
     payments: z.array(billPayment).min(1).max(3).optional(),
@@ -56,6 +63,9 @@ export const closePosBillSchema = z
       (v) => (typeof v === "string" ? v.trim() : v),
       z.string().min(9).max(20).optional(),
     ),
+  })
+  .refine((d) => d.items.length > 0 || (d.combos?.length ?? 0) > 0, {
+    message: "ตะกร้าว่าง — ต้องมีสินค้าหรือคอมโบอย่างน้อย 1 รายการ",
   })
   .refine((d) => d.paymentMethod !== undefined || (d.payments?.length ?? 0) > 0, {
     message: "paymentMethod or payments is required",

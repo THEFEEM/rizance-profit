@@ -14,6 +14,7 @@ import {
   earnPointsForBill,
   upsertPosMember,
 } from "@/lib/pos-member-queries";
+import { expandComboToLines } from "@/lib/pos-combo-queries";
 import type {
   ClosePosBillInput,
   ClosePosBillResult,
@@ -242,7 +243,8 @@ export async function closePosBill(
   userId: string,
   input: ClosePosBillInput,
 ): Promise<ClosePosBillResult> {
-  if (input.items.length === 0) {
+  // ตะกร้าว่างจริง = ไม่มีทั้งสินค้าเดี่ยวและคอมโบ (เช็คซ้ำหลังกางคอมโบด้วย)
+  if (input.items.length === 0 && (input.combos?.length ?? 0) === 0) {
     throw new PosEmptyCartError();
   }
 
@@ -261,13 +263,68 @@ export async function closePosBill(
 
     const billNo = await nextBillNo(client, userId, entryDate);
 
-    const productIds = input.items.map((i) => i.productId);
+    /**
+     * คอมโบ → บรรทัดสินค้าจริง (0071)
+     *
+     * ⚠️ ราคาอ่านจาก DB ใน transaction นี้ (FOR UPDATE) ไม่เชื่อราคาที่ client ส่งมา
+     * แต่ละคอมโบกระจายเป็นหลายบรรทัด แต่ละบรรทัดเป็นสินค้าจริง → ตัดสต๊อก/วัตถุดิบ
+     * และนับในรายงานสินค้าขายดีได้เหมือนบรรทัดปกติทุกประการ
+     */
+    const comboExpanded: {
+      productId: string;
+      qty: number;
+      unitSellPrice: string;
+      lineTotal: string;
+      listUnitPrice: string;
+      comboId: string;
+      comboName: string;
+    }[] = [];
+    for (const c of input.combos ?? []) {
+      const ex = await expandComboToLines(client, userId, c.comboId, c.qty);
+      for (const l of ex.lines) {
+        comboExpanded.push({
+          productId: l.productId,
+          qty: l.quantity * c.qty,
+          unitSellPrice: l.sellUnitPrice,
+          lineTotal: l.lineTotal,
+          listUnitPrice: l.listUnitPrice,
+          comboId: c.comboId,
+          comboName: ex.comboName,
+        });
+      }
+    }
+
+    if (input.items.length === 0 && comboExpanded.length === 0) {
+      throw new PosEmptyCartError();
+    }
+
+    // ล็อกสินค้าทั้งของบรรทัดปกติและของคอมโบพร้อมกัน — กัน deadlock จากการล็อกสองรอบ
+    const productIds = [
+      ...input.items.map((i) => i.productId),
+      ...comboExpanded.map((c) => c.productId),
+    ];
     const products = await lockCartProducts(client, userId, productIds);
 
     // Modifiers: validate ownership/rules, price resolved server-side only.
     const modifiersByLine = await resolveCartModifiers(client, userId, input.items);
 
-    const computedLines = input.items.map((line, sortOrder) => {
+    type ComputedLine = {
+      product: NonNullable<ReturnType<typeof products.get>>;
+      qty: number;
+      note: string | null;
+      unitSellPrice: string;
+      lineTotal: string;
+      lineCost: string;
+      sortOrder: number;
+      selectedModifiers: SelectedModifier[];
+      /** ราคาป้าย — NULL เมื่อไม่มีส่วนลด (บรรทัดปกติ) */
+      listUnitPrice: string | null;
+      discountSource: string | null;
+      comboId: string | null;
+      comboName: string | null;
+    };
+
+    const computedLines: ComputedLine[] = input.items.map((line, sortOrder) => {
       const product = products.get(line.productId)!;
       const selectedModifiers: SelectedModifier[] = modifiersByLine.get(sortOrder) ?? [];
       // Effective unit price = base + Σ delta (cents-safe). Stored in
@@ -277,9 +334,39 @@ export async function closePosBill(
         toCents(product.sell_price) +
         selectedModifiers.reduce((sum, m) => sum + toCents(m.priceDelta), 0);
       const unitSellPrice = centsToDecimalString(unitPriceCents);
-      const lineTotal = lineMoney(unitSellPrice, line.qty);
-      const lineCost = lineMoney(product.cost_price, line.qty);
-      return { line, product, unitSellPrice, lineTotal, lineCost, sortOrder, selectedModifiers };
+      return {
+        product,
+        qty: line.qty,
+        note: line.note?.trim() || null,
+        unitSellPrice,
+        lineTotal: lineMoney(unitSellPrice, line.qty),
+        lineCost: lineMoney(product.cost_price, line.qty),
+        sortOrder,
+        selectedModifiers,
+        listUnitPrice: null,
+        discountSource: null,
+        comboId: null,
+        comboName: null,
+      };
+    });
+
+    // บรรทัดจากคอมโบ — ไม่รับ modifier ในเวอร์ชันนี้ (ราคาถูกล็อกไว้แล้วจากการกระจาย)
+    comboExpanded.forEach((c, i) => {
+      const product = products.get(c.productId)!;
+      computedLines.push({
+        product,
+        qty: c.qty,
+        note: null,
+        unitSellPrice: c.unitSellPrice,
+        lineTotal: c.lineTotal,
+        lineCost: lineMoney(product.cost_price, c.qty),
+        sortOrder: input.items.length + i,
+        selectedModifiers: [],
+        listUnitPrice: c.listUnitPrice,
+        discountSource: "combo",
+        comboId: c.comboId,
+        comboName: c.comboName,
+      });
     });
 
     // ค่าบริการเพิ่ม (เช่น ค่าส่งเดลิเวอรี่) — เก็บเป็นบรรทัดในบิลที่ไม่มี product_id
@@ -325,12 +412,16 @@ export async function closePosBill(
 
     const insertedItems: PosBillItem[] = [];
 
-    for (const { line, product, unitSellPrice, lineTotal, lineCost, sortOrder, selectedModifiers } of computedLines) {
+    for (const {
+      product, qty, note, unitSellPrice, lineTotal, lineCost, sortOrder, selectedModifiers,
+      listUnitPrice, discountSource, comboId, comboName,
+    } of computedLines) {
       const { rows: itemRows } = await client.query<BillItemRow>(
         `INSERT INTO pos_bill_items
            (bill_id, product_id, product_name, unit_sell_price, unit_cost_price,
-            quantity, line_total, line_cost, sort_order, note)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            quantity, line_total, line_cost, sort_order, note,
+            list_unit_price, discount_source, combo_id, combo_name)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
          RETURNING id, bill_id, product_id, product_name,
            unit_sell_price::text, unit_cost_price::text, quantity::text,
            line_total::text, line_cost::text, sort_order, note`,
@@ -340,11 +431,15 @@ export async function closePosBill(
           product.name,
           unitSellPrice,
           product.cost_price,
-          line.qty,
+          qty,
           lineTotal,
           lineCost,
           sortOrder,
-          line.note?.trim() || null,
+          note,
+          listUnitPrice,
+          discountSource,
+          comboId,
+          comboName,
         ],
       );
       const insertedItem = mapBillItem(itemRows[0]);
@@ -368,7 +463,7 @@ export async function closePosBill(
       insertedItems.push(insertedItem);
 
       if (product.track_stock) {
-        const qtyChange = -line.qty;
+        const qtyChange = -qty;
 
         await client.query(
           `INSERT INTO pos_stock_movements
@@ -413,7 +508,7 @@ export async function closePosBill(
       bill.id,
       computedLines.map((l) => ({
         productId: l.product.id,
-        qty: l.line.qty,
+        qty: l.qty,
         modifierIds: l.selectedModifiers.map((m) => m.id),
       })),
     );

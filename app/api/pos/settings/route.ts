@@ -64,6 +64,10 @@ const updateSettingsSchema = z
     cardTheme: z.enum(["ink", "emerald", "sunset", "grape", "ocean", "charcoal"]).optional(),
     /** แต้มที่ต้องมีก่อนบัตรจะขึ้นปุ่มแลกรางวัล */
     redeemPoints: z.number().int().gte(1).lte(100_000).optional(),
+    /** Loyalty economy (0071) — คืนลูกค้ากี่ % ของยอดสุทธิ */
+    loyaltyReturnPct: z.number().gte(0).lte(20).optional(),
+    pointValueSatang: z.number().int().gte(1).lte(10_000).optional(),
+    loyaltyUsePct: z.boolean().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field is required",

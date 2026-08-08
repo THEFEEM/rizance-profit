@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { PoolClient } from "pg";
 import { pool } from "@/lib/db";
+import { pointsFromNet } from "@/lib/pos-combo-pricing";
 
 /**
  * ระบบสมาชิก + แต้ม (migration 0068)
@@ -215,21 +216,61 @@ export async function listPosMembers(
   return rows.map(mapMember);
 }
 
-type PointRules = { enabled: boolean; bahtPerPoint: number };
+type PointRules = {
+  enabled: boolean;
+  /** สูตรเดิม: ซื้อครบกี่บาทได้ 1 แต้ม */
+  bahtPerPoint: number;
+  /** สูตรใหม่ (0071): คืนกี่ % ของยอดสุทธิ */
+  loyaltyReturnPct: number;
+  pointValueSatang: number;
+  usePct: boolean;
+};
 
 export async function getPointRules(
   userId: string,
   client?: PoolClient,
 ): Promise<PointRules> {
   const q = client ?? pool;
-  const { rows } = await q.query<{ points_enabled: boolean; baht_per_point: number }>(
-    `SELECT points_enabled, baht_per_point FROM pos_shop_settings WHERE user_id = $1`,
+  const { rows } = await q.query<{
+    points_enabled: boolean;
+    baht_per_point: number;
+    loyalty_return_pct: string | null;
+    point_value_satang: number | null;
+    loyalty_use_pct: boolean | null;
+  }>(
+    `SELECT points_enabled, baht_per_point,
+            loyalty_return_pct::text AS loyalty_return_pct,
+            point_value_satang, loyalty_use_pct
+     FROM pos_shop_settings WHERE user_id = $1`,
     [userId],
   );
   return {
     enabled: rows[0]?.points_enabled ?? false,
     bahtPerPoint: rows[0]?.baht_per_point ?? 10,
+    loyaltyReturnPct: Number(rows[0]?.loyalty_return_pct ?? 8),
+    pointValueSatang: Number(rows[0]?.point_value_satang ?? 10),
+    usePct: rows[0]?.loyalty_use_pct ?? false,
   };
+}
+
+/**
+ * แต้มที่ได้จากยอดสุทธิ 1 บิล — จุดเดียวที่ตัดสินใจว่าใช้สูตรไหน
+ *
+ * ⚠️ ต้องคำนวณฝั่งเซิร์ฟเวอร์เสมอ frontend ห้ามกำหนดเอง
+ *
+ * usePct = true  → คืน N% ของยอด แล้วแปลงเป็นแต้ม (0071 — ตอบได้ว่าจ่ายไปกี่ % จริง)
+ * usePct = false → ซื้อครบ N บาท = 1 แต้ม (สูตรเดิม เก็บไว้เป็นทางถอยกลับ)
+ */
+export function calcEarnedPoints(totalAmount: string, rules: PointRules): number {
+  if (!rules.enabled) return 0;
+  if (rules.usePct) {
+    return pointsFromNet(totalAmount, {
+      loyaltyReturnPct: rules.loyaltyReturnPct,
+      pointValueSatang: rules.pointValueSatang,
+    });
+  }
+  if (rules.bahtPerPoint <= 0) return 0;
+  return Math.floor(parseFloat(totalAmount) / rules.bahtPerPoint);
 }
 
 /**
@@ -266,8 +307,7 @@ export async function earnPointsForBill(
   );
 
   const rules = await getPointRules(userId, client);
-  if (!rules.enabled) return 0;
-  const points = Math.floor(parseFloat(input.totalAmount) / rules.bahtPerPoint);
+  const points = calcEarnedPoints(input.totalAmount, rules);
   if (points <= 0) return 0;
 
   await client.query(

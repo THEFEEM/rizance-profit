@@ -75,6 +75,11 @@ export type PosBillItem = {
 
 export type ClosePosBillInput = {
   items: { productId: string; qty: number; modifierIds?: string[]; note?: string }[];
+  /**
+   * คอมโบ (0071) — ราคาและรายการสินค้าอ่านจาก DB ฝั่งเซิร์ฟเวอร์
+   * client ส่งมาแค่ "คอมโบใบไหน กี่ชุด" กำหนดราคาเองไม่ได้
+   */
+  combos?: { comboId: string; qty: number }[];
   /** ค่าบริการเพิ่ม เช่น ค่าส่ง — กลายเป็นบรรทัดในบิล (ไม่มี product_id) */
   surcharges?: { label: string; amount: number }[];
   /** Legacy single-method checkout (full amount). Ignored when `payments` present. */
