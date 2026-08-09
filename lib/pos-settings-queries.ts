@@ -42,6 +42,8 @@ export type PosShopSettings = {
   pointValueSatang: number;
   /** true = คิดแต้มจาก % · false = ใช้ baht_per_point แบบเดิม (สวิตช์ถอยกลับ) */
   loyaltyUsePct: boolean;
+  /** มูลค่ารางวัลเป็นบาท (0072) — ใช้ตรวจว่าตั้ง redeem_points คืนเกินเป้าไหม */
+  rewardValue: string | null;
 };
 
 type SettingsRow = {
@@ -70,6 +72,7 @@ type SettingsRow = {
   loyalty_return_pct: string;
   point_value_satang: number;
   loyalty_use_pct: boolean;
+  reward_value: string | null;
 };
 
 const SETTINGS_RETURN = `default_payment_method, promptpay_id, receipt_header,
@@ -78,7 +81,8 @@ const SETTINGS_RETURN = `default_payment_method, promptpay_id, receipt_header,
   delivery_min_order::text AS delivery_min_order, delivery_area_note, shop_phone, default_payment_timing,
   shop_qr_url, shop_qr_note, day_cutoff_hour, points_enabled, baht_per_point, reward_note,
   card_theme, redeem_points,
-  loyalty_return_pct::text AS loyalty_return_pct, point_value_satang, loyalty_use_pct`;
+  loyalty_return_pct::text AS loyalty_return_pct, point_value_satang, loyalty_use_pct,
+  reward_value::text AS reward_value`;
 
 function mapSettings(r: SettingsRow): PosShopSettings {
   return {
@@ -112,6 +116,7 @@ function mapSettings(r: SettingsRow): PosShopSettings {
     loyaltyReturnPct: Number(r.loyalty_return_pct ?? 8),
     pointValueSatang: Number(r.point_value_satang ?? 10),
     loyaltyUsePct: r.loyalty_use_pct ?? false,
+    rewardValue: r.reward_value ?? null,
   };
 }
 
@@ -152,6 +157,7 @@ export type UpdatePosShopSettingsInput = {
   loyaltyReturnPct?: number;
   pointValueSatang?: number;
   loyaltyUsePct?: boolean;
+  rewardValue?: number | null;
 };
 
 export async function upsertPosShopSettings(
@@ -165,7 +171,7 @@ export async function upsertPosShopSettings(
         delivery_enabled, delivery_fee, delivery_min_order, delivery_area_note, shop_phone,
         default_payment_timing, shop_qr_url, shop_qr_note, day_cutoff_hour,
         points_enabled, baht_per_point, reward_note, card_theme, redeem_points,
-        loyalty_return_pct, point_value_satang, loyalty_use_pct)
+        loyalty_return_pct, point_value_satang, loyalty_use_pct, reward_value)
      VALUES (
        $1,
        $2,
@@ -190,7 +196,8 @@ export async function upsertPosShopSettings(
        COALESCE($28, 100),
        COALESCE($29::numeric, 8.00),
        COALESCE($30, 10),
-       COALESCE($31, false)
+       COALESCE($31, false),
+       $32
      )
      ON CONFLICT (user_id) DO UPDATE SET
        promptpay_id            = CASE WHEN $5 THEN $2 ELSE pos_shop_settings.promptpay_id END,
@@ -218,6 +225,7 @@ export async function upsertPosShopSettings(
        loyalty_return_pct      = COALESCE($29::numeric, pos_shop_settings.loyalty_return_pct),
        point_value_satang      = COALESCE($30, pos_shop_settings.point_value_satang),
        loyalty_use_pct         = COALESCE($31, pos_shop_settings.loyalty_use_pct),
+       reward_value            = CASE WHEN $33 THEN $32::numeric ELSE pos_shop_settings.reward_value END,
        updated_at              = now()
      RETURNING ${SETTINGS_RETURN}`,
     [
@@ -252,6 +260,8 @@ export async function upsertPosShopSettings(
       input.loyaltyReturnPct != null ? input.loyaltyReturnPct.toFixed(2) : null,
       input.pointValueSatang ?? null,
       input.loyaltyUsePct ?? null,
+      input.rewardValue != null ? input.rewardValue.toFixed(2) : null,
+      input.rewardValue !== undefined,
     ],
   );
   if (!rows[0]) throw new Error("Could not upsert POS shop settings");

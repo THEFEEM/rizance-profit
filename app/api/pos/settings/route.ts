@@ -68,6 +68,8 @@ const updateSettingsSchema = z
     loyaltyReturnPct: z.number().gte(0).lte(20).optional(),
     pointValueSatang: z.number().int().gte(1).lte(10_000).optional(),
     loyaltyUsePct: z.boolean().optional(),
+    /** มูลค่ารางวัลเป็นบาท (0072) — ใช้ตรวจว่าตั้งแต้มแลกคืนเกินเป้าไหม */
+    rewardValue: z.number().finite().gt(0).max(100_000).nullable().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field is required",
@@ -95,6 +97,51 @@ export async function PATCH(req: NextRequest) {
   const parsed = updateSettingsSchema.safeParse(body);
   if (!parsed.success) {
     return posErrorResponse("invalid_input", 400);
+  }
+
+  /**
+   * ⚠️ กติกาป้องกันตั้งรางวัลที่คืนเกินเป้า (0072)
+   *
+   *   reward_value ≤ redeem_points × point_value_satang/100
+   *
+   * ต้องตรวจกับ "ค่าหลังบันทึก" ไม่ใช่แค่ค่าที่ส่งมา — เพราะ admin อาจส่งมาแค่
+   * ฟิลด์เดียว (เช่นลด redeem_points อย่างเดียว) แล้วทำให้รางวัลเดิมเกินเป้าทันที
+   */
+  if (
+    parsed.data.rewardValue !== undefined ||
+    parsed.data.redeemPoints !== undefined ||
+    parsed.data.pointValueSatang !== undefined
+  ) {
+    const current = await getPosShopSettings(userId);
+    const rewardValue =
+      parsed.data.rewardValue !== undefined
+        ? parsed.data.rewardValue
+        : current.rewardValue != null
+          ? Number(current.rewardValue)
+          : null;
+    const points = parsed.data.redeemPoints ?? current.redeemPoints;
+    const satang = parsed.data.pointValueSatang ?? current.pointValueSatang;
+
+    if (rewardValue != null) {
+      // คำนวณเป็นสตางค์ล้วน กัน floating point ทำให้ ฿65 vs ฿65 ไม่เท่ากัน
+      const rewardSatang = Math.round(rewardValue * 100);
+      const pointsWorthSatang = points * satang;
+      if (rewardSatang > pointsWorthSatang) {
+        return NextResponse.json(
+          {
+            error: "reward_value_exceeds_points",
+            data: {
+              rewardValue,
+              redeemPoints: points,
+              pointValueSatang: satang,
+              /** แต้มขั้นต่ำที่ต้องตั้งเพื่อไม่ให้คืนเกินเป้า */
+              minPointsRequired: Math.ceil(rewardSatang / satang),
+            },
+          },
+          { status: 400 },
+        );
+      }
+    }
   }
 
   const settings = await upsertPosShopSettings(userId, parsed.data);
