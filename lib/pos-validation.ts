@@ -63,6 +63,10 @@ export const closePosBillSchema = z
       (v) => (typeof v === "string" ? v.trim() : v),
       z.string().min(9).max(20).optional(),
     ),
+    memberName: z.preprocess(
+      (v) => (typeof v === "string" ? v.trim() : v),
+      z.string().min(1).max(80).optional(),
+    ),
   })
   .refine((d) => d.items.length > 0 || (d.combos?.length ?? 0) > 0, {
     message: "ตะกร้าว่าง — ต้องมีสินค้าหรือคอมโบอย่างน้อย 1 รายการ",

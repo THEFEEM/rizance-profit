@@ -616,7 +616,7 @@ export async function closePosBill(
       if (input.memberPhone) {
         const member = await upsertPosMember(
           userId,
-          { phone: input.memberPhone },
+          { phone: input.memberPhone, name: input.memberName ?? null },
           client,
         );
         memberId = member.id;

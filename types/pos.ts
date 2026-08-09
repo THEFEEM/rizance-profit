@@ -97,6 +97,8 @@ export type ClosePosBillInput = {
    * ⚠️ แต้มไม่ใช่เงิน — ไม่แตะ total_amount / income_entries / journal
    */
   memberPhone?: string;
+  /** ชื่อลูกค้า — เก็บตอนสมัครครั้งแรก ให้บัตรทักชื่อได้ */
+  memberName?: string;
 };
 
 export type PosModifier = {
