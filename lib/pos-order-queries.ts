@@ -976,6 +976,18 @@ export async function getOrderByAccessToken(
       shopPhone: string | null;
       shopQrUrl: string | null;
       shopQrNote: string | null;
+      /** สมาชิก (ถ้าออเดอร์ผูกอยู่) — ทำให้หน้าติดตามออเดอร์เป็นตัวเชื่อม account */
+      loyalty: {
+        memberCardToken: string;
+        memberName: string | null;
+        /** แต้มที่ได้จากบิลของออเดอร์นี้ (0 = ยังไม่ปิดบิล/ไม่เข้าเงื่อนไข) */
+        pointsEarned: number;
+        pointsBalance: number;
+        redeemPoints: number;
+        rewardNote: string | null;
+      } | null;
+      /** token เมนูร้าน — ปุ่ม "สั่งอีกครั้ง" กลับเข้าแอป */
+      publicMenuToken: string | null;
     })
   | null
 > {
@@ -987,6 +999,14 @@ export async function getOrderByAccessToken(
       shop_phone: string | null;
       shop_qr_url: string | null;
       shop_qr_note: string | null;
+      public_menu_token: string | null;
+      member_id: string | null;
+      member_name: string | null;
+      member_points: number | null;
+      member_card_token: string | null;
+      redeem_points: number | null;
+      reward_note: string | null;
+      points_earned: number | null;
     }
   >(
     `SELECT o.id, o.order_no, o.status, o.channel, o.customer_name, o.customer_phone, o.note,
@@ -998,10 +1018,16 @@ export async function getOrderByAccessToken(
             o.delivery_accuracy_m::text AS delivery_accuracy_m,
             o.delivery_fee::text AS delivery_fee,
             u.shop_name, s.promptpay_id, s.shop_phone, s.shop_qr_url, s.shop_qr_note,
+            s.public_menu_token, COALESCE(s.redeem_points, 100) AS redeem_points, s.reward_note,
+            o.member_id, m.name AS member_name, m.points AS member_points,
+            m.access_token AS member_card_token,
+            (SELECT COALESCE(SUM(e.delta), 0)::int FROM pos_point_events e
+             WHERE e.bill_id = o.bill_id AND e.reason = 'earn') AS points_earned,
             EXISTS (SELECT 1 FROM pos_order_feedback f WHERE f.order_id = o.id) AS has_feedback
      FROM pos_orders o
      JOIN users u ON u.id = o.user_id
      LEFT JOIN pos_shop_settings s ON s.user_id = o.user_id
+     LEFT JOIN pos_members m ON m.id = o.member_id AND m.is_active = true
      WHERE o.access_token = $1`,
     [accessToken],
   );
@@ -1015,6 +1041,24 @@ export async function getOrderByAccessToken(
     shopPhone: rows[0].shop_phone,
     shopQrUrl: rows[0].shop_qr_url,
     shopQrNote: rows[0].shop_qr_note,
+    /**
+     * ⚠️ trade-off ที่ตั้งใจ: การส่ง member_card_token ผ่าน order token แปลว่า
+     * "ใครถือลิงก์ออเดอร์ = เข้าบัตรของคนสั่งได้" — ยอมรับได้เพราะลิงก์ออเดอร์
+     * เป็นของส่วนตัวอยู่แล้ว (มีชื่อ/ที่อยู่/แชท) และนี่คือกลไกเดียวที่ทำให้
+     * account ก่อตัวเองโดยไม่ต้องสมัคร/OTP · การแลกแต้มยังต้องสแกนที่ร้านเสมอ
+     */
+    loyalty:
+      rows[0].member_id && rows[0].member_card_token
+        ? {
+            memberCardToken: rows[0].member_card_token,
+            memberName: rows[0].member_name,
+            pointsEarned: rows[0].points_earned ?? 0,
+            pointsBalance: rows[0].member_points ?? 0,
+            redeemPoints: rows[0].redeem_points ?? 100,
+            rewardNote: rows[0].reward_note,
+          }
+        : null,
+    publicMenuToken: rows[0].public_menu_token,
   };
 }
 
