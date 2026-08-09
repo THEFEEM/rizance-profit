@@ -25,6 +25,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ token: string 
       bahtPerPoint: found.bahtPerPoint,
       cardTheme: found.cardTheme,
       redeemPoints: found.redeemPoints,
+      publicMenuToken: found.publicMenuToken,
       member: {
         name: found.member.name,
         // ปิดเบอร์กลาง กันคนอื่นเห็นเบอร์เต็มถ้าลูกค้าเปิดจอให้ดู

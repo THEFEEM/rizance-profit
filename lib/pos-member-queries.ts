@@ -138,6 +138,8 @@ export async function getPosMemberByToken(token: string): Promise<{
   cardTheme: string;
   /** แต้มที่ต้องมีก่อนจะกดแลกรางวัลได้ */
   redeemPoints: number;
+  /** token เมนูสาธารณะของร้าน — ใช้พาลูกค้าจากบัตรไปหน้า app/สั่งอาหาร */
+  publicMenuToken: string | null;
   events: PosPointEvent[];
 } | null> {
   const { rows } = await pool.query<
@@ -148,13 +150,15 @@ export async function getPosMemberByToken(token: string): Promise<{
       baht_per_point: number;
       card_theme: string | null;
       redeem_points: number;
+      public_menu_token: string | null;
     }
   >(
     `SELECT m.id, m.phone, m.name, m.points, m.total_spent::text, m.visit_count,
             m.last_visit_at, m.access_token, m.created_at,
             m.user_id, u.shop_name,
             s.reward_note, COALESCE(s.baht_per_point, 10) AS baht_per_point,
-            s.card_theme, COALESCE(s.redeem_points, 100) AS redeem_points
+            s.card_theme, COALESCE(s.redeem_points, 100) AS redeem_points,
+            s.public_menu_token
      FROM pos_members m
      JOIN users u ON u.id = m.user_id
      LEFT JOIN pos_shop_settings s ON s.user_id = m.user_id
@@ -189,6 +193,7 @@ export async function getPosMemberByToken(token: string): Promise<{
     bahtPerPoint: r.baht_per_point,
     cardTheme: r.card_theme ?? "ink",
     redeemPoints: r.redeem_points,
+    publicMenuToken: r.public_menu_token ?? null,
     events: eventRows.map((e) => ({
       id: e.id,
       delta: e.delta,

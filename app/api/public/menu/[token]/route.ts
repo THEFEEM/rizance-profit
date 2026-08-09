@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getShopByMenuToken } from "@/lib/pos-order-queries";
 import { listPosCatalog } from "@/lib/pos-queries";
+import { listPosCombos } from "@/lib/pos-combo-queries";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -25,11 +26,14 @@ export async function GET(
   }
 
   const catalog = await listPosCatalog(shop.userId);
+  // คอมโบ: ส่งเฉพาะที่ขายได้จริง — ลูกค้าไม่ควรเห็นชุดที่กดแล้ว error
+  const combos = (await listPosCombos(shop.userId)).filter((c) => c.sellable);
   return NextResponse.json(
     {
       data: {
         shopName: shop.shopName,
         catalog,
+        combos,
         delivery: {
           enabled: shop.deliveryEnabled,
           fee: shop.deliveryFee,
