@@ -81,6 +81,16 @@ CREATE TABLE IF NOT EXISTS pos_feedback (
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- ⚠️ กรณีรันซ้ำหลังไฟล์นี้ถูกแก้: CREATE TABLE IF NOT EXISTS ข้างบนจะ "ข้าม" ทั้งก้อน
+--    ถ้าตารางมีอยู่แล้ว → คอลัมน์ที่เพิ่มมาทีหลังจะไม่ถูกสร้าง แล้ว CHECK ข้างล่างจะล้ม
+--    ALTER แยกออกมาแบบนี้ทำให้รันซ้ำได้เสมอ ไม่ว่าตารางจะอยู่ใน state ไหน
+ALTER TABLE pos_feedback
+  ADD COLUMN IF NOT EXISTS source VARCHAR(10) NOT NULL DEFAULT 'center';
+
+-- index รุ่นแรกของไฟล์นี้ (จำกัด 1 ใบต่อ order+kind) ต้องทิ้ง
+-- ไม่งั้นลูกค้าที่กดดาวเร็วแล้วเข้า Feedback Center ต่อจะถูกตีตกทั้งใบ
+DROP INDEX IF EXISTS idx_pos_feedback_order_kind;
+
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'pos_feedback_kind_check') THEN

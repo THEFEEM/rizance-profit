@@ -284,7 +284,27 @@ async function insertFeedback(
   },
 ): Promise<string> {
   const { input, memberId, phone, businessDate, points } = args;
-  const r = input.ratings ?? {};
+  const r = { ...(input.ratings ?? {}) };
+
+  /**
+   * ⚠️ กรณีที่ทำให้ 500 มาแล้ว: ลูกค้าให้คะแนน "รายเมนู" อย่างเดียว
+   *    ไม่แตะคะแนนด้านบนและไม่พิมพ์ข้อความ → แถวแม่ว่างเปล่า
+   *    → ชน CHECK pos_feedback_not_empty แล้วหน้าเว็บขึ้น "ส่งไม่สำเร็จ"
+   *
+   * แก้ด้วยการสรุป overall จากค่าเฉลี่ยของเมนูที่ให้คะแนน — ถูกทั้งทางเทคนิคและทางความหมาย:
+   * "ให้ 4,3,3,4 ราย ๆ จาน" = ความรู้สึกรวมประมาณ 4 · dashboard จึงนับ feedback ใบนี้ด้วย
+   * (ถ้าปล่อยว่าง ใบนี้จะหายจากคะแนนเฉลี่ยทั้งที่ลูกค้าตอบมาแล้ว)
+   */
+  const parentRatings = [
+    r.overall, r.taste, r.portion, r.value, r.service, r.clean, r.speed,
+  ].map(cleanRating);
+  const itemScores = (input.items ?? [])
+    .map((i) => cleanRating(i.rating))
+    .filter((n): n is number => n !== null);
+  const hasParentRating = parentRatings.some((n) => n !== null);
+  if (!hasParentRating && itemScores.length > 0) {
+    r.overall = Math.round(itemScores.reduce((a, b) => a + b, 0) / itemScores.length);
+  }
   const { rows } = await client.query<{ id: string }>(
     `INSERT INTO pos_feedback (
        user_id, member_id, order_id, bill_id, kind, topic,
