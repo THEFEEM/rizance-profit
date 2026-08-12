@@ -264,10 +264,14 @@ export async function createPublicFeedback(
  *    ถ้าเช็คแค่ code แล้ววันหน้ามี unique index อื่นเพิ่มเข้ามา
  *    การชนอันนั้นจะถูกกลืนเป็น "วันนี้รับแต้มไปแล้ว" แบบเงียบ ๆ หา bug ไม่เจอ
  */
+const AWARD_INDEX = "idx_pos_feedback_award_once_per_day";
+
 function isAwardConflict(err: unknown): boolean {
   if (typeof err !== "object" || err === null) return false;
-  const e = err as { code?: string; constraint?: string };
-  return e.code === "23505" && e.constraint === "idx_pos_feedback_award_once_per_day";
+  const e = err as { code?: string; constraint?: string; message?: string };
+  if (e.code !== "23505") return false;
+  // เทียบทั้ง field constraint และข้อความ — driver บางเส้นทางไม่เซ็ต constraint มาให้
+  return e.constraint === AWARD_INDEX || (e.message ?? "").includes(AWARD_INDEX);
 }
 
 async function insertFeedback(
