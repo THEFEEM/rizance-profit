@@ -195,6 +195,30 @@ export async function POST(
     if (err instanceof PosFeedbackDisabledError) {
       return NextResponse.json({ error: "feedback_disabled" }, { status: 403 });
     }
+
+    /**
+     * ⚠️ บทเรียนจากของจริง: ตอน migration 0073 ยังไม่ครบ (ขาดคอลัมน์ source)
+     *    ลูกค้าเห็นแค่ "ส่งไม่สำเร็จ ลองอีกครั้ง" แล้วกดซ้ำไปเรื่อย ๆ
+     *    เจ้าของร้านก็ไม่รู้ว่าต้องไปรัน migration — เสียเวลาหาสาเหตุนานกว่าที่ควร
+     *
+     *    error ต้องพูดความจริง: แยก "ระบบยังไม่พร้อม" ออกจาก "ข้อมูลที่ส่งมาไม่ถูก"
+     *    และ log ลง server เสมอเพื่อดูใน Vercel Logs ได้ทันที
+     */
+    const e = err as { code?: string; message?: string; constraint?: string };
+    console.error("[feedback] submit failed", {
+      pgCode: e.code,
+      constraint: e.constraint,
+      message: e.message,
+    });
+
+    // 42703 undefined_column · 42P01 undefined_table → ฐานข้อมูลตามโค้ดไม่ทัน
+    if (e.code === "42703" || e.code === "42P01") {
+      return NextResponse.json({ error: "schema_outdated" }, { status: 503 });
+    }
+    // 23514 check_violation → ข้อมูลที่ส่งมาไม่เข้าเงื่อนไข (ไม่ใช่ความผิดของระบบ)
+    if (e.code === "23514") {
+      return NextResponse.json({ error: "invalid_feedback" }, { status: 400 });
+    }
     throw err;
   }
 }
