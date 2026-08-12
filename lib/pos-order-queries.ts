@@ -1023,7 +1023,9 @@ export async function getOrderByAccessToken(
             m.access_token AS member_card_token,
             (SELECT COALESCE(SUM(e.delta), 0)::int FROM pos_point_events e
              WHERE e.bill_id = o.bill_id AND e.reason = 'earn') AS points_earned,
-            EXISTS (SELECT 1 FROM pos_order_feedback f WHERE f.order_id = o.id) AS has_feedback
+            -- 0073: อ่านจาก pos_feedback (แหล่งเดียว) ไม่ใช่ pos_order_feedback ที่ deprecated แล้ว
+            EXISTS (SELECT 1 FROM pos_feedback f
+                    WHERE f.order_id = o.id AND f.source = 'quick') AS has_feedback
      FROM pos_orders o
      JOIN users u ON u.id = o.user_id
      LEFT JOIN pos_shop_settings s ON s.user_id = o.user_id

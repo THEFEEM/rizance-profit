@@ -70,6 +70,9 @@ const updateSettingsSchema = z
     loyaltyUsePct: z.boolean().optional(),
     /** มูลค่ารางวัลเป็นบาท (0072) — ใช้ตรวจว่าตั้งแต้มแลกคืนเกินเป้าไหม */
     rewardValue: z.number().finite().gt(0).max(100_000).nullable().optional(),
+    feedbackEnabled: z.boolean().optional(),
+    // เพดาน 500 ตรงกับ CHECK ใน 0073 — client ตั้งเกินต้องถูกตีตกที่นี่ ไม่ใช่ที่ DB
+    feedbackPoints: z.number().int().min(0).max(500).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field is required",
