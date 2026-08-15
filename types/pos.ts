@@ -99,6 +99,12 @@ export type ClosePosBillInput = {
   memberPhone?: string;
   /** ชื่อลูกค้า — เก็บตอนสมัครครั้งแรก ให้บัตรทักชื่อได้ */
   memberName?: string;
+  /**
+   * Campaign (0074) — client ส่งได้แค่ id หรือ coupon code
+   * ⚠️ ห้ามรับจำนวนเงินส่วนลดจาก client เด็ดขาด — server คำนวณใหม่ทั้งหมด
+   */
+  campaignId?: string;
+  couponCode?: string;
 };
 
 export type PosModifier = {
@@ -127,7 +133,8 @@ export type ClosePosBillResult = {
   negativeStockProductIds: string[];
   /** แต้มที่ให้จากบิลนี้ (0 = ร้านปิดใช้แต้ม / ไม่มีสมาชิก / ยอดไม่ถึง 1 แต้ม) */
   pointsEarned?: number;
-  memberPoints?: number;
+  memberPoints?: number;  /** ส่วนลดแคมเปญที่ apply ไป (0074) — undefined เมื่อไม่ได้ใช้ */
+  campaign?: { name: string; discountAmount: string; subtotalBefore: string };
 };
 
 export type PosCategory = {

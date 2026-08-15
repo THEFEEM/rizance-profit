@@ -3,6 +3,11 @@ import { pool } from "@/lib/db";
 import { getDayCutoffHour } from "@/lib/pos-settings-queries";
 import { businessDate } from "@/lib/date";
 import { centsToDecimalString, sumDecimals, toCents } from "@/lib/money";
+import {
+  recordCampaignUsage,
+  validateCampaignForCart,
+} from "@/lib/pos-campaign-queries";
+import type { CampaignRejectReason, EngineLine } from "@/lib/pos-campaign-engine";
 import { isPosPlanAllowed } from "@/lib/pos-config";
 import { resolveActivePlan } from "@/lib/subscription-plan";
 import { lockShopUser } from "@/lib/shop-profit-withdrawal-queries";
@@ -239,6 +244,14 @@ async function lockCartProducts(
  * Atomic POS checkout: bill + items + stock + shop income_entries.
  * Rolls back entirely on any failure — client may retry with the same cart.
  */
+/** Campaign ถูกปฏิเสธ — reason เป็น machine-readable code ให้ client แปลเอง */
+export class PosCampaignRejectedError extends Error {
+  constructor(public readonly reason: CampaignRejectReason) {
+    super(`campaign_rejected:${reason}`);
+    this.name = "PosCampaignRejectedError";
+  }
+}
+
 export async function closePosBill(
   userId: string,
   input: ClosePosBillInput,
@@ -368,6 +381,90 @@ export async function closePosBill(
         comboName: c.comboName,
       });
     });
+
+    /**
+     * ═══ Ninenon Campaign (0074) — จุดเดียวที่ส่วนลดแคมเปญเกิดขึ้น ═══
+     *
+     * ลำดับที่จงใจ: หลังคอมโบกางเสร็จ (ส่วนลดคอมโบฝังในบรรทัดแล้ว)
+     * ก่อน surcharge/totalAmount — ส่วนลดจึง:
+     *   · ไม่แตะค่าส่ง (surcharge ไม่เข้าฐานคำนวณ)
+     *   · ฝังในราคาบรรทัดผ่าน list_unit_price + discount_source='coupon'
+     *   · invariant Σ line_total = total_amount = journal ยังจริงโดยไม่แก้ posting
+     *
+     * ⚠️ Coupon = Revenue Reduction (การตัดสินใจธุรกิจที่ล็อกไว้):
+     *    line_total ที่ลดแล้วไหลเข้ารายได้ตามปกติ = รายได้ลดจริง ไม่มี journal เพิ่ม
+     */
+    let campaignApplied: {
+      campaignId: string;
+      campaignName: string;
+      couponCode: string | null;
+      discountAmount: string;
+      subtotalBefore: string;
+      usageLimitPerCustomer: number | null;
+      memberId: string | null;
+    } | null = null;
+
+    if (input.campaignId || input.couponCode) {
+      // ตัวตนลูกค้าสำหรับ eligibility — ต้องรู้ "ก่อน" คิดส่วนลด
+      let campaignMemberId: string | null = null;
+      if (input.memberPhone) {
+        try {
+          const m = await upsertPosMember(
+            userId,
+            { phone: input.memberPhone, name: input.memberName ?? null },
+            client,
+          );
+          campaignMemberId = m.id;
+        } catch (err) {
+          if (!(err instanceof PosInvalidPhoneError)) throw err;
+        }
+      } else if (input.linkOrderId) {
+        const { rows } = await client.query<{ member_id: string | null }>(
+          `SELECT member_id FROM pos_orders WHERE id = $2 AND user_id = $1`,
+          [userId, input.linkOrderId],
+        );
+        campaignMemberId = rows[0]?.member_id ?? null;
+      }
+
+      const engineLines: EngineLine[] = computedLines.map((l, index) => ({
+        index,
+        productId: l.product.id,
+        lineTotalCents: toCents(l.lineTotal),
+        // MVP: ไม่ลดซ้อนบนบรรทัดที่มีส่วนลดแล้ว (คอมโบ) — ดู audit
+        alreadyDiscounted: l.discountSource !== null,
+      }));
+
+      const { campaign, evaluation } = await validateCampaignForCart({
+        userId,
+        campaignId: input.campaignId,
+        couponCode: input.couponCode,
+        lines: engineLines,
+        memberId: campaignMemberId,
+        client,
+      });
+      if (!evaluation.valid) throw new PosCampaignRejectedError(evaluation.reason);
+
+      const subtotalBefore = sumDecimals(...computedLines.map((l) => l.lineTotal));
+      for (const [index, discCents] of evaluation.perLineDiscountCents) {
+        if (discCents <= 0) continue;
+        const line = computedLines[index];
+        const newCents = toCents(line.lineTotal) - discCents;
+        // ราคาป้าย = ราคาก่อนลด (ต่อหน่วย) · line_total คือค่าจริงที่ SUM ต้องตรง
+        line.listUnitPrice = line.listUnitPrice ?? line.unitSellPrice;
+        line.lineTotal = centsToDecimalString(newCents);
+        line.unitSellPrice = centsToDecimalString(Math.floor(newCents / line.qty));
+        line.discountSource = "coupon";
+      }
+      campaignApplied = {
+        campaignId: campaign.id,
+        campaignName: campaign.name,
+        couponCode: campaign.code,
+        discountAmount: evaluation.discountAmount,
+        subtotalBefore,
+        usageLimitPerCustomer: campaign.usageLimitPerCustomer,
+        memberId: campaignMemberId,
+      };
+    }
 
     // ค่าบริการเพิ่ม (เช่น ค่าส่งเดลิเวอรี่) — เก็บเป็นบรรทัดในบิลที่ไม่มี product_id
     // เพื่อให้ SUM(bill_items.line_total) = total_amount = journal เสมอ
@@ -599,6 +696,22 @@ export async function closePosBill(
       if (!rowCount) throw new PosOrderLinkFailedError();
     }
 
+    // Campaign usage — transaction เดียวกับบิล: บิลล้ม usage หาย, usage ล้ม บิลไม่เกิด
+    // atomic UPDATE ข้างในคือคนบังคับ usage limit จริง (pre-check ของ engine แพ้ race ได้)
+    if (campaignApplied) {
+      await recordCampaignUsage(client, userId, {
+        campaignId: campaignApplied.campaignId,
+        billId: mappedBill.id,
+        billNo: mappedBill.billNo,
+        memberId: campaignApplied.memberId,
+        couponCode: campaignApplied.couponCode,
+        discountAmount: campaignApplied.discountAmount,
+        orderSubtotal: campaignApplied.subtotalBefore,
+        orderTotal: mappedBill.totalAmount,
+        usageLimitPerCustomer: campaignApplied.usageLimitPerCustomer,
+      });
+    }
+
     /**
      * สมาชิก + แต้ม (0068) — ใน transaction เดียวกับบิล
      *
@@ -612,8 +725,8 @@ export async function closePosBill(
     let pointsEarned = 0;
     let memberPoints: number | undefined;
     try {
-      let memberId: string | null = null;
-      if (input.memberPhone) {
+      let memberId: string | null = campaignApplied?.memberId ?? null;
+      if (!memberId && input.memberPhone) {
         const member = await upsertPosMember(
           userId,
           { phone: input.memberPhone, name: input.memberName ?? null },
@@ -657,6 +770,13 @@ export async function closePosBill(
       negativeStockProductIds,
       pointsEarned,
       memberPoints,
+      campaign: campaignApplied
+        ? {
+            name: campaignApplied.campaignName,
+            discountAmount: campaignApplied.discountAmount,
+            subtotalBefore: campaignApplied.subtotalBefore,
+          }
+        : undefined,
     };
   } catch (err) {
     await client.query("ROLLBACK");

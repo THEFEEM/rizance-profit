@@ -5,6 +5,7 @@ import { listPosBillsByDate } from "@/lib/pos-bill-queries";
 import {
   PosEmptyCartError,
   PosOrderLinkFailedError,
+  PosCampaignRejectedError,
   PosPaymentMismatchError,
   PosProductNotFoundError,
   closePosBill,
@@ -78,6 +79,13 @@ export async function POST(req: NextRequest) {
     }
     if (err instanceof PosInvalidModifierError) {
       return posErrorResponse("invalid_modifier", 400);
+    }
+    if (err instanceof PosCampaignRejectedError) {
+      // reason เป็น machine code — POS แปลเป็นข้อความไทยเอง
+      return NextResponse.json(
+        { error: "campaign_rejected", data: { reason: err.reason } },
+        { status: 409 },
+      );
     }
     if (err instanceof PosPaymentMismatchError) {
       return posErrorResponse("payment_mismatch", 400);

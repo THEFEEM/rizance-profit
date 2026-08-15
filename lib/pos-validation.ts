@@ -58,6 +58,11 @@ export const closePosBillSchema = z
       .optional(),
     /** ผูกบิลเข้าออเดอร์ใน transaction เดียว (กันบิลกำพร้า) */
     linkOrderId: z.string().uuid().optional(),
+    /** Campaign (0074) — server คำนวณส่วนลดเองทั้งหมด client บอกได้แค่ "ใบไหน" */
+    campaignId: z.string().uuid().optional(),
+    couponCode: z
+      .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(40))
+      .optional(),
     /** เบอร์สมาชิกสะสมแต้ม (ไม่บังคับ) — แต้มไม่ใช่เงิน ไม่กระทบยอดบิล */
     memberPhone: z.preprocess(
       (v) => (typeof v === "string" ? v.trim() : v),
