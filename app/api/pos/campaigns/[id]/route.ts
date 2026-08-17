@@ -11,7 +11,7 @@ import {
   updatePosCampaign,
 } from "@/lib/pos-campaign-queries";
 import { displayStatus } from "@/lib/pos-campaign-engine";
-import { campaignBaseSchema } from "../route";
+import { campaignBaseSchema } from "@/lib/pos-campaign-schema";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

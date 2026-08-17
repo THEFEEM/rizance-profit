@@ -8,7 +8,7 @@ import { pool } from "@/lib/db";
  * QR ต่อโต๊ะ = /m/<menuToken>?t=<code> (สร้างฝั่ง POS จาก token ที่มีอยู่)
  */
 
-export type PosTableRow = {
+type PosTableRow = {
   id: string;
   code: string;
   label: string;
