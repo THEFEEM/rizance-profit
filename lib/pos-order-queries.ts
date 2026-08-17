@@ -64,7 +64,9 @@ export type PosOrder = {
   slipVerifiedAt: string | null;
   slipRejectedReason: string | null;
   /** pickup = มารับที่ร้าน · delivery = ส่งถึงบ้าน */
-  orderType: "pickup" | "delivery";
+  orderType: "pickup" | "delivery" | "dine_in";
+  /** โต๊ะ (0075) — snapshot code เช่น T01 · null = ไม่ใช่ dine-in */
+  tableCode: string | null;
   deliveryAddress: string | null;
   deliveryNote: string | null;
   /** พิกัดที่ลูกค้าแชร์มา (ถ้ามี) — ใช้นำทางแทนที่อยู่ตัวอักษร */
@@ -162,6 +164,7 @@ type OrderRow = {
   slip_verified_at: Date | string | null;
   slip_rejected_reason: string | null;
   order_type: string;
+  table_code: string | null;
   delivery_address: string | null;
   delivery_note: string | null;
   delivery_lat: string | null;
@@ -178,7 +181,7 @@ type OrderRow = {
 const ORDER_RETURN = `id, order_no, status, channel, customer_name, customer_phone, note,
   pickup_at_text, total_amount::text AS total_amount, bill_id, cancel_reason, created_at,
   payment_intent, slip_url, slip_uploaded_at, slip_verified_at, slip_rejected_reason,
-  order_type, delivery_address, delivery_note,
+  order_type, table_code, delivery_address, delivery_note,
   delivery_lat::text AS delivery_lat, delivery_lng::text AS delivery_lng,
   delivery_accuracy_m::text AS delivery_accuracy_m,
   delivery_fee::text AS delivery_fee,
@@ -212,6 +215,7 @@ function mapOrder(r: OrderRow, items: PosOrderItem[]): PosOrder {
     slipVerifiedAt: toIsoOrNull(r.slip_verified_at),
     slipRejectedReason: r.slip_rejected_reason,
     orderType: (r.order_type as PosOrder["orderType"]) ?? "pickup",
+    tableCode: r.table_code ?? null,
     deliveryAddress: r.delivery_address,
     deliveryNote: r.delivery_note,
     deliveryLat: r.delivery_lat,
@@ -337,7 +341,8 @@ export type CreatePublicOrderInput = {
   /** ลูกค้าเลือกจะโอนก่อนหรือจ่ายที่ร้าน */
   paymentIntent?: "at_shop" | "prepaid_transfer";
   /** pickup = มารับเอง · delivery = ให้ไปส่ง (ต้องมีที่อยู่) */
-  orderType?: "pickup" | "delivery";
+  orderType?: "pickup" | "delivery" | "dine_in";
+  tableCode?: string;
   deliveryAddress?: string;
   deliveryNote?: string;
   deliveryLat?: number;
@@ -349,6 +354,14 @@ export type CreatePublicOrderInput = {
 };
 
 /** Create a pre-order — prices resolved server-side, snapshot into order rows. */
+/** โต๊ะไม่ถูกต้อง/ปิดใช้งาน (0075) */
+export class PosTableInvalidError extends Error {
+  constructor() {
+    super("invalid_table");
+    this.name = "PosTableInvalidError";
+  }
+}
+
 export async function createPublicOrder(
   userId: string,
   input: CreatePublicOrderInput,
@@ -455,6 +468,20 @@ export async function createPublicOrder(
 
     if (computed.length === 0) throw new PosOrderProductError();
 
+    // โต๊ะ (0075): dine_in ต้องมาจากโต๊ะจริงที่เปิดใช้ — ?t= ใน URL เชื่อไม่ได้
+    let tableCode: string | null = null;
+    let tableLabel: string | null = null;
+    if (input.orderType === "dine_in") {
+      const { rows: tbl } = await client.query<{ code: string; label: string }>(
+        `SELECT code, label FROM pos_tables
+         WHERE user_id = $1 AND upper(code) = upper($2) AND is_active = true`,
+        [userId, input.tableCode ?? ""],
+      );
+      if (!tbl[0]) throw new PosTableInvalidError();
+      tableCode = tbl[0].code;
+      tableLabel = tbl[0].label;
+    }
+
     const itemsTotal = sumDecimals(...computed.map((c) => c.lineTotal));
 
     // เดลิเวอรี่: อ่านค่าส่ง/ยอดขั้นต่ำจากตั้งค่าร้าน (ไม่เชื่อ client)
@@ -488,9 +515,9 @@ export async function createPublicOrder(
     const { rows: orderRows } = await client.query<{ id: string; access_token: string }>(
       `INSERT INTO pos_orders
          (user_id, order_no, customer_name, customer_phone, note, pickup_at_text,
-          total_amount, payment_intent, order_type, delivery_address, delivery_note,
+          total_amount, payment_intent, order_type, table_code, delivery_address, delivery_note,
           delivery_fee, delivery_lat, delivery_lng, delivery_accuracy_m)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
        RETURNING id, access_token`,
       [
         userId,
@@ -502,6 +529,7 @@ export async function createPublicOrder(
         totalAmount,
         input.paymentIntent ?? "at_shop",
         input.orderType ?? "pickup",
+        tableCode,
         input.deliveryAddress?.trim() || null,
         input.deliveryNote?.trim() || null,
         deliveryFee,
@@ -581,7 +609,7 @@ export async function createPublicOrder(
       .then((m) =>
         m.pushStaff(userId, {
           title: `🔔 ออเดอร์ใหม่ · ${orderNo}`,
-          body: `${input.customerName?.trim() || "ลูกค้า QR"} · ฿${totalAmount}${input.orderType === "delivery" ? " · เดลิเวอรี่ 🛵" : ""}`,
+          body: `${input.customerName?.trim() || "ลูกค้า QR"} · ฿${totalAmount}${input.orderType === "delivery" ? " · เดลิเวอรี่ 🛵" : ""}${tableLabel ? ` · ${tableLabel} 🍽️` : ""}`,
           tag: `new-order-${orderRows[0].id}`,
         }),
       )
@@ -1013,7 +1041,7 @@ export async function getOrderByAccessToken(
             o.pickup_at_text, o.total_amount::text AS total_amount, o.bill_id,
             o.cancel_reason, o.created_at, o.payment_intent, o.slip_url,
             o.slip_uploaded_at, o.slip_verified_at, o.slip_rejected_reason,
-            o.order_type, o.delivery_address, o.delivery_note,
+            o.order_type, o.table_code, o.delivery_address, o.delivery_note,
             o.delivery_lat::text AS delivery_lat, o.delivery_lng::text AS delivery_lng,
             o.delivery_accuracy_m::text AS delivery_accuracy_m,
             o.delivery_fee::text AS delivery_fee,

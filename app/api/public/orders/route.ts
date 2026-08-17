@@ -4,6 +4,7 @@ import {
   PosDeliveryMinOrderError,
   PosDeliveryUnavailableError,
   PosOrderProductError,
+  PosTableInvalidError,
   createPublicOrder,
   getShopByMenuToken,
 } from "@/lib/pos-order-queries";
@@ -43,6 +44,9 @@ export async function POST(req: NextRequest) {
     const result = await createPublicOrder(shop.userId, input);
     return NextResponse.json({ data: result }, { status: 201 });
   } catch (err) {
+    if (err instanceof PosTableInvalidError) {
+      return NextResponse.json({ error: "invalid_table" }, { status: 400 });
+    }
     if (err instanceof PosDeliveryUnavailableError) {
       return NextResponse.json({ error: "delivery_unavailable" }, { status: 400 });
     }

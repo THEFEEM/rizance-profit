@@ -374,7 +374,11 @@ export const publicOrderSchema = z.object({
   /** ลูกค้าเลือกโอนก่อน หรือจ่ายที่ร้าน (default at_shop) */
   paymentIntent: z.enum(["at_shop", "prepaid_transfer"]).optional(),
   /** pickup = มารับเอง · delivery = ให้ไปส่ง */
-  orderType: z.enum(["pickup", "delivery"]).optional(),
+  orderType: z.enum(["pickup", "delivery", "dine_in"]).optional(),
+  /** โต๊ะ (0075) — บังคับเมื่อ dine_in · server ตรวจว่าเป็นโต๊ะจริงที่เปิดใช้ */
+  tableCode: z
+    .preprocess((v) => (typeof v === "string" ? v.trim().toUpperCase() : v), z.string().min(1).max(10))
+    .optional(),
   deliveryAddress: z
     .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(3).max(300))
     .optional(),
