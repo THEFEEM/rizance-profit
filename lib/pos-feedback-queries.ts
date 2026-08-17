@@ -314,8 +314,8 @@ async function insertFeedback(
        user_id, member_id, order_id, bill_id, kind, topic,
        rating_overall, rating_taste, rating_portion, rating_value,
        rating_service, rating_clean, rating_speed,
-       comment, contact_phone, business_date, points_awarded
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::date,$17)
+       comment, contact_phone, business_date, points_awarded, source
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::date,$17,$18)
      RETURNING id`,
     [
       userId,
