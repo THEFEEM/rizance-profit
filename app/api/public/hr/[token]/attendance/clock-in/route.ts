@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { AlreadyWorkingError, staffClockIn } from "@/lib/hr-attendance-queries";
+import {
+  AlreadyWorkingError,
+  NoShiftError,
+  staffClockIn,
+} from "@/lib/hr-attendance-queries";
 import { authRateLimitExceeded, clientIp } from "@/lib/rate-limit";
 
 /**
@@ -27,6 +31,10 @@ export async function POST(
     if (err instanceof AlreadyWorkingError) {
       // กดซ้ำ/กด 2 เครื่อง — DB กันไว้ (idx_attendance_open_once)
       return NextResponse.json({ error: "already_working" }, { status: 409 });
+    }
+    if (err instanceof NoShiftError) {
+      // ร้านปิด walk-in และวันนี้ไม่มีกะ (allow_unscheduled_clock_in = false)
+      return NextResponse.json({ error: "no_shift" }, { status: 409 });
     }
     throw err;
   }

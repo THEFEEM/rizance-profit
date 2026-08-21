@@ -58,6 +58,58 @@ export const attendanceFilterSchema = z.object({
   status: z.enum(["working", "completed", "adjusted", "cancelled"]).optional(),
 });
 
+// ── Shifts (Phase 3) ──────────────────────────────────────────
+
+const minuteOfDay = z.number().int().min(0).max(1439);
+
+export const shiftTemplateCreateSchema = z.object({
+  name: z.string().trim().min(1).max(60),
+  startMin: minuteOfDay,
+  endMin: minuteOfDay,
+  breakMinutes: z.number().int().min(0).max(480).optional(),
+  branchId: z.string().uuid().nullish().transform((v) => v ?? null),
+});
+
+export const shiftTemplatePatchSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().trim().min(1).max(60).optional(),
+  startMin: minuteOfDay.optional(),
+  endMin: minuteOfDay.optional(),
+  breakMinutes: z.number().int().min(0).max(480).optional(),
+  isActive: z.boolean().optional(),
+});
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export const shiftCreateSchema = z.union([
+  // คัดลอกตาราง — day (1 วัน) / week (7 วัน)
+  z.object({
+    action: z.enum(["copy_day", "copy_week"]),
+    from: z.string().regex(DATE_RE),
+    to: z.string().regex(DATE_RE),
+  }),
+  z.object({
+    employeeId: z.string().uuid(),
+    businessDate: z.string().regex(DATE_RE),
+    startMin: minuteOfDay,
+    endMin: minuteOfDay,
+    breakMinutes: z.number().int().min(0).max(480).optional(),
+    branchId: z.string().uuid().nullish().transform((v) => v ?? null),
+    templateId: z.string().uuid().nullish().transform((v) => v ?? null),
+    note: z.string().trim().max(255).nullish().transform((v) => v || null),
+  }),
+]);
+
+export const shiftPatchSchema = z.object({
+  employeeId: z.string().uuid().optional(),
+  businessDate: z.string().regex(DATE_RE).optional(),
+  startMin: minuteOfDay.optional(),
+  endMin: minuteOfDay.optional(),
+  breakMinutes: z.number().int().min(0).max(480).optional(),
+  note: z.string().trim().max(255).nullish().transform((v) => (v === undefined ? undefined : v || null)),
+  status: z.enum(["scheduled", "working", "completed", "absent", "cancelled"]).optional(),
+});
+
 export const branchCreateSchema = z.object({
   name: z.string().trim().min(1).max(120),
 });
