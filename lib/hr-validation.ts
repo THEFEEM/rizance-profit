@@ -110,6 +110,31 @@ export const shiftPatchSchema = z.object({
   status: z.enum(["scheduled", "working", "completed", "absent", "cancelled"]).optional(),
 });
 
+// ── Payroll (Phase 4) ─────────────────────────────────────────
+
+export const payrollCreateSchema = z.object({
+  periodStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  periodEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
+/** action-based ทั้งหมด — client ไม่มีทางส่งตัวเลขเงินตรง ๆ ยกเว้น bonus/deduction ที่มีเหตุผลกำกับ */
+export const payrollPatchSchema = z.union([
+  z.object({
+    action: z.enum(["submit_review", "back_to_draft", "cancel", "regenerate", "approve"]),
+  }),
+  z.object({
+    action: z.literal("add_line"),
+    itemId: z.string().uuid(),
+    kind: z.enum(["bonus", "deduction"]),
+    amount: z.number().positive().max(1_000_000),
+    reason: z.string().trim().min(1).max(255),
+  }),
+  z.object({
+    action: z.literal("remove_line"),
+    lineId: z.string().uuid(),
+  }),
+]);
+
 export const branchCreateSchema = z.object({
   name: z.string().trim().min(1).max(120),
 });
