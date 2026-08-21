@@ -29,6 +29,35 @@ export const employeePatchSchema = z.union([
   employeeBaseSchema.partial(),
 ]);
 
+/**
+ * ปรับเวลา attendance (owner) — reason บังคับเสมอ (ห้ามแก้เงียบ ๆ)
+ * เวลาที่ owner ส่งมาเป็นการแก้มือโดยเจตนา → ลง attendance_adjustments + audit
+ */
+export const attendanceAdjustSchema = z.union([
+  z.object({
+    cancel: z.literal(true),
+    reason: z.string().trim().min(1).max(255),
+    note: z.string().trim().max(255).nullish().transform((v) => v || null),
+  }),
+  z
+    .object({
+      clockInAt: z.string().datetime({ offset: true }).optional(),
+      clockOutAt: z.string().datetime({ offset: true }).nullable().optional(),
+      reason: z.string().trim().min(1).max(255),
+      note: z.string().trim().max(255).nullish().transform((v) => v || null),
+    })
+    .refine((v) => v.clockInAt !== undefined || v.clockOutAt !== undefined, {
+      message: "nothing_to_adjust",
+    }),
+]);
+
+export const attendanceFilterSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  employeeId: z.string().uuid().optional(),
+  branchId: z.string().uuid().optional(),
+  status: z.enum(["working", "completed", "adjusted", "cancelled"]).optional(),
+});
+
 export const branchCreateSchema = z.object({
   name: z.string().trim().min(1).max(120),
 });
