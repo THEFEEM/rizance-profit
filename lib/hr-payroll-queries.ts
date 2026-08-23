@@ -213,6 +213,69 @@ export function calcItems(rows: CalcRow[], otMultiplier: number): CalcItem[] {
   });
 }
 
+/**
+ * โหมดเงินกองกลาง (0083): items มาจาก daily_allocations แทนรายชั่วโมง
+ * โครงเดิมทั้งหมด (period · approve · expense · immutable · adjust) ใช้ต่อ
+ */
+async function calcItemsFromPool(
+  userId: string,
+  periodStart: string,
+  periodEnd: string,
+): Promise<CalcItem[]> {
+  const { summarizePeriod } = await import("@/lib/hr-daily-pool-queries");
+  const summary = await summarizePeriod(userId, periodStart, periodEnd);
+
+  return summary.perEmployee.map((e) => ({
+    employeeId: e.employeeId,
+    employeeName: e.employeeName,
+    // เก็บเป็น 'daily' — ค่าแรงคิดเป็นวัน ไม่ใช่ชั่วโมง (CHECK ของ 0080 รองรับ)
+    wageType: "daily" as const,
+    wageRateSnapshot:
+      e.daysWorked > 0
+        ? centsToDecimalString(Math.round(toCents(e.total) / e.daysWorked))
+        : "0.00",
+    regularMinutes: 0,
+    otMinutes: 0,
+    daysWorked: e.daysWorked,
+    regularCents: toCents(e.total),
+    otCents: 0,
+    breakdown: Object.entries(e.byDate).map(([date, amount]) => ({
+      date,
+      attendanceId: "",
+      regularMinutes: 0,
+      otMinutes: 0,
+      lateMinutes: null,
+      rate: amount,
+      regularAmount: amount,
+      otAmount: "0.00",
+    })),
+  }));
+}
+
+async function payrollModeOf(userId: string): Promise<"hourly" | "daily_pool"> {
+  const { rows } = await pool.query<{ payroll_mode: "hourly" | "daily_pool" }>(
+    `SELECT payroll_mode FROM hr_settings WHERE user_id = $1`,
+    [userId],
+  );
+  return rows[0]?.payroll_mode ?? "hourly";
+}
+
+/** ที่มาของตัวเลข — สลับตามโหมดของร้าน (จุดเดียว ใช้ทุกที่) */
+async function buildItems(
+  userId: string,
+  periodStart: string,
+  periodEnd: string,
+): Promise<CalcItem[]> {
+  if ((await payrollModeOf(userId)) === "daily_pool") {
+    return calcItemsFromPool(userId, periodStart, periodEnd);
+  }
+  const [rows, ot] = await Promise.all([
+    fetchCalcRows(userId, periodStart, periodEnd),
+    otMultiplierOf(userId),
+  ]);
+  return calcItems(rows, ot);
+}
+
 async function otMultiplierOf(userId: string): Promise<number> {
   const { rows } = await pool.query<{ ot_multiplier: string }>(
     `SELECT ot_multiplier::text FROM hr_settings WHERE user_id = $1`,
@@ -237,12 +300,9 @@ export async function previewPayroll(
   periodStart: string,
   periodEnd: string,
 ): Promise<{ items: Omit<PayrollItem, "id" | "adjustLines" | "bonusAmount" | "deductionAmount" | "grossAmount" | "netPay">[] }> {
-  const [rows, ot] = await Promise.all([
-    fetchCalcRows(userId, periodStart, periodEnd),
-    otMultiplierOf(userId),
-  ]);
+  const built = await buildItems(userId, periodStart, periodEnd);
   return {
-    items: calcItems(rows, ot).map((it) => ({
+    items: built.map((it) => ({
       employeeId: it.employeeId,
       employeeName: it.employeeName,
       wageType: it.wageType,
@@ -335,11 +395,7 @@ export async function createPayrollPeriod(
   periodStart: string,
   periodEnd: string,
 ): Promise<PayrollDetail> {
-  const [rows, ot] = await Promise.all([
-    fetchCalcRows(userId, periodStart, periodEnd),
-    otMultiplierOf(userId),
-  ]);
-  const items = calcItems(rows, ot);
+  const items = await buildItems(userId, periodStart, periodEnd);
 
   const client = await pool.connect();
   try {
@@ -530,14 +586,11 @@ export async function regeneratePayroll(userId: string, periodId: string): Promi
      FROM payroll_periods WHERE user_id = $1 AND id = $2`,
     [userId, periodId],
   );
-  const [calcRows, ot] = await Promise.all([
-    fetchCalcRows(userId, rows[0].period_start, rows[0].period_end),
-    otMultiplierOf(userId),
-  ]);
+  const items = await buildItems(userId, rows[0].period_start, rows[0].period_end);
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    await writeItems(client, userId, periodId, calcItems(calcRows, ot), true);
+    await writeItems(client, userId, periodId, items, true);
     await client.query("COMMIT");
   } catch (err) {
     await client.query("ROLLBACK");
@@ -687,12 +740,14 @@ export async function approvePayroll(
     }
     if (p.status !== "review") throw new PayrollStateError(p.status, "approve");
 
-    // recalc สดจาก attendance — เวลา/อัตราที่เปลี่ยนหลัง review ถูกสะท้อนเสมอ
-    const [calcRows, ot] = await Promise.all([
-      fetchCalcRows(userId, p.period_start, p.period_end),
-      otMultiplierOf(userId),
-    ]);
-    await writeItems(client, userId, periodId, calcItems(calcRows, ot), true);
+    // recalc สดจากต้นทางจริง — เวลา/อัตรา/allocation ที่เปลี่ยนหลัง review สะท้อนเสมอ
+    await writeItems(
+      client,
+      userId,
+      periodId,
+      await buildItems(userId, p.period_start, p.period_end),
+      true,
+    );
 
     // invariant ชั้น server (DB CHECK ยันรายแถวอยู่แล้ว)
     const { rows: sums } = await client.query<{ item_sum: string; total: string }>(

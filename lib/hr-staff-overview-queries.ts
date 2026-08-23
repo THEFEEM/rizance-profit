@@ -54,6 +54,15 @@ export type StaffOverview = {
   /** 0082: ความคืบหน้า checklist วันนี้ (done/total ต่อช่วง) */
   checklist: { phase: "opening" | "during" | "closing"; done: number; total: number }[];
 
+  /**
+   * 0083: โหมดจ่ายเงินของร้าน
+   * daily_pool → ตัวเลขคือ "เงินที่ได้รับ" จากการแบ่งเงินกองกลาง (ไม่ใช่รายชั่วโมง)
+   * พนักงานไม่เห็นยอดกองกลางและไม่เห็นของคนอื่น
+   */
+  payrollMode: "hourly" | "daily_pool";
+  /** เงินที่ได้รับวันนี้ (โหมด pool) — null เมื่อยังไม่เข้าเกณฑ์/โหมดรายชั่วโมง */
+  todayAllocation: string | null;
+
   todayShift: {
     startMin: number;
     endMin: number;
@@ -352,6 +361,23 @@ export async function getStaffOverview(token: string): Promise<StaffOverview | n
     ),
   ]);
 
+  // 0083: โหมดเงินกองกลาง — ยอดของ "ตัวเอง" เท่านั้น
+  const { getPoolSettings, computeDay, employeePeriodPool } = await import(
+    "@/lib/hr-daily-pool-queries"
+  );
+  const poolSettings = await getPoolSettings(emp.user_id);
+  let todayAllocation: string | null = null;
+  let poolPeriod: { total: string; daysWorked: number } | null = null;
+  if (poolSettings.payrollMode === "daily_pool") {
+    const [day, mine] = await Promise.all([
+      computeDay(emp.user_id, bizDate),
+      employeePeriodPool(emp.id, emp.user_id, period.start, period.end),
+    ]);
+    todayAllocation =
+      day.rows.find((r) => r.employeeId === emp.id)?.allocation ?? "0.00";
+    poolPeriod = { total: mine.total, daysWorked: mine.daysWorked };
+  }
+
   // 0082: ประกาศ + checklist วันนี้
   const [{ rows: annRows }, checklistRows] = await Promise.all([
     pool.query<{ id: string; body: string; created_at: string }>(
@@ -405,6 +431,8 @@ export async function getStaffOverview(token: string): Promise<StaffOverview | n
       id: a.id, body: a.body, createdAt: a.created_at,
     })),
     checklist: checklistRows,
+    payrollMode: poolSettings.payrollMode,
+    todayAllocation,
     todayShift: shiftRows[0]
       ? {
           startMin: shiftRows[0].start_min,
@@ -431,8 +459,11 @@ export async function getStaffOverview(token: string): Promise<StaffOverview | n
       end: period.end,
       minutes: periodSum.minutes,
       otMinutes: periodSum.ot_minutes,
-      shifts: periodSum.days,
-      estimatedPay: centsToDecimalString(periodSum.pay_cents),
+      // โหมด pool: นับ "วันที่ได้เงิน" แทนจำนวนกะที่มีเวลา
+      shifts: poolPeriod ? poolPeriod.daysWorked : periodSum.days,
+      estimatedPay: poolPeriod
+        ? poolPeriod.total
+        : centsToDecimalString(periodSum.pay_cents),
       avgHourlyRate:
         periodHours > 0 && emp.wage_type === "hourly"
           ? centsToDecimalString(Math.round(periodSum.pay_cents / periodHours))
