@@ -43,7 +43,16 @@ export type StaffOverview = {
     earnedSoFar: string | null;
     /** อัตราต่อชั่วโมงที่ใช้คิดตอนนี้ */
     hourlyRate: string | null;
+    /** 0082: กำลังพักอยู่ตั้งแต่เมื่อไหร่ (null = ไม่ได้พัก) — บันทึกอย่างเดียว ไม่หักเงิน */
+    breakStartedAt: string | null;
+    breakMinutes: number;
   } | null;
+
+  /** 0082: ประกาศจากร้าน (เฉพาะที่เปิดอยู่) */
+  announcements: { id: string; body: string; createdAt: string }[];
+
+  /** 0082: ความคืบหน้า checklist วันนี้ (done/total ต่อช่วง) */
+  checklist: { phase: "opening" | "during" | "closing"; done: number; total: number }[];
 
   todayShift: {
     startMin: number;
@@ -77,7 +86,14 @@ export type StaffOverview = {
 
   /** ของที่พนักงานต้องจัดการเอง/รู้ไว้ */
   todo: {
-    kind: "missing_clock_out" | "adjusted_by_shop" | "leave_pending" | "leave_rejected";
+    kind:
+      | "missing_clock_out"
+      | "adjusted_by_shop"
+      | "leave_pending"
+      | "leave_rejected"
+      | "correction_pending"
+      | "correction_rejected"
+      | "checklist_incomplete";
     businessDate: string;
     detail: string | null;
   }[];
@@ -248,8 +264,12 @@ export async function getStaffOverview(token: string): Promise<StaffOverview | n
     { rows: paidRows },
     { rows: todoRows },
   ] = await Promise.all([
-    pool.query<{ clock_in_at: string; late_minutes: number | null; rate: string }>(
+    pool.query<{
+      clock_in_at: string; late_minutes: number | null; rate: string;
+      break_started_at: string | null; break_minutes: number;
+    }>(
       `SELECT a.clock_in_at::text AS clock_in_at, a.late_minutes,
+              a.break_started_at::text AS break_started_at, a.break_minutes,
               COALESCE(wh.wage_rate, e.wage_rate)::text AS rate
        FROM attendance a
        JOIN employees e ON e.id = a.employee_id
@@ -318,9 +338,31 @@ export async function getStaffOverview(token: string): Promise<StaffOverview | n
        SELECT 'leave_rejected', start_date::text, review_note
        FROM leave_requests WHERE employee_id = $1 AND status = 'rejected'
          AND reviewed_at > now() - interval '7 days'
+       UNION ALL
+       SELECT 'correction_pending', business_date::text, note
+       FROM attendance_correction_requests
+       WHERE employee_id = $1 AND status = 'pending'
+       UNION ALL
+       SELECT 'correction_rejected', business_date::text, review_note
+       FROM attendance_correction_requests
+       WHERE employee_id = $1 AND status = 'rejected'
+         AND reviewed_at > now() - interval '7 days'
        ORDER BY business_date DESC LIMIT 10`,
       [emp.id, bizDate],
     ),
+  ]);
+
+  // 0082: ประกาศ + checklist วันนี้
+  const [{ rows: annRows }, checklistRows] = await Promise.all([
+    pool.query<{ id: string; body: string; created_at: string }>(
+      `SELECT id, body, created_at::text AS created_at FROM shop_announcements
+       WHERE user_id = $1 AND is_active ORDER BY created_at DESC LIMIT 3`,
+      [emp.user_id],
+    ),
+    (async () => {
+      const { checklistSummary } = await import("@/lib/hr-ops-queries");
+      return checklistSummary(emp.user_id, bizDate);
+    })(),
   ]);
 
   // เงินที่ได้แล้วของกะที่กำลังทำอยู่ (hourly เท่านั้น — daily/monthly ไม่เดินตามวินาที)
@@ -339,6 +381,8 @@ export async function getStaffOverview(token: string): Promise<StaffOverview | n
           ? centsToDecimalString(Math.round((minutes * rateCents) / 60))
           : null,
       hourlyRate: emp.wage_type === "hourly" ? activeRows[0].rate : null,
+      breakStartedAt: activeRows[0].break_started_at,
+      breakMinutes: activeRows[0].break_minutes,
     };
   }
 
@@ -357,6 +401,10 @@ export async function getStaffOverview(token: string): Promise<StaffOverview | n
     serverTime: new Date().toISOString(),
     businessDate: bizDate,
     active,
+    announcements: annRows.map((a) => ({
+      id: a.id, body: a.body, createdAt: a.created_at,
+    })),
+    checklist: checklistRows,
     todayShift: shiftRows[0]
       ? {
           startMin: shiftRows[0].start_min,
