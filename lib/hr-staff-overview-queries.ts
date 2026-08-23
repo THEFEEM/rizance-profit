@@ -62,6 +62,10 @@ export type StaffOverview = {
   payrollMode: "hourly" | "daily_pool";
   /** เงินที่ได้รับวันนี้ (โหมด pool) — null เมื่อยังไม่เข้าเกณฑ์/โหมดรายชั่วโมง */
   todayAllocation: string | null;
+  /** รายวันของงวดนี้ (โหมด pool) — ของตัวเองเท่านั้น ไม่มียอดกองกลาง */
+  periodDays: { businessDate: string; amount: string }[];
+  /** สุขภาพเวลาทำงานของฉัน — บอกว่ามีอะไรต้องแก้ ไม่ใช่ระบบจับผิด */
+  health: { clockOutMissing: number; adjusted: number; pendingRequests: number };
 
   todayShift: {
     startMin: number;
@@ -368,6 +372,7 @@ export async function getStaffOverview(token: string): Promise<StaffOverview | n
   const poolSettings = await getPoolSettings(emp.user_id);
   let todayAllocation: string | null = null;
   let poolPeriod: { total: string; daysWorked: number } | null = null;
+  let periodDays: { businessDate: string; amount: string }[] = [];
   if (poolSettings.payrollMode === "daily_pool") {
     const [day, mine] = await Promise.all([
       computeDay(emp.user_id, bizDate),
@@ -376,6 +381,10 @@ export async function getStaffOverview(token: string): Promise<StaffOverview | n
     todayAllocation =
       day.rows.find((r) => r.employeeId === emp.id)?.allocation ?? "0.00";
     poolPeriod = { total: mine.total, daysWorked: mine.daysWorked };
+    periodDays = mine.days.map((d) => ({
+      businessDate: d.businessDate,
+      amount: d.allocation,
+    }));
   }
 
   // 0082: ประกาศ + checklist วันนี้
@@ -433,6 +442,14 @@ export async function getStaffOverview(token: string): Promise<StaffOverview | n
     checklist: checklistRows,
     payrollMode: poolSettings.payrollMode,
     todayAllocation,
+    periodDays,
+    health: {
+      clockOutMissing: todoRows.filter((t) => t.kind === "missing_clock_out").length,
+      adjusted: todoRows.filter((t) => t.kind === "adjusted_by_shop").length,
+      pendingRequests: todoRows.filter(
+        (t) => t.kind === "correction_pending" || t.kind === "leave_pending",
+      ).length,
+    },
     todayShift: shiftRows[0]
       ? {
           startMin: shiftRows[0].start_min,
