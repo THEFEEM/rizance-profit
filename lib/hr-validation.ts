@@ -135,6 +135,43 @@ export const payrollPatchSchema = z.union([
   }),
 ]);
 
+// ── Leave (Phase 5) ───────────────────────────────────────────
+
+const DATE_ONLY = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+export const leaveCreateSchema = z
+  .object({
+    // ประเภทลามาจาก hr_settings.leave_types — ไม่ hardcode รายชื่อที่นี่
+    leaveType: z.string().trim().min(1).max(20),
+    startDate: DATE_ONLY,
+    endDate: DATE_ONLY,
+    reason: z.string().trim().max(255).nullish().transform((v) => v || null),
+  })
+  .refine((v) => v.endDate >= v.startDate, { message: "bad_range" });
+
+/** owner สร้างใบลาแทนพนักงาน (โทรมาลา) — ต้องระบุตัวพนักงาน */
+export const leaveOwnerCreateSchema = z
+  .object({
+    employeeId: z.string().uuid(),
+    leaveType: z.string().trim().min(1).max(20),
+    startDate: DATE_ONLY,
+    endDate: DATE_ONLY,
+    reason: z.string().trim().max(255).nullish().transform((v) => v || null),
+  })
+  .refine((v) => v.endDate >= v.startDate, { message: "bad_range" });
+
+export const leaveReviewSchema = z.union([
+  z.object({
+    action: z.literal("approve"),
+    note: z.string().trim().max(255).nullish().transform((v) => v || null),
+  }),
+  z.object({
+    action: z.literal("reject"),
+    note: z.string().trim().min(1).max(255), // ปฏิเสธต้องมีเหตุผล
+  }),
+  z.object({ action: z.literal("cancel") }),
+]);
+
 export const branchCreateSchema = z.object({
   name: z.string().trim().min(1).max(120),
 });

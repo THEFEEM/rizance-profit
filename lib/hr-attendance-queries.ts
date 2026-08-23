@@ -27,7 +27,13 @@ export class NoShiftError extends Error {}
 
 // ── types ──────────────────────────────────────────────────────
 
-export type AttendanceStatus = "working" | "completed" | "adjusted" | "cancelled";
+/** 'leave' = แถวที่ระบบสร้างจากใบลาที่อนุมัติ (0081) — ไม่มีการกดเวลา */
+export type AttendanceStatus =
+  | "working"
+  | "completed"
+  | "adjusted"
+  | "cancelled"
+  | "leave";
 
 export type AttendanceRecord = {
   id: string;
