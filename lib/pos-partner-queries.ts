@@ -8,6 +8,8 @@ import {
   type PartnerEvaluation,
   type PartnerSettings,
 } from "@/lib/pos-partner-engine";
+import { resolveCartModifiers } from "@/lib/pos-modifier-queries";
+import { expandComboToLines } from "@/lib/pos-combo-queries";
 
 /**
  * หุ้นส่วน — ข้อมูล + ตั้งค่า + ตัวเชื่อมเข้า closePosBill (0086)
@@ -349,16 +351,38 @@ export async function partnerReport(
 
 // ═══ พรีวิวก่อนเก็บเงิน ═════════════════════════════════════════
 
-export type PartnerPreviewLine = { productId: string; qty: number };
+export type PartnerPreviewLine = {
+  productId: string;
+  qty: number;
+  /** ตัวเลือกเสริม — ราคาต่อหน่วยเปลี่ยนตามนี้ ต้องคิดให้ตรงกับตอนปิดบิล */
+  modifierIds?: string[];
+};
+
+export type PartnerPreviewItem = {
+  productId: string | null;
+  name: string;
+  qty: number;
+  regularTotal: string;
+  paidTotal: string;
+  discountAmount: string;
+  /** null = ได้ส่วนลด · มีค่า = บอกเหตุผลที่ไม่ได้ */
+  skipReason: string | null;
+};
 
 /**
- * คำนวณให้ดูก่อนกดเก็บเงิน — ใช้เส้นทางคำนวณเดียวกับตอนปิดบิลเป๊ะ
- * (ราคา/ต้นทุนอ่านจาก DB สด ไม่รับจาก client)
+ * คำนวณให้ดูก่อนกดเก็บเงิน
+ *
+ * ⚠️ ต้องได้ตัวเลข "เท่ากับ" ตอนปิดบิลเป๊ะ ไม่งั้นแคชเชียร์เห็นเลขหนึ่ง
+ *    ลูกค้าจ่ายอีกเลขหนึ่ง — จึงใช้ helper ตัวเดียวกับ closePosBill:
+ *      · resolveCartModifiers  (ราคาตัวเลือกเสริม)
+ *      · expandComboToLines    (การกระจายราคาคอมโบ)
+ *    ไม่คัดลอกสูตรมาเขียนซ้ำแม้แต่บรรทัดเดียว
  */
 export async function previewPartnerBenefit(
   userId: string,
   partnerId: string,
   items: PartnerPreviewLine[],
+  combos: { comboId: string; qty: number }[] = [],
 ): Promise<{
   partner: Partner;
   regularTotal: string;
@@ -366,6 +390,7 @@ export async function previewPartnerBenefit(
   discountAmount: string;
   costTotal: string;
   contribution: string;
+  items: PartnerPreviewItem[];
   skipped: { productId: string; reason: string }[];
 }> {
   const { rows: pr } = await pool.query<PartnerRow>(
@@ -375,44 +400,118 @@ export async function previewPartnerBenefit(
   if (!pr[0]) throw new PartnerNotFoundError();
   if (!pr[0].is_active) throw new PartnerInactiveError();
 
-  const ids = [...new Set(items.map((i) => i.productId))];
-  const { rows: prods } = await pool.query<{
-    id: string; sell_price: string; cost_price: string;
-  }>(
-    `SELECT id, sell_price::text AS sell_price, cost_price::text AS cost_price
-     FROM pos_products WHERE user_id = $1 AND id = ANY($2::uuid[])`,
-    [userId, ids],
-  );
-  const byId = new Map(prods.map((p) => [p.id, p]));
+  const client = await pool.connect();
+  try {
+    const ids = [...new Set(items.map((i) => i.productId))];
+    const { rows: prods } = await client.query<{
+      id: string; name: string; sell_price: string; cost_price: string;
+    }>(
+      `SELECT id, name, sell_price::text AS sell_price, cost_price::text AS cost_price
+       FROM pos_products WHERE user_id = $1 AND id = ANY($2::uuid[])`,
+      [userId, ids],
+    );
+    const byId = new Map(prods.map((p) => [p.id, p]));
 
-  const lines: PartnerEngineLine[] = [];
-  const indexToProduct = new Map<number, string>();
-  items.forEach((it, index) => {
-    const p = byId.get(it.productId);
-    if (!p) return;
-    indexToProduct.set(index, it.productId);
-    lines.push({
-      index,
-      lineTotalCents: toCents(p.sell_price) * it.qty,
-      lineCostCents: toCents(p.cost_price) * it.qty,
-      qty: it.qty,
-      alreadyDiscounted: false,
+    const modifiersByLine = await resolveCartModifiers(client, userId, items);
+
+    type Meta = { productId: string | null; name: string; qty: number; regularCents: number };
+    const lines: PartnerEngineLine[] = [];
+    const meta: Meta[] = [];
+
+    items.forEach((it, sortOrder) => {
+      const p = byId.get(it.productId);
+      if (!p) return;
+      const mods = modifiersByLine.get(sortOrder) ?? [];
+      const unitCents =
+        toCents(p.sell_price) + mods.reduce((s, m) => s + toCents(m.priceDelta), 0);
+      const lineTotalCents = lineCents(unitCents, it.qty);
+      const index = lines.length;
+      lines.push({
+        index,
+        lineTotalCents,
+        lineCostCents: lineCents(toCents(p.cost_price), it.qty),
+        qty: it.qty,
+        alreadyDiscounted: false,
+      });
+      meta.push({
+        productId: p.id,
+        name: mods.length > 0 ? `${p.name} +${mods.length} ตัวเลือก` : p.name,
+        qty: it.qty,
+        regularCents: lineTotalCents,
+      });
     });
-  });
 
-  const settings = await getPartnerSettings(userId);
-  const ev = evaluatePartnerBenefit(lines, settings);
+    // คอมโบ — ราคาลดอยู่แล้ว จึงไม่ได้สิทธิ์ซ้อน แต่ต้องนับรวมในยอดบิล
+    for (const c of combos) {
+      if (c.qty <= 0) continue;
+      const expanded = await expandComboToLines(client, userId, c.comboId, c.qty);
+      for (const comp of expanded.lines) {
+        const p = await productPriceOf(client, userId, comp.productId);
+        const total = toCents(comp.lineTotal);
+        const index = lines.length;
+        lines.push({
+          index,
+          lineTotalCents: total,
+          lineCostCents: lineCents(toCents(p?.cost_price ?? "0"), comp.quantity),
+          qty: comp.quantity,
+          alreadyDiscounted: true,
+        });
+        meta.push({
+          productId: comp.productId,
+          name: `${expanded.comboName} · ${p?.name ?? ""}`.trim(),
+          qty: comp.quantity,
+          regularCents: total,
+        });
+      }
+    }
 
-  return {
-    partner: mapPartner(pr[0]),
-    regularTotal: centsToDecimalString(ev.regularTotalCents),
-    paidTotal: centsToDecimalString(ev.paidTotalCents),
-    discountAmount: centsToDecimalString(ev.discountTotalCents),
-    costTotal: centsToDecimalString(ev.costTotalCents),
-    contribution: centsToDecimalString(ev.contributionCents),
-    skipped: ev.skipped.map((s) => ({
-      productId: indexToProduct.get(s.index) ?? "",
-      reason: s.reason,
-    })),
-  };
+    const settings = await getPartnerSettings(userId, client);
+    const ev = evaluatePartnerBenefit(lines, settings);
+    const byIndex = new Map(ev.lines.map((l) => [l.index, l]));
+
+    return {
+      partner: mapPartner(pr[0]),
+      regularTotal: centsToDecimalString(ev.regularTotalCents),
+      paidTotal: centsToDecimalString(ev.paidTotalCents),
+      discountAmount: centsToDecimalString(ev.discountTotalCents),
+      costTotal: centsToDecimalString(ev.costTotalCents),
+      contribution: centsToDecimalString(ev.contributionCents),
+      items: meta.map((m, i) => {
+        const r = byIndex.get(i);
+        return {
+          productId: m.productId,
+          name: m.name,
+          qty: m.qty,
+          regularTotal: centsToDecimalString(m.regularCents),
+          paidTotal: centsToDecimalString(r?.newLineTotalCents ?? m.regularCents),
+          discountAmount: centsToDecimalString(r?.discountCents ?? 0),
+          skipReason: r?.skipReason ?? null,
+        };
+      }),
+      skipped: ev.skipped.map((s) => ({
+        productId: meta[s.index]?.productId ?? "",
+        reason: s.reason,
+      })),
+    };
+  } finally {
+    client.release();
+  }
+}
+
+/** คูณจำนวนแบบสตางค์-safe — สูตรเดียวกับ lineMoney() ใน closePosBill */
+function lineCents(unitCents: number, qty: number): number {
+  return Math.round((unitCents * Math.round(qty * 1000)) / 1000);
+}
+
+async function productPriceOf(
+  client: PoolClient,
+  userId: string,
+  productId: string,
+): Promise<{ name: string; cost_price: string } | null> {
+  const { rows } = await client.query<{ name: string; cost_price: string }>(
+    `SELECT name, cost_price::text AS cost_price FROM pos_products
+     WHERE id = $2 AND user_id = $1`,
+    [userId, productId],
+  );
+  return rows[0] ?? null;
 }

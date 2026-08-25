@@ -20,9 +20,18 @@ import { z } from "zod";
 const bodySchema = z.object({
   partnerId: z.string().uuid(),
   items: z
-    .array(z.object({ productId: z.string().uuid(), qty: z.number().int().positive().max(999) }))
-    .min(1)
+    .array(
+      z.object({
+        productId: z.string().uuid(),
+        qty: z.number().int().positive().max(999),
+        modifierIds: z.array(z.string().uuid()).max(20).optional(),
+      }),
+    )
     .max(100),
+  combos: z
+    .array(z.object({ comboId: z.string().uuid(), qty: z.number().int().positive().max(99) }))
+    .max(20)
+    .optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -43,6 +52,7 @@ export async function POST(req: NextRequest) {
       userId,
       parsed.data.partnerId,
       parsed.data.items,
+      parsed.data.combos ?? [],
     );
     return NextResponse.json({ data: preview });
   } catch (err) {
