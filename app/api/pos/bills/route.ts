@@ -14,6 +14,12 @@ import {
   PosInvalidModifierError,
   PosModifierRuleError,
 } from "@/lib/pos-modifier-queries";
+import {
+  PartnerInactiveError,
+  PartnerMarginError,
+  PartnerNotFoundError,
+  PartnerStackingError,
+} from "@/lib/pos-partner-queries";
 import { today } from "@/lib/date";
 
 export async function GET(req: NextRequest) {
@@ -79,6 +85,20 @@ export async function POST(req: NextRequest) {
     }
     if (err instanceof PosInvalidModifierError) {
       return posErrorResponse("invalid_modifier", 400);
+    }
+    // ── สิทธิ์หุ้นส่วน (0086) — บอกเหตุผลตรง ๆ ไม่เงียบ ──
+    if (err instanceof PartnerNotFoundError) {
+      return posErrorResponse("partner_not_found", 404);
+    }
+    if (err instanceof PartnerInactiveError) {
+      return posErrorResponse("partner_inactive", 409);
+    }
+    if (err instanceof PartnerStackingError) {
+      return posErrorResponse("partner_stacking_not_allowed", 409);
+    }
+    // ไม่ควรเกิด — ตาข่ายกันบั๊กในเครื่องคิดเลข ยอมยกเลิกดีกว่าขาดทุน
+    if (err instanceof PartnerMarginError) {
+      return posErrorResponse("partner_margin_violation", 500);
     }
     if (err instanceof PosCampaignRejectedError) {
       // reason เป็น machine code — POS แปลเป็นข้อความไทยเอง

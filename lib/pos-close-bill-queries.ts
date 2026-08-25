@@ -8,6 +8,8 @@ import {
   validateCampaignForCart,
 } from "@/lib/pos-campaign-queries";
 import type { CampaignRejectReason, EngineLine } from "@/lib/pos-campaign-engine";
+import { applyPartnerBenefit, type PartnerApplied } from "@/lib/pos-partner-queries";
+import type { PartnerEngineLine } from "@/lib/pos-partner-engine";
 import { isPosPlanAllowed } from "@/lib/pos-config";
 import { resolveActivePlan } from "@/lib/subscription-plan";
 import { lockShopUser } from "@/lib/shop-profit-withdrawal-queries";
@@ -466,6 +468,47 @@ export async function closePosBill(
       };
     }
 
+    /**
+     * ═══ Partner Benefit (0086) ═══════════════════════════════════
+     *
+     * วางต่อจากแคมเปญด้วยเหตุผลเดียวกัน: หลังคอมโบกาง ก่อน surcharge
+     *   · ค่าส่งไม่ถูกลด
+     *   · ส่วนลดฝังในราคาบรรทัด → invariant Σ line_total = total เดิมยังจริง
+     *   · ไม่มี journal เพิ่ม (เป็นรายได้ที่ลดลง ไม่ใช่เงินจ่ายออก)
+     *
+     * client ส่งได้แค่ partnerId — ต้นทุน/ส่วนลด/กำไร คิดจาก DB สดทั้งหมด
+     */
+    let partnerApplied: PartnerApplied | null = null;
+
+    if (input.partnerId) {
+      const engineLines: PartnerEngineLine[] = computedLines.map((l, index) => ({
+        index,
+        lineTotalCents: toCents(l.lineTotal),
+        lineCostCents: toCents(l.lineCost),
+        qty: l.qty,
+        alreadyDiscounted: l.discountSource !== null,
+      }));
+
+      partnerApplied = await applyPartnerBenefit({
+        client,
+        userId,
+        partnerId: input.partnerId,
+        lines: engineLines,
+        // แคมเปญ/คูปองถูกใช้ไปแล้วในบิลนี้ = ห้ามซ้อนสิทธิ์หุ้นส่วน
+        hasOtherBillDiscount: campaignApplied !== null,
+      });
+
+      for (const [index, discCents] of partnerApplied.perLineDiscountCents) {
+        if (discCents <= 0) continue;
+        const line = computedLines[index];
+        const newCents = toCents(line.lineTotal) - discCents;
+        line.listUnitPrice = line.listUnitPrice ?? line.unitSellPrice;
+        line.lineTotal = centsToDecimalString(newCents);
+        line.unitSellPrice = centsToDecimalString(Math.floor(newCents / line.qty));
+        line.discountSource = "partner";
+      }
+    }
+
     // ค่าบริการเพิ่ม (เช่น ค่าส่งเดลิเวอรี่) — เก็บเป็นบรรทัดในบิลที่ไม่มี product_id
     // เพื่อให้ SUM(bill_items.line_total) = total_amount = journal เสมอ
     const surchargeLines = (input.surcharges ?? [])
@@ -498,12 +541,25 @@ export async function closePosBill(
     const billMethod = payments.length === 1 ? payments[0].method : "split";
 
     const { rows: billRows } = await client.query<BillRow>(
+      // snapshot หุ้นส่วนอยู่ใน INSERT เดียวกับบิล — อยู่ใน transaction เดียวกับ
+      // การชำระเงิน ต้นทุน/ชื่อ/ตั้งค่าที่เปลี่ยนทีหลังจึงไม่กระทบประวัติ
       `INSERT INTO pos_bills
-         (user_id, bill_no, status, total_amount, payment_method, entry_date)
-       VALUES ($1, $2, 'paid', $3, $4, $5::date)
+         (user_id, bill_no, status, total_amount, payment_method, entry_date,
+          partner_id, partner_name, partner_regular_total, partner_paid_total,
+          partner_discount_amount, partner_cost_total, partner_contribution)
+       VALUES ($1, $2, 'paid', $3, $4, $5::date, $6, $7, $8, $9, $10, $11, $12)
        RETURNING id, user_id, bill_no, status, total_amount::text, payment_method,
          entry_date::text, income_entry_id, created_at`,
-      [userId, billNo, totalAmount, billMethod, entryDate],
+      [
+        userId, billNo, totalAmount, billMethod, entryDate,
+        partnerApplied?.partnerId ?? null,
+        partnerApplied?.partnerName ?? null,
+        partnerApplied?.regularTotal ?? null,
+        partnerApplied?.paidTotal ?? null,
+        partnerApplied?.discountAmount ?? null,
+        partnerApplied?.costTotal ?? null,
+        partnerApplied?.contribution ?? null,
+      ],
     );
     const bill = billRows[0];
 

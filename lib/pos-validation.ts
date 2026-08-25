@@ -60,6 +60,12 @@ export const closePosBillSchema = z
     linkOrderId: z.string().uuid().optional(),
     /** Campaign (0074) — server คำนวณส่วนลดเองทั้งหมด client บอกได้แค่ "ใบไหน" */
     campaignId: z.string().uuid().optional(),
+    /**
+     * สิทธิ์หุ้นส่วน (0086) — client บอกได้แค่ "คนไหน"
+     * ส่วนลด/ต้นทุน/กำไร server คำนวณจาก DB สดเท่านั้น
+     * ถ้า client ส่ง field อื่นมา zod จะตัดทิ้งเงียบ ๆ (strip mode)
+     */
+    partnerId: z.string().uuid().optional(),
     couponCode: z
       .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(40))
       .optional(),

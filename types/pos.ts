@@ -105,6 +105,12 @@ export type ClosePosBillInput = {
    */
   campaignId?: string;
   couponCode?: string;
+  /**
+   * สิทธิ์หุ้นส่วน (0086) — client ส่งได้แค่ "คนไหน"
+   * ⚠️ ต้นทุน · ส่วนลด · กำไรที่เหลือ server คำนวณจาก DB สดทั้งหมด
+   *    ไม่มีทางที่ client จะกำหนดราคาหุ้นส่วนเองได้
+   */
+  partnerId?: string;
 };
 
 export type PosModifier = {
