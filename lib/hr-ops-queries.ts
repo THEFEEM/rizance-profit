@@ -29,10 +29,14 @@ const TOKEN_RE = /^[A-Za-z0-9_-]{20,64}$/;
 
 async function employeeByToken(
   token: string,
-): Promise<{ id: string; user_id: string } | null> {
+): Promise<{ id: string; user_id: string; hr_role: "staff" | "manager" } | null> {
   if (!TOKEN_RE.test(token)) return null;
-  const { rows } = await pool.query<{ id: string; user_id: string }>(
-    `SELECT id, user_id FROM employees
+  const { rows } = await pool.query<{
+    id: string;
+    user_id: string;
+    hr_role: "staff" | "manager";
+  }>(
+    `SELECT id, user_id, hr_role FROM employees
      WHERE token_hash = $1 AND token_expires_at > now() AND status = 'active'`,
     [hashToken(token)],
   );
@@ -107,8 +111,18 @@ export async function foldOpenBreak(employeeId: string): Promise<void> {
 }
 
 /**
- * ด่านก่อน clock-out: งานปิดร้านค้างกี่งาน (+ปิดเบรกที่ค้างให้เรียบร้อย)
- * force = true → บันทึก override พร้อมเหตุผลลง audit แล้วปล่อยผ่าน
+ * ก่อน clock-out — ปิดเบรกที่ค้างให้เรียบร้อย แล้วปล่อยผ่านเสมอ
+ *
+ * ═══ 0084: ไม่บล็อกการเลิกงานอีกต่อไป ═════════════════════════
+ * เดิม (0082) บล็อกถ้างานปิดร้านไม่ครบ — ถอดออกเพราะการตรวจสอบ
+ * ย้ายไปเป็นหน้าที่ของผู้จัดการแล้ว พนักงานรายวันไม่ควรถูกกักไว้
+ *
+ * ยังคืน `remaining` อยู่เพื่อให้ฝั่งเรียกใช้แสดงผลได้ และถ้าคนที่
+ * เลิกงานเป็นผู้จัดการที่ทำ Duty ไม่ครบ จะบันทึกลง audit ให้เจ้าของเห็น
+ * — บันทึกอย่างเดียว ไม่หักเงิน ไม่ขวางทาง
+ *
+ * คงชื่อ/รูปแบบผลลัพธ์เดิมไว้ทั้งหมด (ok/remaining) เพื่อไม่ให้ route
+ * และ UI ที่เรียกอยู่พัง — `ok` เป็น true เสมอนับจากนี้
  */
 export async function staffClosingGate(
   token: string,
@@ -117,21 +131,29 @@ export async function staffClosingGate(
   const emp = await employeeByToken(token);
   if (!emp) return null;
   await foldOpenBreak(emp.id);
+
+  // ผู้จัดการเท่านั้นที่มี Duty — พนักงานทั่วไปข้ามไปเลย ไม่ต้องแตะ DB
+  if (emp.hr_role !== "manager") return { ok: true, remaining: 0 };
+
   const bizDate = businessDate(await getDayCutoffHour(emp.user_id));
-  const remaining = await closingRemaining(emp.user_id, bizDate);
-  if (remaining === 0) return { ok: true, remaining: 0 };
-  if (!opts.force) return { ok: false, remaining };
-  await logHr(emp.user_id, "staff", emp.id, "checklist_override", {
-    remaining,
-    reason: opts.overrideReason?.trim() || "ไม่ระบุ",
-    businessDate: bizDate,
-  });
+  const remaining = await managerDutyRemaining(emp.user_id, bizDate);
+  if (remaining > 0) {
+    await logHr(emp.user_id, "staff", emp.id, "manager_duty_incomplete", {
+      remaining,
+      businessDate: bizDate,
+      reason: opts.overrideReason?.trim() || null,
+    });
+  }
   return { ok: true, remaining };
 }
 
 // ═══ Checklist ═══════════════════════════════════════════════════
 
-export type ChecklistPhase = "opening" | "during" | "closing";
+export type ChecklistPhase = "opening" | "during" | "closing" | "manager";
+
+/** งานของผู้จัดการ (0084) แยกจากงานพนักงานเดิมด้วย phase */
+const MANAGER_PHASES: ChecklistPhase[] = ["manager"];
+const STAFF_PHASES: ChecklistPhase[] = ["opening", "during", "closing"];
 
 export type ChecklistItemView = {
   itemId: string;
@@ -142,17 +164,23 @@ export type ChecklistItemView = {
   completedByName: string | null;
 };
 
-/** สร้างรายการของวันนี้จาก template (lazy · กันเบิ้ลด้วย unique) แล้วคืนทั้งชุด */
+/**
+ * สร้างรายการของวันนี้จาก template (lazy · กันเบิ้ลด้วย unique) แล้วคืนทั้งชุด
+ *
+ * 0084: รับ phases มากรองได้ — ผู้จัดการเห็นเฉพาะ 'manager'
+ * ค่าเริ่มต้นคืนทุก phase เพื่อไม่ให้ที่เรียกอยู่เดิมเปลี่ยนพฤติกรรม
+ */
 export async function ensureTodayChecklist(
   userId: string,
   bizDate: string,
+  phases: ChecklistPhase[] = [...STAFF_PHASES, ...MANAGER_PHASES],
 ): Promise<ChecklistItemView[]> {
   await pool.query(
     `INSERT INTO shift_checklist_items (user_id, template_id, business_date)
      SELECT $1, id, $2::date FROM shift_checklists
-     WHERE user_id = $1 AND is_active
+     WHERE user_id = $1 AND is_active AND phase = ANY($3::text[])
      ON CONFLICT (template_id, business_date) DO NOTHING`,
-    [userId, bizDate],
+    [userId, bizDate, phases],
   );
   const { rows } = await pool.query<{
     item_id: string; template_id: string; phase: ChecklistPhase; title: string;
@@ -164,8 +192,9 @@ export async function ensureTodayChecklist(
      JOIN shift_checklists c ON c.id = i.template_id
      LEFT JOIN employees e ON e.id = i.completed_by
      WHERE i.user_id = $1 AND i.business_date = $2::date AND c.is_active
+       AND c.phase = ANY($3::text[])
      ORDER BY c.phase, c.sort_order`,
-    [userId, bizDate],
+    [userId, bizDate, phases],
   );
   return rows.map((r) => ({
     itemId: r.item_id,
@@ -177,17 +206,65 @@ export async function ensureTodayChecklist(
   }));
 }
 
-export async function staffChecklist(token: string): Promise<{
+export type DutyView = {
   businessDate: string;
+  /** true = คนนี้เป็นผู้จัดการ และวันนี้มีกะจัดไว้ → มีรอบ Duty ให้ทำ */
+  hasDuty: boolean;
   items: ChecklistItemView[];
-} | null> {
+  done: number;
+  total: number;
+};
+
+/**
+ * เช็กลิสต์ของผู้จัดการสำหรับวันนี้
+ *
+ * ═══ เงื่อนไขการมองเห็น (0084) ══════════════════════════════════
+ * ต้องครบทั้ง 2 ข้อถึงจะมีรอบ Duty:
+ *   1) hr_role = 'manager'
+ *   2) มีกะจัดไว้ในวันนั้น (ไม่นับกะที่ยกเลิก)
+ *
+ * ทำแบบนี้เพราะ ฿200 ผูกกับ "รอบที่ตกลงไว้ล่วงหน้า" ไม่ใช่วันที่โผล่มา
+ * เจ้าของคุมได้ว่ารอบไหนมี Duty ผ่านการจัดกะ — ที่เดียว ไม่มีสวิตช์ซ้อน
+ *
+ * พนักงานทั่วไปเรียกได้ ไม่ error แต่ได้ hasDuty=false และรายการว่าง
+ * (เก็บ endpoint เดิมไว้ ไม่ต้องแก้ client ที่เรียกอยู่)
+ */
+export async function staffChecklist(token: string): Promise<DutyView | null> {
   const emp = await employeeByToken(token);
   if (!emp) return null;
   const bizDate = businessDate(await getDayCutoffHour(emp.user_id));
-  return { businessDate: bizDate, items: await ensureTodayChecklist(emp.user_id, bizDate) };
+  const empty: DutyView = {
+    businessDate: bizDate, hasDuty: false, items: [], done: 0, total: 0,
+  };
+  if (emp.hr_role !== "manager") return empty;
+  if (!(await hasShiftOn(emp.id, bizDate))) return empty;
+
+  const items = await ensureTodayChecklist(emp.user_id, bizDate, MANAGER_PHASES);
+  return {
+    businessDate: bizDate,
+    hasDuty: true,
+    items,
+    done: items.filter((i) => i.status === "completed" || i.status === "verified").length,
+    total: items.length,
+  };
 }
 
-/** ติ๊ก/ยกเลิกติ๊ก — verified แล้วห้ามแตะ (ของ Manager) */
+/** มีกะจัดไว้ในวันนั้นไหม (กะที่ยกเลิกไม่นับ) */
+async function hasShiftOn(employeeId: string, bizDate: string): Promise<boolean> {
+  const { rows } = await pool.query<{ n: number }>(
+    `SELECT COUNT(*)::int AS n FROM shifts
+     WHERE employee_id = $1 AND business_date = $2::date AND status <> 'cancelled'`,
+    [employeeId, bizDate],
+  );
+  return (rows[0]?.n ?? 0) > 0;
+}
+
+/**
+ * ติ๊ก/ยกเลิกติ๊ก — verified แล้วห้ามแตะ
+ *
+ * 0084: เฉพาะผู้จัดการเท่านั้น และแตะได้เฉพาะงาน phase 'manager'
+ * กันพนักงานที่มี token ของร้านเดียวกันเดารหัสรายการแล้วติ๊กแทน
+ */
 export async function staffToggleChecklistItem(
   token: string,
   itemId: string,
@@ -195,31 +272,141 @@ export async function staffToggleChecklistItem(
 ): Promise<boolean | null> {
   const emp = await employeeByToken(token);
   if (!emp) return null;
+  if (emp.hr_role !== "manager") return false;
   const { rowCount } = await pool.query(
     `UPDATE shift_checklist_items SET
        status = $3, completed_at = CASE WHEN $4 THEN now() END,
        completed_by = CASE WHEN $4 THEN $2::uuid END,
        updated_at = now()
      WHERE id = $1 AND user_id = (SELECT user_id FROM employees WHERE id = $2)
-       AND status <> 'verified'`,
+       AND status <> 'verified'
+       AND template_id IN (SELECT id FROM shift_checklists WHERE phase = 'manager')`,
     [itemId, emp.id, done ? "completed" : "pending", done],
   );
   return (rowCount ?? 0) > 0;
 }
 
-/** งานปิดร้านที่ยังไม่เสร็จของวันนี้ — ใช้เป็นด่านก่อน clock-out */
-export async function closingRemaining(userId: string, bizDate: string): Promise<number> {
-  await ensureTodayChecklist(userId, bizDate);
+/**
+ * งาน Manager Duty ที่ยังไม่เสร็จของวันนี้
+ *
+ * 0084: เดิมชื่อ closingRemaining และนับ phase 'closing' เพื่อใช้บล็อก
+ * การเลิกงานของพนักงาน — ตอนนี้ไม่บล็อกแล้ว ใช้บันทึกลง audit อย่างเดียว
+ * ไม่เรียก ensureTodayChecklist ซ้ำ (staffChecklist สร้างให้แล้ว) เพื่อไม่
+ * ให้การเลิกงานไปสร้างรอบ Duty ในวันที่ไม่มีกะ
+ */
+export async function managerDutyRemaining(userId: string, bizDate: string): Promise<number> {
   const { rows } = await pool.query<{ n: number }>(
     `SELECT COUNT(*)::int AS n
      FROM shift_checklist_items i
      JOIN shift_checklists c ON c.id = i.template_id
      WHERE i.user_id = $1 AND i.business_date = $2::date
-       AND c.phase = 'closing' AND c.is_active
+       AND c.phase = 'manager' AND c.is_active
        AND i.status IN ('pending', 'in_progress')`,
     [userId, bizDate],
   );
   return rows[0]?.n ?? 0;
+}
+
+/**
+ * สถานะรอบ Duty ของคนคนหนึ่งในวันหนึ่ง — อ่านอย่างเดียว ไม่สร้างแถว
+ *
+ * ใช้ในหน้าแรกของแอป ซึ่งต้องรู้ว่า "วันนี้มีรอบไหม" ตั้งแต่ก่อนผู้จัดการ
+ * เปิดชีต (ตอนนั้นยังไม่มีแถวใน shift_checklist_items เลย)
+ * → total นับจากแม่แบบที่ active · done นับจากแถวที่ติ๊กแล้ว (ถ้ามี)
+ */
+export async function managerDutyStatus(
+  employeeId: string,
+  userId: string,
+  bizDate: string,
+): Promise<{ hasDuty: boolean; done: number; total: number }> {
+  const { rows } = await pool.query<{
+    is_manager: boolean; scheduled: boolean; total: number; done: number;
+  }>(
+    `SELECT
+       (e.hr_role = 'manager') AS is_manager,
+       EXISTS (
+         SELECT 1 FROM shifts s
+         WHERE s.employee_id = e.id AND s.business_date = $3::date
+           AND s.status <> 'cancelled'
+       ) AS scheduled,
+       (SELECT COUNT(*)::int FROM shift_checklists c
+        WHERE c.user_id = $2 AND c.phase = 'manager' AND c.is_active) AS total,
+       (SELECT COUNT(*)::int FROM shift_checklist_items i
+        JOIN shift_checklists c ON c.id = i.template_id
+        WHERE i.user_id = $2 AND i.business_date = $3::date
+          AND c.phase = 'manager' AND c.is_active
+          AND i.status IN ('completed','verified')) AS done
+     FROM employees e
+     WHERE e.id = $1 AND e.user_id = $2`,
+    [employeeId, userId, bizDate],
+  );
+  const r = rows[0];
+  if (!r || !r.is_manager || !r.scheduled) return { hasDuty: false, done: 0, total: 0 };
+  return { hasDuty: r.total > 0, done: r.done, total: r.total };
+}
+
+export type ManagerDutyDay = {
+  businessDate: string;
+  employeeName: string | null;
+  scheduled: boolean;
+  clockedIn: boolean;
+  done: number;
+  total: number;
+};
+
+/**
+ * ฝั่งเจ้าของ — รอบ Duty ของผู้จัดการในช่วงวันที่กำหนด
+ *
+ * ตั้งต้นจาก "กะที่จัดไว้" ไม่ใช่จากรายการที่ติ๊ก เพราะรอบที่ผู้จัดการ
+ * ยังไม่เปิดแอปเลยจะไม่มีแถวใน shift_checklist_items — แต่เจ้าของต้องเห็นว่า
+ * มีรอบนั้นอยู่และยังไม่ได้เริ่ม (done 0 / total 0 พร้อม scheduled = true)
+ */
+export async function managerDutyWeek(
+  userId: string,
+  from: string,
+  to: string,
+): Promise<ManagerDutyDay[]> {
+  const { rows } = await pool.query<{
+    business_date: string; employee_name: string | null;
+    clocked_in: boolean; done: number; total: number;
+  }>(
+    `WITH duty_shifts AS (
+       SELECT s.business_date, s.employee_id,
+              COALESCE(e.nickname, e.name) AS employee_name
+       FROM shifts s
+       JOIN employees e ON e.id = s.employee_id
+       WHERE s.user_id = $1 AND e.hr_role = 'manager'
+         AND s.status <> 'cancelled'
+         AND s.business_date BETWEEN $2::date AND $3::date
+     )
+     SELECT d.business_date::text AS business_date, d.employee_name,
+            EXISTS (
+              SELECT 1 FROM attendance a
+              WHERE a.employee_id = d.employee_id
+                AND a.business_date = d.business_date
+            ) AS clocked_in,
+            COALESCE(k.done, 0)::int  AS done,
+            COALESCE(k.total, 0)::int AS total
+     FROM duty_shifts d
+     LEFT JOIN LATERAL (
+       SELECT COUNT(*) FILTER (WHERE i.status IN ('completed','verified')) AS done,
+              COUNT(*) AS total
+       FROM shift_checklist_items i
+       JOIN shift_checklists c ON c.id = i.template_id
+       WHERE i.user_id = $1 AND i.business_date = d.business_date
+         AND c.phase = 'manager' AND c.is_active
+     ) k ON true
+     ORDER BY d.business_date`,
+    [userId, from, to],
+  );
+  return rows.map((r) => ({
+    businessDate: r.business_date,
+    employeeName: r.employee_name,
+    scheduled: true,
+    clockedIn: r.clocked_in,
+    done: r.done,
+    total: r.total,
+  }));
 }
 
 // ── owner: จัดการ template ──
@@ -278,23 +465,33 @@ export async function updateChecklistTemplate(
   return (rowCount ?? 0) > 0;
 }
 
-/** ภาพรวมวันนี้สำหรับ owner (done/total ต่อ phase) */
+/**
+ * ภาพรวมของวันนี้ (done/total ต่อ phase)
+ *
+ * ═══ 0084: อ่านอย่างเดียว ห้ามสร้างรายการ ═══════════════════════
+ * เดิมเรียก ensureTodayChecklist ซึ่งจะ "สร้าง" รายการของวันนั้น
+ * ฟังก์ชันนี้ถูกเรียกทุกครั้งที่พนักงานเปิดแอป → ถ้ายังสร้างอยู่
+ * จะเกิดรอบ Duty ในวันที่ไม่มีกะ ผิดกติกาข้อ "เห็นเฉพาะวันที่จัดกะไว้"
+ *
+ * ตอนนี้อ่านจากที่มีอยู่เท่านั้น — ผู้สร้างรายการมีที่เดียวคือ
+ * staffChecklist() ซึ่งเช็กกะและบทบาทก่อนแล้ว
+ */
 export async function checklistSummary(
   userId: string,
   bizDate: string,
 ): Promise<{ phase: ChecklistPhase; done: number; total: number }[]> {
-  const items = await ensureTodayChecklist(userId, bizDate);
-  const phases: ChecklistPhase[] = ["opening", "during", "closing"];
-  return phases
-    .map((phase) => {
-      const of = items.filter((i) => i.phase === phase);
-      return {
-        phase,
-        done: of.filter((i) => i.status === "completed" || i.status === "verified").length,
-        total: of.length,
-      };
-    })
-    .filter((p) => p.total > 0);
+  const { rows } = await pool.query<{ phase: ChecklistPhase; done: number; total: number }>(
+    `SELECT c.phase,
+            COUNT(*) FILTER (WHERE i.status IN ('completed','verified'))::int AS done,
+            COUNT(*)::int AS total
+     FROM shift_checklist_items i
+     JOIN shift_checklists c ON c.id = i.template_id
+     WHERE i.user_id = $1 AND i.business_date = $2::date AND c.is_active
+     GROUP BY c.phase
+     ORDER BY c.phase`,
+    [userId, bizDate],
+  );
+  return rows;
 }
 
 // ═══ แจ้งเวลาไม่ตรง (Attendance Correction) ═════════════════════

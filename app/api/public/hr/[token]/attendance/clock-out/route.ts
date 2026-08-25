@@ -6,8 +6,12 @@ import { authRateLimitExceeded, clientIp } from "@/lib/rate-limit";
 /**
  * POST /api/public/hr/:token/attendance/clock-out — server ตัดสินเวลาเสมอ
  * body (optional): {force?: boolean, overrideReason?: string}
- * ด่าน checklist ปิดร้าน (0082): งานค้าง → 409 พร้อมจำนวน · force = ผ่านได้
- * แต่บันทึกเหตุผลลง audit + งานค้างโผล่ฝั่งเจ้าของร้าน
+ *
+ * 0084: ไม่มีด่าน checklist แล้ว — เลิกงานได้เสมอ
+ * staffClosingGate ยังถูกเรียกอยู่เพราะทำ 2 อย่างที่ยังจำเป็น:
+ *   1) ปิดเบรกที่ค้าง (เวลาพักไม่หาย)
+ *   2) ถ้าเป็นผู้จัดการที่ Duty ไม่ครบ → บันทึกลง audit ให้เจ้าของเห็น
+ * คืน dutyRemaining กลับไปด้วยเพื่อให้แอปแสดงเตือนเบา ๆ ได้ (ไม่บล็อก)
  */
 export async function POST(
   req: NextRequest,
@@ -40,17 +44,11 @@ export async function POST(
   const { token } = await params;
   const gate = await staffClosingGate(token, opts);
   if (!gate) return NextResponse.json({ error: "not_found" }, { status: 404 });
-  if (!gate.ok) {
-    return NextResponse.json(
-      { error: "checklist_incomplete", data: { remaining: gate.remaining } },
-      { status: 409 },
-    );
-  }
 
   try {
     const result = await staffClockOut(token);
     if (!result) return NextResponse.json({ error: "not_found" }, { status: 404 });
-    return NextResponse.json({ data: result });
+    return NextResponse.json({ data: { ...result, dutyRemaining: gate.remaining } });
   } catch (err) {
     if (err instanceof NoActiveAttendanceError) {
       return NextResponse.json({ error: "not_working" }, { status: 409 });

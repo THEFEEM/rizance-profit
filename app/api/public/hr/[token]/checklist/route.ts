@@ -12,7 +12,11 @@ function rateLimited(req: NextRequest): NextResponse | null {
       );
 }
 
-/** GET — checklist ของวันนี้ (สร้างจาก template อัตโนมัติ) */
+/**
+ * GET — Manager Duty ของวันนี้
+ * ผู้จัดการที่มีกะวันนั้น → hasDuty=true + รายการ 11 ข้อ (สร้างอัตโนมัติครั้งแรก)
+ * คนอื่น / วันที่ไม่มีกะ → hasDuty=false + รายการว่าง (ไม่ error)
+ */
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ token: string }> },

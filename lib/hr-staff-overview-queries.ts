@@ -3,6 +3,7 @@ import { businessDate } from "@/lib/date";
 import { centsToDecimalString, toCents } from "@/lib/money";
 import { getDayCutoffHour } from "@/lib/pos-settings-queries";
 import { hashToken } from "@/lib/hr-employee-queries";
+import type { ChecklistPhase } from "@/lib/hr-ops-queries";
 
 /**
  * Staff App รอบ A — ข้อมูลหน้าแรกของพนักงานใน request เดียว
@@ -51,8 +52,12 @@ export type StaffOverview = {
   /** 0082: ประกาศจากร้าน (เฉพาะที่เปิดอยู่) */
   announcements: { id: string; body: string; createdAt: string }[];
 
-  /** 0082: ความคืบหน้า checklist วันนี้ (done/total ต่อช่วง) */
-  checklist: { phase: "opening" | "during" | "closing"; done: number; total: number }[];
+  /**
+   * 0082: ความคืบหน้า checklist วันนี้ (done/total ต่อช่วง)
+   * 0084: งานของพนักงานถูกปิดหมดแล้ว เหลือเฉพาะ phase 'manager'
+   * → พนักงานทั่วไปได้ [] เสมอ
+   */
+  checklist: { phase: ChecklistPhase; done: number; total: number }[];
 
   /**
    * 0083: โหมดจ่ายเงินของร้าน
@@ -394,9 +399,13 @@ export async function getStaffOverview(token: string): Promise<StaffOverview | n
        WHERE user_id = $1 AND is_active ORDER BY created_at DESC LIMIT 3`,
       [emp.user_id],
     ),
+    // 0084: รอบ Duty ของผู้จัดการ — อ่านอย่างเดียว ไม่สร้างแถว
     (async () => {
-      const { checklistSummary } = await import("@/lib/hr-ops-queries");
-      return checklistSummary(emp.user_id, bizDate);
+      const { managerDutyStatus } = await import("@/lib/hr-ops-queries");
+      const d = await managerDutyStatus(emp.id, emp.user_id, bizDate);
+      return d.hasDuty
+        ? [{ phase: "manager" as const, done: d.done, total: d.total }]
+        : [];
     })(),
   ]);
 

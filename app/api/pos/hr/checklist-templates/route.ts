@@ -16,7 +16,8 @@ export async function GET(req: NextRequest) {
 }
 
 const createSchema = z.object({
-  phase: z.enum(["opening", "during", "closing"]),
+  // 0084: เพิ่ม 'manager' — เจ้าของแก้รายการ Manager Duty ได้จากหน้าเดิม
+  phase: z.enum(["opening", "during", "closing", "manager"]),
   title: z.string().trim().min(1).max(120),
 });
 
