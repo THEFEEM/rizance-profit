@@ -283,6 +283,8 @@ export const createPosIngredientSchema = z.object({
   purchasePrice: moneyNonNegative,
   trackStock: z.boolean().default(true),
   lowStockThreshold: z.number().finite().gte(0).nullable().optional(),
+  /** 0085: เป้าหมายสต็อก — null = ใช้การพยากรณ์จากอัตราการใช้ล้วน ๆ */
+  targetStock: z.number().finite().gte(0).nullable().optional(),
   category: ingredientCategory,
   supplierName: supplierName,
 });
@@ -324,6 +326,7 @@ export const updatePosIngredientSchema = z
     purchasePrice: moneyNonNegative.optional(),
     trackStock: z.boolean().optional(),
     lowStockThreshold: z.number().finite().gte(0).nullable().optional(),
+    targetStock: z.number().finite().gte(0).nullable().optional(),
     category: ingredientCategory,
     supplierName: supplierName,
   })

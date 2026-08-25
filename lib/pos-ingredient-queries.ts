@@ -27,6 +27,8 @@ export type PosIngredient = {
   trackStock: boolean;
   stockQty: string;
   lowStockThreshold: string | null;
+  /** 0085: เป้าหมายสต็อก (null = ไม่ได้ตั้ง) */
+  targetStock: string | null;
   /** หมวด (เนื้อ/ขนมปัง/ผัก/ซอส/บรรจุภัณฑ์) — ใช้จัดกลุ่มตอนไปตลาด */
   category: string | null;
   /** ต้นทุนเฉลี่ยถ่วงน้ำหนัก ต่อ 1 หน่วยซื้อ */
@@ -47,7 +49,8 @@ export type PosRecipeLine = {
   lineCost: string;
 };
 
-type IngredientRow = {
+/** @internal — เปิดให้ stock-purchase-queries ใช้ ไม่ควรใช้ที่อื่น */
+export type IngredientRow = {
   id: string;
   name: string;
   purchase_quantity: string;
@@ -56,6 +59,7 @@ type IngredientRow = {
   track_stock: boolean;
   stock_qty: string;
   low_stock_threshold: string | null;
+  target_stock: string | null;
   category: string | null;
   avg_cost: string | null;
   last_purchase_price: string | null;
@@ -63,9 +67,11 @@ type IngredientRow = {
   supplier_name: string | null;
 };
 
-const INGREDIENT_RETURN = `id, name, purchase_quantity::text AS purchase_quantity,
+/** @internal — เปิดให้ stock-purchase-queries ใช้ ไม่ควรใช้ที่อื่น */
+export const INGREDIENT_RETURN = `id, name, purchase_quantity::text AS purchase_quantity,
   purchase_unit, purchase_price::text AS purchase_price, track_stock,
   stock_qty::text AS stock_qty, low_stock_threshold::text AS low_stock_threshold,
+  target_stock::text AS target_stock,
   category, avg_cost::text AS avg_cost,
   last_purchase_price::text AS last_purchase_price, last_purchased_at, supplier_name`;
 
@@ -87,6 +93,7 @@ function mapIngredient(r: IngredientRow): PosIngredient {
     trackStock: r.track_stock,
     stockQty: r.stock_qty,
     lowStockThreshold: r.low_stock_threshold,
+    targetStock: r.target_stock,
     category: r.category,
     avgCost: r.avg_cost,
     lastPurchasePrice: r.last_purchase_price,
@@ -128,6 +135,8 @@ export type UpsertIngredientInput = {
   purchasePrice: number;
   trackStock?: boolean;
   lowStockThreshold?: number | null;
+  /** 0085: เป้าหมายสต็อก — null = ใช้การพยากรณ์จากอัตราการใช้ล้วน ๆ */
+  targetStock?: number | null;
   category?: string | null;
   supplierName?: string | null;
 };
@@ -139,9 +148,9 @@ export async function createPosIngredient(
   const { rows } = await pool.query<IngredientRow>(
     `INSERT INTO ingredients
        (user_id, name, purchase_quantity, purchase_unit, purchase_price,
-        track_stock, low_stock_threshold, category, supplier_name,
+        track_stock, low_stock_threshold, target_stock, category, supplier_name,
         avg_cost, last_purchase_price)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11)
      RETURNING ${INGREDIENT_RETURN}`,
     [
       userId,
@@ -151,6 +160,7 @@ export async function createPosIngredient(
       input.purchasePrice.toFixed(2),
       input.trackStock ?? true,
       input.lowStockThreshold ?? null,
+      input.targetStock ?? null,
       input.category?.trim() || null,
       input.supplierName?.trim() || null,
       input.purchaseQuantity > 0
@@ -183,6 +193,7 @@ export async function updatePosIngredient(
   if (input.trackStock !== undefined) push("track_stock", input.trackStock);
   if (input.lowStockThreshold !== undefined)
     push("low_stock_threshold", input.lowStockThreshold);
+  if (input.targetStock !== undefined) push("target_stock", input.targetStock);
   if (input.category !== undefined) push("category", input.category?.trim() || null);
   if (input.supplierName !== undefined)
     push("supplier_name", input.supplierName?.trim() || null);
@@ -636,6 +647,90 @@ export async function restockIngredient(
 }
 
 // ---------------------------------------------------------------------------
+// เครื่องยนต์รับของ — ใช้ร่วมกันระหว่างโหมดไปตลาดกับเอกสารการซื้อ (0085)
+// ---------------------------------------------------------------------------
+
+/**
+ * รับของ 1 บรรทัดเข้าคลัง — จุดเดียวในระบบที่แก้ stock_qty แบบ "เพิ่ม"
+ *
+ * ═══ ทำอะไรบ้าง ═══════════════════════════════════════════════
+ * 1) คำนวณต้นทุนเฉลี่ยถ่วงน้ำหนัก (ของเก่าที่เหลือ + ของใหม่)
+ * 2) เพิ่มสต็อก + อัปเดต avg_cost / last_purchase_price
+ * 3) ลง movement พร้อมยอดก่อน–หลัง
+ *
+ * ⚠️ สูตรค่าเฉลี่ยถ่วงน้ำหนักคัดลอกมาจากของเดิมทุกตัวอักษร — ห้ามเปลี่ยน
+ *    เพราะต้นทุนเมนูทุกตัวคำนวณต่อจากค่านี้ (trigger 0076)
+ *
+ * ⚠️ qtyIn และ lineCost ต้องอยู่ใน "หน่วยสต็อก" แล้วเสมอ
+ *    การแปลงหน่วยบรรจุ (3 แพ็ค → 252 แผ่น) ทำก่อนเรียกฟังก์ชันนี้
+ */
+export async function applyReceiveLine(
+  client: PoolClient,
+  userId: string,
+  before: IngredientRow,
+  opts: {
+    qtyIn: number;
+    lineCost: number | null;
+    expenseEntryId: string | null;
+    purchaseId: string | null;
+    note: string | null;
+  },
+): Promise<{ qtyBefore: number; qtyAfter: number; unitCost: number | null }> {
+  const stockBefore = Number(before.stock_qty) || 0;
+  const unitCost = opts.lineCost != null ? opts.lineCost / opts.qtyIn : null;
+
+  // ค่าเฉลี่ยถ่วงน้ำหนัก — ของเก่าที่เหลือ + ของใหม่ที่เพิ่งซื้อ
+  // สต็อกติดลบนับเป็น 0 ในการถ่วงน้ำหนัก (ไม่งั้นค่าเฉลี่ยเพี้ยน)
+  let avgCost = before.avg_cost == null ? null : Number(before.avg_cost);
+  if (unitCost != null) {
+    const base = avgCost ?? unitCost;
+    const totalQty = Math.max(stockBefore, 0) + opts.qtyIn;
+    avgCost =
+      totalQty > 0
+        ? (Math.max(stockBefore, 0) * base + opts.qtyIn * unitCost) / totalQty
+        : unitCost;
+  }
+
+  await client.query(
+    `UPDATE ingredients
+     SET stock_qty = stock_qty + $3,
+         track_stock = true,
+         avg_cost = COALESCE($4, avg_cost),
+         last_purchase_price = COALESCE($5, last_purchase_price),
+         last_purchased_at = CASE WHEN $5 IS NULL THEN last_purchased_at ELSE now() END,
+         updated_at = now()
+     WHERE id = $1 AND user_id = $2`,
+    [
+      before.id,
+      userId,
+      opts.qtyIn,
+      avgCost == null ? null : avgCost.toFixed(4),
+      unitCost == null ? null : unitCost.toFixed(2),
+    ],
+  );
+
+  const qtyAfter = stockBefore + opts.qtyIn;
+  await client.query(
+    `INSERT INTO ingredient_stock_movements
+       (user_id, ingredient_id, expense_entry_id, purchase_id, movement_type,
+        qty_change, qty_before, qty_after, note)
+     VALUES ($1, $2, $3, $4, 'restock', $5, $6, $7, $8)`,
+    [
+      userId,
+      before.id,
+      opts.expenseEntryId,
+      opts.purchaseId,
+      opts.qtyIn,
+      stockBefore.toFixed(4),
+      qtyAfter.toFixed(4),
+      opts.note,
+    ],
+  );
+
+  return { qtyBefore: stockBefore, qtyAfter, unitCost };
+}
+
+// ---------------------------------------------------------------------------
 // โหมดไปตลาด — รับของทั้งตะกร้าใน transaction เดียว
 // ---------------------------------------------------------------------------
 
@@ -716,54 +811,16 @@ export async function restockIngredientsBatch(
       expenseEntryId = exp[0].id;
     }
 
-    // 2) รับเข้าทีละบรรทัด
+    // 2) รับเข้าทีละบรรทัด — ใช้เครื่องยนต์เดียวกับ receivePurchase()
     for (const line of input.lines) {
       if (line.quantity <= 0) continue;
-      const before = byId.get(line.ingredientId)!;
-      const stockBefore = Number(before.stock_qty) || 0;
-      const unitCost = line.lineCost ? line.lineCost / line.quantity : null;
-
-      // ค่าเฉลี่ยถ่วงน้ำหนัก — ของเก่าที่เหลือ + ของใหม่ที่เพิ่งซื้อ
-      let avgCost = before.avg_cost == null ? null : Number(before.avg_cost);
-      if (unitCost != null) {
-        const base = avgCost ?? unitCost;
-        const totalQty = Math.max(stockBefore, 0) + line.quantity;
-        avgCost =
-          totalQty > 0
-            ? (Math.max(stockBefore, 0) * base + line.quantity * unitCost) / totalQty
-            : unitCost;
-      }
-
-      await client.query(
-        `UPDATE ingredients
-         SET stock_qty = stock_qty + $3,
-             track_stock = true,
-             avg_cost = COALESCE($4, avg_cost),
-             last_purchase_price = COALESCE($5, last_purchase_price),
-             last_purchased_at = CASE WHEN $5 IS NULL THEN last_purchased_at ELSE now() END,
-             updated_at = now()
-         WHERE id = $1 AND user_id = $2`,
-        [
-          line.ingredientId,
-          userId,
-          line.quantity,
-          avgCost == null ? null : avgCost.toFixed(4),
-          unitCost == null ? null : unitCost.toFixed(2),
-        ],
-      );
-
-      await client.query(
-        `INSERT INTO ingredient_stock_movements
-           (user_id, ingredient_id, expense_entry_id, movement_type, qty_change, note)
-         VALUES ($1, $2, $3, 'restock', $4, $5)`,
-        [
-          userId,
-          line.ingredientId,
-          expenseEntryId,
-          line.quantity,
-          line.lineCost ? `฿${line.lineCost.toFixed(2)}` : "ไม่ระบุราคา",
-        ],
-      );
+      await applyReceiveLine(client, userId, byId.get(line.ingredientId)!, {
+        qtyIn: line.quantity,
+        lineCost: line.lineCost ?? null,
+        expenseEntryId,
+        purchaseId: null,
+        note: line.lineCost ? `฿${line.lineCost.toFixed(2)}` : "ไม่ระบุราคา",
+      });
     }
 
     await client.query("COMMIT");
@@ -842,9 +899,13 @@ export type ShoppingListItem = {
   dailyUsage: string;
   /** พอขายอีกกี่วัน (null = ยังไม่มีข้อมูลการใช้) */
   daysLeft: number | null;
-  /** ปริมาณแนะนำให้ซื้อ (ให้พอ ~7 วัน) */
+  /** ปริมาณแนะนำให้ซื้อ (ให้พอ ~7 วัน) — หน่วยสต็อก */
   suggestedPurchase: string;
   urgency: "critical" | "low" | "ok";
+  /** 0085: เป้าหมายสต็อก (null = ใช้การพยากรณ์ล้วน ๆ) */
+  targetStock: string | null;
+  /** 0085: คำแนะนำแปลงเป็นหีบห่อ เช่น "≈ 2 แพ็ค" (null = ซื้อเป็นหน่วยสต็อก) */
+  suggestedPack: { unitName: string; quantity: string } | null;
 };
 
 export async function getShoppingList(
@@ -858,11 +919,17 @@ export async function getShoppingList(
     purchase_unit: string;
     stock_qty: string;
     low_stock_threshold: string | null;
+    target_stock: string | null;
+    pack_unit: string | null;
+    pack_factor: string | null;
     used: string;
   }>(
     `SELECT i.id, i.name, i.purchase_unit,
             i.stock_qty::text AS stock_qty,
             i.low_stock_threshold::text AS low_stock_threshold,
+            i.target_stock::text AS target_stock,
+            u.unit_name AS pack_unit,
+            u.conversion_factor::text AS pack_factor,
             COALESCE((
               SELECT SUM(-m.qty_change)
               FROM ingredient_stock_movements m
@@ -871,6 +938,8 @@ export async function getShoppingList(
                 AND m.created_at >= now() - ($2 || ' days')::interval
             ), 0)::text AS used
      FROM ingredients i
+     LEFT JOIN ingredient_purchase_units u
+            ON u.ingredient_id = i.id AND u.is_active AND u.is_default
      WHERE i.user_id = $1 AND i.track_stock = true
      ORDER BY i.name ASC`,
     [userId, String(lookback)],
@@ -886,7 +955,22 @@ export async function getShoppingList(
     // ควรซื้อให้พอ ~7 วัน (เผื่อ buffer) หรือเติมถึง threshold ถ้าตั้งไว้
     const targetFor7Days = daily * 7;
     const target = Math.max(targetFor7Days, threshold ?? 0);
-    const suggested = Math.max(target - stock, 0);
+    const forecastSuggested = Math.max(target - stock, 0);
+
+    // 0085: target_stock เป็นตัวเสริม ไม่ทับการพยากรณ์
+    // NULL → พฤติกรรมเดิม 100% · มีค่า → ใช้ค่าที่มากกว่า และไม่ติดลบ
+    const targetStock = r.target_stock == null ? null : Number(r.target_stock);
+    const suggested =
+      targetStock == null
+        ? forecastSuggested
+        : Math.max(forecastSuggested, Math.max(targetStock - stock, 0));
+
+    // แปลงคำแนะนำเป็นหีบห่อ — ปัดขึ้นเพราะซื้อครึ่งแพ็คไม่ได้
+    const packFactor = r.pack_factor == null ? null : Number(r.pack_factor);
+    const suggestedPack =
+      r.pack_unit && packFactor && packFactor > 0 && suggested > 0
+        ? { unitName: r.pack_unit, quantity: String(Math.ceil(suggested / packFactor)) }
+        : null;
 
     const urgency: ShoppingListItem["urgency"] =
       (daysLeft !== null && daysLeft <= 1) || (threshold !== null && stock <= threshold * 0.5)
@@ -906,6 +990,8 @@ export async function getShoppingList(
       daysLeft,
       suggestedPurchase: suggested.toFixed(3),
       urgency,
+      targetStock: r.target_stock,
+      suggestedPack,
     };
   });
 
