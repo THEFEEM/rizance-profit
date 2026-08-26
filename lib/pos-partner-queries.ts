@@ -47,55 +47,111 @@ export class PartnerMarginError extends Error {
   }
 }
 
+export class PartnerDuplicateNameError extends Error {
+  constructor() {
+    super("partner_duplicate_name");
+    this.name = "PartnerDuplicateNameError";
+  }
+}
+
 export type Partner = {
   id: string;
   name: string;
   nickname: string | null;
+  note: string | null;
   isActive: boolean;
 };
 
-type PartnerRow = { id: string; name: string; nickname: string | null; is_active: boolean };
+type PartnerRow = {
+  id: string;
+  name: string;
+  nickname: string | null;
+  note: string | null;
+  is_active: boolean;
+};
+
+const PARTNER_COLS = `id, name, nickname, note, is_active`;
 
 const mapPartner = (r: PartnerRow): Partner => ({
   id: r.id,
   name: r.name,
   nickname: r.nickname,
+  note: r.note,
   isActive: r.is_active,
 });
 
+/** ชื่อซ้ำในร้านเดียวกันถูกกันด้วย unique index ใน 0086 */
+const isDuplicate = (err: unknown): boolean =>
+  typeof err === "object" && err !== null && (err as { code?: string }).code === "23505";
+
 export async function listPartners(userId: string, activeOnly = false): Promise<Partner[]> {
   const { rows } = await pool.query<PartnerRow>(
-    `SELECT id, name, nickname, is_active FROM pos_partners
+    `SELECT ${PARTNER_COLS} FROM pos_partners
      WHERE user_id = $1 ${activeOnly ? "AND is_active" : ""}
-     ORDER BY name ASC`,
+     ORDER BY is_active DESC, name ASC`,
     [userId],
   );
   return rows.map(mapPartner);
 }
 
+export async function createPartner(
+  userId: string,
+  input: { name: string; nickname?: string | null; note?: string | null },
+): Promise<Partner> {
+  try {
+    const { rows } = await pool.query<PartnerRow>(
+      `INSERT INTO pos_partners (user_id, name, nickname, note)
+       VALUES ($1, $2, $3, $4)
+       RETURNING ${PARTNER_COLS}`,
+      [userId, input.name.trim(), input.nickname?.trim() || null, input.note?.trim() || null],
+    );
+    return mapPartner(rows[0]);
+  } catch (err) {
+    if (isDuplicate(err)) throw new PartnerDuplicateNameError();
+    throw err;
+  }
+}
+
+/**
+ * แก้ข้อมูลหุ้นส่วน
+ *
+ * ⚠️ เปลี่ยนชื่อวันนี้ ไม่เปลี่ยนชื่อบนบิลเมื่อวาน —
+ *    บิลเก็บ partner_name ไว้เป็น snapshot ตั้งแต่ตอนปิดบิล (0086)
+ *    ตารางนี้เก็บแค่ "ชื่อปัจจุบัน" สำหรับใช้ครั้งต่อไปเท่านั้น
+ *
+ * ไม่มีการลบหุ้นส่วน — ปิดใช้งานแทน เพื่อให้ประวัติยังอ่านได้ครบ
+ */
 export async function updatePartner(
   userId: string,
   id: string,
-  input: { name?: string; nickname?: string | null; isActive?: boolean },
+  input: { name?: string; nickname?: string | null; note?: string | null; isActive?: boolean },
 ): Promise<Partner | null> {
-  const { rows } = await pool.query<PartnerRow>(
-    `UPDATE pos_partners SET
-       name      = COALESCE($3, name),
-       nickname  = CASE WHEN $4::boolean THEN $5 ELSE nickname END,
-       is_active = COALESCE($6, is_active),
-       updated_at = now()
-     WHERE id = $2 AND user_id = $1
-     RETURNING id, name, nickname, is_active`,
-    [
-      userId,
-      id,
-      input.name?.trim() || null,
-      input.nickname !== undefined,
-      input.nickname?.trim() || null,
-      input.isActive ?? null,
-    ],
-  );
-  return rows[0] ? mapPartner(rows[0]) : null;
+  try {
+    const { rows } = await pool.query<PartnerRow>(
+      `UPDATE pos_partners SET
+         name      = COALESCE($3, name),
+         nickname  = CASE WHEN $4::boolean THEN $5 ELSE nickname END,
+         note      = CASE WHEN $6::boolean THEN $7 ELSE note END,
+         is_active = COALESCE($8, is_active),
+         updated_at = now()
+       WHERE id = $2 AND user_id = $1
+       RETURNING ${PARTNER_COLS}`,
+      [
+        userId,
+        id,
+        input.name?.trim() || null,
+        input.nickname !== undefined,
+        input.nickname?.trim() || null,
+        input.note !== undefined,
+        input.note?.trim() || null,
+        input.isActive ?? null,
+      ],
+    );
+    return rows[0] ? mapPartner(rows[0]) : null;
+  } catch (err) {
+    if (isDuplicate(err)) throw new PartnerDuplicateNameError();
+    throw err;
+  }
 }
 
 // ═══ ตั้งค่า ═══════════════════════════════════════════════════
@@ -200,7 +256,7 @@ export async function applyPartnerBenefit(opts: {
   if (opts.hasOtherBillDiscount) throw new PartnerStackingError();
 
   const { rows } = await client.query<PartnerRow>(
-    `SELECT id, name, nickname, is_active FROM pos_partners
+    `SELECT ${PARTNER_COLS} FROM pos_partners
      WHERE id = $2 AND user_id = $1`,
     [userId, partnerId],
   );
@@ -394,7 +450,7 @@ export async function previewPartnerBenefit(
   skipped: { productId: string; reason: string }[];
 }> {
   const { rows: pr } = await pool.query<PartnerRow>(
-    `SELECT id, name, nickname, is_active FROM pos_partners WHERE id = $2 AND user_id = $1`,
+    `SELECT ${PARTNER_COLS} FROM pos_partners WHERE id = $2 AND user_id = $1`,
     [userId, partnerId],
   );
   if (!pr[0]) throw new PartnerNotFoundError();

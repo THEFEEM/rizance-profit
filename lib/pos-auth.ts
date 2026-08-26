@@ -52,6 +52,40 @@ export async function requirePosSessionAndPlan(
   return userId;
 }
 
+/**
+ * ต้องปลดล็อกโหมดผู้จัดการก่อน (0087)
+ *
+ * ═══ ใช้กับอะไร ═══════════════════════════════════════════════
+ * เฉพาะ endpoint ใหม่ที่อ่อนไหวจริง — เปลี่ยนรหัส · จัดการหุ้นส่วน ·
+ * แก้นโยบายสิทธิ์หุ้นส่วน
+ *
+ * ⚠️ ไม่ได้แทน requirePosSessionAndPlan — ต้องเรียกคู่กันเสมอ
+ *    คุกกี้ผู้จัดการเป็น "ชั้นเพิ่ม" ไม่ใช่ตัวยืนยันตัวตนของร้าน
+ *
+ * ⚠️ restricted API เดิมทั้งหมดคงนโยบายเดิมไว้โดยตั้งใจ (รักษา compatibility)
+ *    การเปลี่ยนทั้งระบบพร้อมกันเสี่ยงทำของที่ใช้อยู่พัง
+ *
+ * ตรวจ 2 ชั้น: ลายเซ็น+อายุของคุกกี้ และเวอร์ชันของรหัสปัจจุบัน
+ * เปลี่ยนรหัสเมื่อไร คุกกี้เก่าตายทันทีทุกเครื่อง
+ */
+export async function requireManagerUnlock(
+  req: NextRequest,
+  userId: string,
+): Promise<null | NextResponse> {
+  const { MANAGER_COOKIE, verifyManagerUnlock } = await import("@/lib/manager-unlock");
+  const { currentPinVersion } = await import("@/lib/manager-pin-queries");
+
+  const unlock = await verifyManagerUnlock(req.cookies.get(MANAGER_COOKIE)?.value);
+  if (!unlock || unlock.userId !== userId) {
+    return posErrorResponse("manager_locked", 403);
+  }
+  const version = await currentPinVersion(userId);
+  if (version === null || version !== unlock.version) {
+    return posErrorResponse("manager_locked", 403);
+  }
+  return null;
+}
+
 export async function getPosSessionUser(userId: string): Promise<{
   id: string;
   shopName: string;

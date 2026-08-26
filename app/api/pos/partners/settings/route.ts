@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePosSessionAndPlan } from "@/lib/pos-auth";
+import { requireManagerUnlock, requirePosSessionAndPlan } from "@/lib/pos-auth";
 import { getPartnerSettings, updatePartnerSettings } from "@/lib/pos-partner-queries";
+import { logManager } from "@/lib/manager-pin-queries";
 import { z } from "zod";
 
 /**
@@ -8,6 +9,9 @@ import { z } from "zod";
  *
  * ⚠️ allowBelowCost = true คือการยอมขายขาดทุนให้หุ้นส่วน
  *    ค่าตั้งต้นคือ false และควรอยู่แบบนั้น — เปิดต้องตั้งใจจริง
+ *
+ * แก้ค่าพวกนี้ = แก้เพดานส่วนลดของทั้งร้าน จึงต้องอยู่ในโหมดผู้จัดการ
+ * ส่วนการอ่านปล่อยผ่าน เพราะหน้าเก็บเงินต้องรู้ว่าเพดานเท่าไร
  */
 
 export async function GET(req: NextRequest) {
@@ -28,6 +32,8 @@ const patchSchema = z
 export async function PATCH(req: NextRequest) {
   const userId = await requirePosSessionAndPlan(req);
   if (userId instanceof NextResponse) return userId;
+  const gate = await requireManagerUnlock(req, userId);
+  if (gate) return gate;
 
   let body: unknown;
   try {
@@ -38,7 +44,7 @@ export async function PATCH(req: NextRequest) {
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "invalid_input" }, { status: 400 });
 
-  return NextResponse.json({
-    data: { settings: await updatePartnerSettings(userId, parsed.data) },
-  });
+  const settings = await updatePartnerSettings(userId, parsed.data);
+  await logManager(userId, "partner_settings_changed", parsed.data);
+  return NextResponse.json({ data: { settings } });
 }

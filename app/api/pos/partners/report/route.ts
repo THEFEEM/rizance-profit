@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePosSessionAndPlan } from "@/lib/pos-auth";
+import { requireManagerUnlock, requirePosSessionAndPlan } from "@/lib/pos-auth";
 import { partnerReport } from "@/lib/pos-partner-queries";
 import { z } from "zod";
 
@@ -8,6 +8,9 @@ import { z } from "zod";
  *
  * อ่านจาก snapshot บนบิลเท่านั้น ไม่คำนวณใหม่
  * บิลที่ถูกยกเลิกไม่ถูกนับ (กรองด้วย status='paid' ตามนิยามยอดขายเดิม)
+ *
+ * รายงานนี้เปิดเผยต้นทุนและกำไร → ต้องอยู่ในโหมดผู้จัดการ
+ * (หน้าเก็บเงินไม่ได้ใช้ endpoint นี้ ใช้ /preview ซึ่งไม่บอกต้นทุน)
  */
 
 const querySchema = z.object({
@@ -19,6 +22,8 @@ const querySchema = z.object({
 export async function GET(req: NextRequest) {
   const userId = await requirePosSessionAndPlan(req);
   if (userId instanceof NextResponse) return userId;
+  const gate = await requireManagerUnlock(req, userId);
+  if (gate) return gate;
 
   const { searchParams } = new URL(req.url);
   const parsed = querySchema.safeParse({
