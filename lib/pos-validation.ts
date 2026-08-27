@@ -293,6 +293,13 @@ export const createPosIngredientSchema = z.object({
   targetStock: z.number().finite().gte(0).nullable().optional(),
   category: ingredientCategory,
   supplierName: supplierName,
+  /**
+   * 0089: ของนี้มาจากไหน
+   *   purchased = ซื้อเข้าร้าน (ค่าตั้งต้น)
+   *   produced  = ร้านผลิตเอง เช่น ซอสโฮมเมด → เข้าสต็อกผ่านหน้าผลิตเท่านั้น
+   * คนละเรื่องกับ category ซึ่งเป็นหมวดของ (Mayo อยู่หมวดซอสแต่ซื้อมา)
+   */
+  kind: z.enum(["purchased", "produced"]).optional(),
 });
 
 /** ไปตลาด 1 รอบ — รับของหลายตัว + ของนอกลิสต์ ในครั้งเดียว */
@@ -335,6 +342,7 @@ export const updatePosIngredientSchema = z
     targetStock: z.number().finite().gte(0).nullable().optional(),
     category: ingredientCategory,
     supplierName: supplierName,
+    kind: z.enum(["purchased", "produced"]).optional(),
   })
   .refine((d) => Object.keys(d).length > 0, { message: "At least one field is required" });
 
