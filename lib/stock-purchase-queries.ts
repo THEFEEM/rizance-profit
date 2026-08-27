@@ -6,6 +6,7 @@ import {
   INGREDIENT_RETURN,
   PosIngredientNotFoundError,
   applyReceiveLine,
+  assertReceivable,
   type IngredientRow,
 } from "@/lib/pos-ingredient-queries";
 
@@ -254,6 +255,8 @@ export async function receivePurchase(
       [userId, ids],
     );
     if (locked.length !== ids.length) throw new PosIngredientNotFoundError();
+    // 0089: ซอสที่ร้านผลิตเองห้ามเข้าสต็อกผ่านใบซื้อ ต้องผ่านหน้าผลิต
+    locked.forEach(assertReceivable);
     const byId = new Map(locked.map((r) => [r.id, r]));
 
     // หน่วยบรรจุของทุกตัวที่เกี่ยวข้อง (query เดียว)

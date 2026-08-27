@@ -37,7 +37,16 @@ export type PosIngredient = {
   lastPurchasePrice: string | null;
   lastPurchasedAt: string | null;
   supplierName: string | null;
+  /**
+   * 0089: ของนี้มาจากไหน
+   *   purchased = ซื้อเข้าร้าน (ค่าตั้งต้น)
+   *   produced  = ร้านผลิตเอง เช่น ซอสโฮมเมด → เข้าสต็อกผ่านหน้าผลิตเท่านั้น
+   * คนละเรื่องกับ category ซึ่งเป็น "หมวดของ" (Mayo ก็อยู่หมวดซอส แต่ซื้อมา)
+   */
+  kind: IngredientKind;
 };
+
+export type IngredientKind = "purchased" | "produced";
 
 export type PosRecipeLine = {
   ingredientId: string;
@@ -65,6 +74,7 @@ export type IngredientRow = {
   last_purchase_price: string | null;
   last_purchased_at: Date | string | null;
   supplier_name: string | null;
+  kind: IngredientKind;
 };
 
 /** @internal — เปิดให้ stock-purchase-queries ใช้ ไม่ควรใช้ที่อื่น */
@@ -73,7 +83,8 @@ export const INGREDIENT_RETURN = `id, name, purchase_quantity::text AS purchase_
   stock_qty::text AS stock_qty, low_stock_threshold::text AS low_stock_threshold,
   target_stock::text AS target_stock,
   category, avg_cost::text AS avg_cost,
-  last_purchase_price::text AS last_purchase_price, last_purchased_at, supplier_name`;
+  last_purchase_price::text AS last_purchase_price, last_purchased_at, supplier_name,
+  kind`;
 
 /** ต้นทุนต่อ 1 หน่วยซื้อ (สตางค์-safe, ปัดที่ 4 ตำแหน่งเพื่อความแม่นของสูตร) */
 function costPerPurchaseUnit(purchasePrice: string, purchaseQuantity: string): string {
@@ -104,7 +115,30 @@ function mapIngredient(r: IngredientRow): PosIngredient {
           ? r.last_purchased_at.toISOString()
           : String(r.last_purchased_at),
     supplierName: r.supplier_name,
+    kind: r.kind ?? "purchased",
   };
+}
+
+/**
+ * 0089: ของที่ร้านผลิตเองต้องเข้าสต็อกผ่านหน้าผลิตเท่านั้น
+ *
+ * ถ้าปล่อยให้ "รับของเข้า" เพิ่มสต็อกซอสได้ จะเกิดสองปัญหา:
+ *   1) ค่าวัตถุดิบถูกลงเป็นรายจ่ายซ้ำ (ครั้งแรกตอนซื้อ Mayo ครั้งที่สองตอนรับซอส)
+ *   2) ต้นทุนซอสต่อกรัมกลายเป็นค่าที่คนกรอกมือ ไม่ใช่ค่าที่คำนวณจากการผลิตจริง
+ *
+ * บล็อกที่ชั้นนี้ ไม่ใช่ที่ CHECK ของ DB เพราะต้องการข้อความที่ผู้ใช้อ่านรู้เรื่อง
+ * และ engine รับของถูกใช้ร่วมกันหลายทาง (รับของ · โหมดไปตลาด · ใบซื้อ)
+ */
+export class IngredientIsProducedError extends Error {
+  constructor(public ingredientName?: string) {
+    super("ingredient_is_produced");
+    this.name = "IngredientIsProducedError";
+  }
+}
+
+/** ปฏิเสธถ้าแถวนี้เป็นของที่ผลิตเอง — เรียกหลังล็อกแถวแล้วทุกครั้ง */
+export function assertReceivable(row: Pick<IngredientRow, "kind" | "name">): void {
+  if (row.kind === "produced") throw new IngredientIsProducedError(row.name);
 }
 
 export class PosIngredientNotFoundError extends Error {
@@ -139,18 +173,24 @@ export type UpsertIngredientInput = {
   targetStock?: number | null;
   category?: string | null;
   supplierName?: string | null;
+  /** 0089: purchased (ค่าตั้งต้น) หรือ produced สำหรับของที่ร้านผลิตเอง */
+  kind?: IngredientKind;
 };
 
 export async function createPosIngredient(
   userId: string,
   input: UpsertIngredientInput,
 ): Promise<PosIngredient> {
+  const seedCost =
+    input.purchaseQuantity > 0
+      ? (input.purchasePrice / input.purchaseQuantity).toFixed(4)
+      : null;
   const { rows } = await pool.query<IngredientRow>(
     `INSERT INTO ingredients
        (user_id, name, purchase_quantity, purchase_unit, purchase_price,
         track_stock, low_stock_threshold, target_stock, category, supplier_name,
-        avg_cost, last_purchase_price)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11)
+        avg_cost, last_purchase_price, kind)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
      RETURNING ${INGREDIENT_RETURN}`,
     [
       userId,
@@ -163,9 +203,10 @@ export async function createPosIngredient(
       input.targetStock ?? null,
       input.category?.trim() || null,
       input.supplierName?.trim() || null,
-      input.purchaseQuantity > 0
-        ? (input.purchasePrice / input.purchaseQuantity).toFixed(4)
-        : null,
+      seedCost,
+      // ของที่ผลิตเองไม่มี "ราคาซื้อล่าสุด" — ปล่อย null ไว้ ไม่โกหกรายงาน
+      (input.kind ?? "purchased") === "produced" ? null : seedCost,
+      input.kind ?? "purchased",
     ],
   );
   return mapIngredient(rows[0]);
@@ -197,6 +238,7 @@ export async function updatePosIngredient(
   if (input.category !== undefined) push("category", input.category?.trim() || null);
   if (input.supplierName !== undefined)
     push("supplier_name", input.supplierName?.trim() || null);
+  if (input.kind !== undefined) push("kind", input.kind);
 
   if (sets.length === 0) {
     const { rows } = await pool.query<IngredientRow>(
@@ -585,6 +627,7 @@ export async function restockIngredient(
       [userId, input.ingredientId],
     );
     if (!found[0]) throw new PosIngredientNotFoundError();
+    assertReceivable(found[0]);
 
     let expenseEntryId: string | null = null;
     const costCents = input.totalCost ? toCents(input.totalCost) : 0;
@@ -674,8 +717,19 @@ export async function applyReceiveLine(
     expenseEntryId: string | null;
     purchaseId: string | null;
     note: string | null;
+    /**
+     * 0089: ของเข้ามาจากไหน
+     *   purchase   → movement 'restock' · อัปเดต last_purchase_price + last_purchased_at
+     *   production → movement 'production_output' · **ห้ามแตะ last_purchase_price**
+     *                เพราะซอสโฮมเมดไม่ได้ถูกซื้อ ถ้าตั้งไว้รายงาน "ซื้อล่าสุด" จะโกหก
+     * ไม่ระบุ = purchase (พฤติกรรมเดิมเป๊ะ ทุก caller เดิมไม่ต้องแก้)
+     */
+    source?: "purchase" | "production";
+    productionBatchId?: string | null;
   },
 ): Promise<{ qtyBefore: number; qtyAfter: number; unitCost: number | null }> {
+  const source = opts.source ?? "purchase";
+  const isPurchase = source === "purchase";
   const stockBefore = Number(before.stock_qty) || 0;
   const unitCost = opts.lineCost != null ? opts.lineCost / opts.qtyIn : null;
 
@@ -691,6 +745,9 @@ export async function applyReceiveLine(
         : unitCost;
   }
 
+  // ราคาซื้อล่าสุด: อัปเดตเฉพาะตอน "ซื้อ" จริง — การผลิตไม่ใช่การซื้อ
+  const lastPrice = isPurchase && unitCost != null ? unitCost.toFixed(2) : null;
+
   await client.query(
     `UPDATE ingredients
      SET stock_qty = stock_qty + $3,
@@ -705,21 +762,23 @@ export async function applyReceiveLine(
       userId,
       opts.qtyIn,
       avgCost == null ? null : avgCost.toFixed(4),
-      unitCost == null ? null : unitCost.toFixed(2),
+      lastPrice,
     ],
   );
 
   const qtyAfter = stockBefore + opts.qtyIn;
   await client.query(
     `INSERT INTO ingredient_stock_movements
-       (user_id, ingredient_id, expense_entry_id, purchase_id, movement_type,
-        qty_change, qty_before, qty_after, note)
-     VALUES ($1, $2, $3, $4, 'restock', $5, $6, $7, $8)`,
+       (user_id, ingredient_id, expense_entry_id, purchase_id, production_batch_id,
+        movement_type, qty_change, qty_before, qty_after, note)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
     [
       userId,
       before.id,
       opts.expenseEntryId,
       opts.purchaseId,
+      opts.productionBatchId ?? null,
+      isPurchase ? "restock" : "production_output",
       opts.qtyIn,
       stockBefore.toFixed(4),
       qtyAfter.toFixed(4),
@@ -778,6 +837,7 @@ export async function restockIngredientsBatch(
       [userId, ids],
     );
     if (locked.length !== ids.length) throw new PosIngredientNotFoundError();
+    locked.forEach(assertReceivable);
     const byId = new Map(locked.map((r) => [r.id, r]));
 
     // ยอดรวมทั้งทริป (สตางค์-safe)
@@ -934,7 +994,15 @@ export async function getShoppingList(
               SELECT SUM(-m.qty_change)
               FROM ingredient_stock_movements m
               WHERE m.ingredient_id = i.id
-                AND m.movement_type = 'sale'
+                -- 0089: วัตถุดิบถูกใช้ไป 2 ทาง ต้องนับทั้งคู่
+                --   sale             = ขายอาหารตรง ๆ
+                --   production_input = ถูกใช้ผลิตซอส
+                -- ถ้านับแค่ sale: Mayo ที่ถูกใช้ผลิต 2,000g จะรายงานว่าใช้ 0g
+                -- → daysLeft ผิด → ไม่เตือนให้ซื้อ → Mayo หมดกลางร้าน
+                --
+                -- ⚠️ production_output ห้ามนับ — มันคือของ "เข้า" ไม่ใช่ของใช้ไป
+                --    (ตัวเลข qty_change เป็นบวก ถ้าเผลอนับจะหักกลบกันจนเพี้ยน)
+                AND m.movement_type IN ('sale', 'production_input')
                 AND m.created_at >= now() - ($2 || ' days')::interval
             ), 0)::text AS used
      FROM ingredients i
