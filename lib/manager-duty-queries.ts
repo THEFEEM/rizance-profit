@@ -162,6 +162,83 @@ async function mapDuty(r: DutyRow): Promise<DutyView> {
   };
 }
 
+// ═══ M4 · Smart Evidence — ระบบยืนยันแทนการติ๊กมือ ═══════════════
+//
+// หลัก: System Evidence > Manual Checkbox
+// ถ้าข้อมูลจริงพิสูจน์ได้ว่างานเกิดขึ้นแล้ว ไม่ต้องให้ผู้จัดการติ๊กซ้ำ
+//
+// ครอบเฉพาะข้อที่มีหลักฐานจริงในระบบ:
+//   "รับของ/บันทึกของเข้า"  ← ใบซื้อ (stock_purchases) ของวันนี้
+//   "ทำซอส"                ← ใบผลิต (production_batches) ที่ปิดวันนี้
+//   "ตรวจเงินสด"            ← เช็คเงินสดที่ปิดแล้ว (ทำใน completeCashCheck อยู่แล้ว)
+// ข้อที่พิสูจน์ไม่ได้ (ความสะอาด/คุณภาพ/อุปกรณ์) ยังเป็นหน้าที่คนติ๊ก — ตั้งใจ
+//
+// แตะเฉพาะข้อที่ยัง pending — ผู้จัดการติ๊กเอง/ทำเครื่องหมายอื่นไว้ ไม่ทับ
+
+async function applySystemEvidence(userId: string, dutyId: string, date: string): Promise<void> {
+  // ── ใบซื้อวันนี้ → "รับของ" + "บันทึกของเข้า" + "ซื้อของ" ──
+  const { rows: purchases } = await pool.query<{ n: string; total: string; items: string }>(
+    `SELECT COUNT(*)::text AS n, COALESCE(SUM(total), 0)::text AS total,
+            COALESCE(SUM((SELECT COUNT(*) FROM stock_purchase_items i
+                          WHERE i.purchase_id = p.id)), 0)::text AS items
+     FROM stock_purchases p
+     WHERE p.user_id = $1 AND p.business_date = $2::date AND p.status = 'received'`,
+    [userId, date],
+  );
+  if (Number(purchases[0].n) > 0) {
+    await pool.query(
+      // ⚠️ ทุก parameter ต้องถูกอ้างใน SQL — ส่งเกินมา Postgres โยน 42P18
+      `UPDATE manager_duty_items SET
+         status = 'done',
+         evidence = jsonb_build_object(
+           'kind', 'purchase',
+           'purchases', $2::int, 'items', $3::int, 'total', $4::text),
+         updated_at = now()
+       WHERE duty_id = $1 AND status = 'pending'
+         AND (title LIKE '%ซื้อของ%' OR title LIKE '%รับของ%' OR title LIKE '%ของเข้า%')`,
+      [dutyId, Number(purchases[0].n), Number(purchases[0].items), purchases[0].total],
+    );
+  }
+
+  // ── ใบผลิตที่ปิดวันนี้ → "ทำซอส" ──
+  const { rows: batches } = await pool.query<{ n: string; qty: string }>(
+    `SELECT COUNT(*)::text AS n, COALESCE(SUM(actual_output_qty), 0)::text AS qty
+     FROM production_batches
+     WHERE user_id = $1 AND business_date = $2::date AND status = 'completed'`,
+    [userId, date],
+  );
+  if (Number(batches[0].n) > 0) {
+    await pool.query(
+      `UPDATE manager_duty_items SET
+         status = 'done',
+         evidence = jsonb_build_object(
+           'kind', 'production', 'batches', $2::int, 'outputQty', $3::text),
+         updated_at = now()
+       WHERE duty_id = $1 AND status = 'pending' AND title LIKE '%ซอส%'`,
+      [dutyId, Number(batches[0].n), batches[0].qty],
+    );
+  }
+
+  // ── เช็คเงินสดปิดแล้ว → "ตรวจเงินสด" ──
+  // (completeCashCheck ทำให้ทันทีอยู่แล้ว — ตรงนี้เก็บตกกรณีเช็คปิดก่อนเปิดรอบ)
+  const { rows: cash } = await pool.query<{ id: string; difference: string }>(
+    `SELECT id, difference::text AS difference FROM daily_cash_checks
+     WHERE user_id = $1 AND business_date = $2::date AND status = 'completed'`,
+    [userId, date],
+  );
+  if (cash[0]) {
+    await pool.query(
+      `UPDATE manager_duty_items SET
+         status = 'done',
+         evidence = jsonb_build_object(
+           'kind', 'cash_check', 'checkId', $2::text, 'difference', $3::text),
+         updated_at = now()
+       WHERE duty_id = $1 AND status = 'pending' AND title LIKE '%เงินสด%'`,
+      [dutyId, cash[0].id, cash[0].difference],
+    );
+  }
+}
+
 // ═══ อ่านสถานะสัปดาห์ (หน้า home ผู้จัดการ) ═════════════════════
 
 export async function managerWeek(token: string): Promise<ManagerWeekView | null> {
@@ -195,6 +272,12 @@ export async function managerWeek(token: string): Promise<ManagerWeekView | null
       [emp.user_id, emp.id, today],
     ),
   ]);
+
+  // M4: รอบวันนี้ยังเปิดอยู่ → เก็บหลักฐานจากระบบก่อนส่งให้หน้าจอ
+  // (ทุกครั้งที่รีเฟรช — ซื้อของ/ผลิตซอสหลังเปิดรอบก็ถูกติ๊กให้เอง)
+  if (todayRows[0] && todayRows[0].status === "open") {
+    await applySystemEvidence(emp.user_id, todayRows[0].id, today);
+  }
 
   return {
     weekStart,
@@ -270,6 +353,10 @@ export async function openDuty(token: string): Promise<DutyView> {
     );
 
     await client.query("COMMIT");
+
+    // M4: เปิดรอบปุ๊บ เก็บหลักฐานที่มีอยู่แล้วทันที
+    // (เช่น ไปตลาดตอนเช้าก่อนเปิดรอบ — ข้อ "ซื้อของ" ต้องติ๊กให้เองเลย)
+    await applySystemEvidence(emp.user_id, created[0].id, today);
     return mapDuty(created[0]);
   } catch (err) {
     await client.query("ROLLBACK");

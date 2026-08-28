@@ -216,6 +216,14 @@ export function calcItems(rows: CalcRow[], otMultiplier: number): CalcItem[] {
 /**
  * โหมดเงินกองกลาง (0083): items มาจาก daily_allocations แทนรายชั่วโมง
  * โครงเดิมทั้งหมด (period · approve · expense · immutable · adjust) ใช้ต่อ
+ *
+ * ═══ M3 (0091): แหล่งเงินผู้จัดการเปลี่ยน ═══════════════════════
+ * งวดที่เริ่ม >= MANAGER_WEEKLY_CUTOVER:
+ *   · ผู้จัดการ = ยอดอนุมัติรายสัปดาห์ (Owner Approved Weekly Compensation)
+ *     ตัดกิ่ง manager ของ pool ทิ้ง — Staff Pool Manager Contribution = 0
+ *   · ห้ามสองแหล่ง (daily_rate + weekly) จ่ายพร้อมกันในงวดเดียว —
+ *     บังคับที่นี่โดยการ "เลือกทางเดียว" ตามวันเริ่มงวด
+ * งวดที่เริ่มก่อน cutover: สูตรเดิมทั้งหมด ไม่ย้อนแก้
  */
 async function calcItemsFromPool(
   userId: string,
@@ -223,33 +231,74 @@ async function calcItemsFromPool(
   periodEnd: string,
 ): Promise<CalcItem[]> {
   const { summarizePeriod } = await import("@/lib/hr-daily-pool-queries");
+  const { MANAGER_WEEKLY_CUTOVER, managerPayrollLines } = await import(
+    "@/lib/manager-week-queries"
+  );
   const summary = await summarizePeriod(userId, periodStart, periodEnd);
+  const weeklyMode = periodStart >= MANAGER_WEEKLY_CUTOVER;
 
-  return summary.perEmployee.map((e) => ({
-    employeeId: e.employeeId,
-    employeeName: e.employeeName,
-    // เก็บเป็น 'daily' — ค่าแรงคิดเป็นวัน ไม่ใช่ชั่วโมง (CHECK ของ 0080 รองรับ)
-    wageType: "daily" as const,
-    wageRateSnapshot:
-      e.daysWorked > 0
-        ? centsToDecimalString(Math.round(toCents(e.total) / e.daysWorked))
-        : "0.00",
-    regularMinutes: 0,
-    otMinutes: 0,
-    daysWorked: e.daysWorked,
-    regularCents: toCents(e.total),
-    otCents: 0,
-    breakdown: Object.entries(e.byDate).map(([date, amount]) => ({
-      date,
-      attendanceId: "",
+  const items: CalcItem[] = summary.perEmployee
+    // งวดใหม่: ผู้จัดการไม่รับผ่าน pool — กันจ่ายซ้ำที่ต้นทางตัวเลข
+    .filter((e) => !(weeklyMode && e.kind === "manager"))
+    .map((e) => ({
+      employeeId: e.employeeId,
+      employeeName: e.employeeName,
+      // เก็บเป็น 'daily' — ค่าแรงคิดเป็นวัน ไม่ใช่ชั่วโมง (CHECK ของ 0080 รองรับ)
+      wageType: "daily" as const,
+      wageRateSnapshot:
+        e.daysWorked > 0
+          ? centsToDecimalString(Math.round(toCents(e.total) / e.daysWorked))
+          : "0.00",
       regularMinutes: 0,
       otMinutes: 0,
-      lateMinutes: null,
-      rate: amount,
-      regularAmount: amount,
-      otAmount: "0.00",
-    })),
-  }));
+      daysWorked: e.daysWorked,
+      regularCents: toCents(e.total),
+      otCents: 0,
+      breakdown: Object.entries(e.byDate).map(([date, amount]) => ({
+        date,
+        attendanceId: "",
+        regularMinutes: 0,
+        otMinutes: 0,
+        lateMinutes: null,
+        rate: amount,
+        regularAmount: amount,
+        otAmount: "0.00",
+      })),
+    }));
+
+  if (weeklyMode) {
+    const managers = await managerPayrollLines(userId, periodStart, periodEnd);
+    for (const m of managers) {
+      if (m.totalCents <= 0 && m.weeks.length === 0) continue;
+      items.push({
+        employeeId: m.employeeId,
+        employeeName: m.employeeName,
+        wageType: "daily" as const,
+        // "อัตรา" ในสลิป = ยอดต่อสัปดาห์ (จำนวนสัปดาห์อยู่ใน daysWorked)
+        wageRateSnapshot:
+          m.weeks.length > 0
+            ? centsToDecimalString(Math.round(m.totalCents / m.weeks.length))
+            : "0.00",
+        regularMinutes: 0,
+        otMinutes: 0,
+        daysWorked: m.weeks.length,
+        regularCents: m.totalCents,
+        otCents: 0,
+        breakdown: m.weeks.map((w) => ({
+          date: w.weekStart,
+          attendanceId: "",
+          regularMinutes: 0,
+          otMinutes: 0,
+          lateMinutes: null,
+          rate: centsToDecimalString(w.amountCents),
+          regularAmount: centsToDecimalString(w.amountCents),
+          otAmount: "0.00",
+        })),
+      });
+    }
+  }
+
+  return items;
 }
 
 async function payrollModeOf(userId: string): Promise<"hourly" | "daily_pool"> {
