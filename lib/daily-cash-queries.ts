@@ -6,7 +6,7 @@ import { centsToDecimalString, toCents } from "@/lib/money";
 import { NotManagerError } from "@/lib/manager-duty-queries";
 
 /**
- * สมุดเงินสดรายวัน (0091)
+ * สมุดเงินสดรายวัน (0091 · แยกเป็น Financial Control อิสระใน 0092)
  *
  * ═══ สมการ ═══════════════════════════════════════════════════
  *   ควรมี  = ยกมา + ขายเงินสด − รายจ่ายเงินสด + เงินเข้า − ถอนออก
@@ -19,6 +19,13 @@ import { NotManagerError } from "@/lib/manager-duty-queries";
  *                  ไม่มีทาง double count เพราะไม่มีตารางรายจ่ายที่สอง
  *   เงินเข้า/ถอน ← cash_movements (เฉพาะ cash_in/withdrawal)
  *   ยกมา        ← เช็คที่ปิดแล้วของวันก่อน (carried) หรือกรอกครั้งแรก (manual)
+ *
+ * ═══ ใครปิดได้ (C-2 · 28 ส.ค. 2569) ═════════════════════════════
+ *   core ทุกตัวรับ userId + actor — มีสองทางเข้าที่พิสูจน์ตัวตนแล้วเท่านั้น:
+ *     · ผู้จัดการ: token wrapper (managerByToken — hr_role ตรวจที่ server)
+ *     · เจ้าของ:   /api/pos/cash หลัง requirePosSessionAndPlan + requireManagerUnlock
+ *   Cash Closing ไม่ผูกกับ Manager Duty — วันไม่มีรอบผู้จัดการก็ปิดเงินสดได้
+ *   และการปิดเงินสดไม่นับเป็น duty ไม่แตะ payroll
  *
  * ═══ ปิดเช็คแล้ว = snapshot ถาวร ═══════════════════════════════
  *   void บิล/แก้ expense ย้อนหลังทำให้ตัวเลขสดขยับได้
@@ -65,6 +72,14 @@ async function managerByToken(token: string): Promise<ManagerEmp | null> {
   if (rows[0].hr_role !== "manager") throw new NotManagerError();
   return rows[0];
 }
+
+/**
+ * ใครเป็นคนทำรายการ — ใช้ snapshot ชื่อผู้ตรวจ + audit log
+ * employeeId = null คือเจ้าของ (POS session ไม่มีตัวตนพนักงาน)
+ */
+export type CashActor = { employeeId: string | null; name: string };
+
+export const OWNER_ACTOR: CashActor = { employeeId: null, name: "เจ้าของร้าน" };
 
 // ═══ views ═════════════════════════════════════════════════════
 
@@ -227,65 +242,76 @@ async function movementLines(userId: string, date: string): Promise<CashMovement
   }));
 }
 
-/** จอเงินสดของวันนี้ — completed แล้วอ่านจาก snapshot ไม่คำนวณใหม่ */
-export async function dailyCashView(token: string): Promise<DailyCashView | null> {
-  const emp = await managerByToken(token);
-  if (!emp) return null;
+type CheckRow = {
+  id: string; business_date: string; status: "open" | "completed";
+  opening_cash: string; opening_source: "carried" | "manual";
+  cash_sales: string | null; cash_expenses: string | null;
+  cash_in: string | null; withdrawals: string | null;
+  expected_cash: string | null; actual_cash: string | null;
+  difference: string | null; difference_reason: string | null;
+  counted_by_name: string | null; completed_at: string | null;
+};
 
-  const cutoff = await getDayCutoffHour(emp.user_id);
+const CHECK_COLS = `id, business_date::text AS business_date, status,
+  opening_cash::text AS opening_cash, opening_source,
+  cash_sales::text AS cash_sales, cash_expenses::text AS cash_expenses,
+  cash_in::text AS cash_in, withdrawals::text AS withdrawals,
+  expected_cash::text AS expected_cash, actual_cash::text AS actual_cash,
+  difference::text AS difference, difference_reason,
+  counted_by_name, completed_at::text AS completed_at`;
+
+/** view ของเช็คที่ "ปิดแล้ว" — ทุกตัวเลขจาก snapshot (รายการย่อยเป็นข้อมูลประกอบ) */
+async function completedView(userId: string, check: CheckRow): Promise<DailyCashView> {
+  const [lines, moves] = await Promise.all([
+    expenseLines(userId, check.business_date),
+    movementLines(userId, check.business_date),
+  ]);
+  return {
+    businessDate: check.business_date,
+    status: "completed",
+    checkId: check.id,
+    openingCash: check.opening_cash,
+    openingSource: check.opening_source,
+    suggestedOpening: null,
+    cashSales: check.cash_sales ?? "0",
+    cashExpenses: check.cash_expenses ?? "0",
+    cashIn: check.cash_in ?? "0",
+    withdrawals: check.withdrawals ?? "0",
+    expectedCash: check.expected_cash,
+    actualCash: check.actual_cash,
+    difference: check.difference,
+    differenceReason: check.difference_reason,
+    countedByName: check.counted_by_name,
+    completedAt: check.completed_at,
+    expenseLines: lines,
+    movementLines: moves,
+  };
+}
+
+// ═══ core — per user (ผู้จัดการผ่าน token / เจ้าของผ่าน POS session) ═══
+
+/** จอเงินสดของวันนี้ — completed แล้วอ่านจาก snapshot ไม่คำนวณใหม่ */
+export async function dailyCashViewForUser(userId: string): Promise<DailyCashView> {
+  const cutoff = await getDayCutoffHour(userId);
   const date = businessDate(cutoff);
 
-  const { rows: checks } = await pool.query<{
-    id: string; status: "open" | "completed";
-    opening_cash: string; opening_source: "carried" | "manual";
-    cash_sales: string | null; cash_expenses: string | null;
-    cash_in: string | null; withdrawals: string | null;
-    expected_cash: string | null; actual_cash: string | null;
-    difference: string | null; difference_reason: string | null;
-    counted_by_name: string | null; completed_at: string | null;
-  }>(
-    `SELECT id, status, opening_cash::text AS opening_cash, opening_source,
-            cash_sales::text AS cash_sales, cash_expenses::text AS cash_expenses,
-            cash_in::text AS cash_in, withdrawals::text AS withdrawals,
-            expected_cash::text AS expected_cash, actual_cash::text AS actual_cash,
-            difference::text AS difference, difference_reason,
-            counted_by_name, completed_at::text AS completed_at
-     FROM daily_cash_checks WHERE user_id = $1 AND business_date = $2::date`,
-    [emp.user_id, date],
+  const { rows: checks } = await pool.query<CheckRow>(
+    `SELECT ${CHECK_COLS} FROM daily_cash_checks
+     WHERE user_id = $1 AND business_date = $2::date`,
+    [userId, date],
   );
   const check = checks[0] ?? null;
 
+  // ── ปิดแล้ว: ทุกตัวเลขจาก snapshot — void ย้อนหลังไม่ทำให้รายงานขยับ ──
+  if (check && check.status === "completed") return completedView(userId, check);
+
   const [lines, moves] = await Promise.all([
-    expenseLines(emp.user_id, date),
-    movementLines(emp.user_id, date),
+    expenseLines(userId, date),
+    movementLines(userId, date),
   ]);
 
-  // ── ปิดแล้ว: ทุกตัวเลขจาก snapshot — void ย้อนหลังไม่ทำให้รายงานขยับ ──
-  if (check && check.status === "completed") {
-    return {
-      businessDate: date,
-      status: "completed",
-      checkId: check.id,
-      openingCash: check.opening_cash,
-      openingSource: check.opening_source,
-      suggestedOpening: null,
-      cashSales: check.cash_sales ?? "0",
-      cashExpenses: check.cash_expenses ?? "0",
-      cashIn: check.cash_in ?? "0",
-      withdrawals: check.withdrawals ?? "0",
-      expectedCash: check.expected_cash,
-      actualCash: check.actual_cash,
-      difference: check.difference,
-      differenceReason: check.difference_reason,
-      countedByName: check.counted_by_name,
-      completedAt: check.completed_at,
-      expenseLines: lines,
-      movementLines: moves,
-    };
-  }
-
   // ── ยังไม่ปิด: คำนวณสด ──
-  const live = await liveTotals(emp.user_id, date);
+  const live = await liveTotals(userId, date);
   const opening = check?.opening_cash ?? null;
   const expected =
     opening == null
@@ -304,7 +330,7 @@ export async function dailyCashView(token: string): Promise<DailyCashView | null
     checkId: check?.id ?? null,
     openingCash: opening,
     openingSource: check?.opening_source ?? null,
-    suggestedOpening: check ? null : await suggestedOpening(emp.user_id, date),
+    suggestedOpening: check ? null : await suggestedOpening(userId, date),
     cashSales: live.cashSales,
     cashExpenses: live.cashExpenses,
     cashIn: live.cashIn,
@@ -320,24 +346,19 @@ export async function dailyCashView(token: string): Promise<DailyCashView | null
   };
 }
 
-// ═══ เริ่มเช็คของวัน (ตั้งเงินยกมา) ══════════════════════════════
-
 /**
  * เริ่มเช็ค — ครั้งแรกของร้านต้องกรอกยอดนับจริง (manual)
  * วันถัด ๆ ไประบบเสนอยอดยกจากเช็คปิดของวันก่อน (carried) แก้ได้ถ้าไม่ตรง
  * เริ่มซ้ำ = คืนของเดิม
  */
-export async function startCashCheck(
-  token: string,
+export async function startCashCheckForUser(
+  userId: string,
   input: { openingCash?: number | null },
 ): Promise<DailyCashView> {
-  const emp = await managerByToken(token);
-  if (!emp) throw new CashCheckNotFoundError();
-
-  const cutoff = await getDayCutoffHour(emp.user_id);
+  const cutoff = await getDayCutoffHour(userId);
   const date = businessDate(cutoff);
 
-  const carried = await suggestedOpening(emp.user_id, date);
+  const carried = await suggestedOpening(userId, date);
   const manual = input.openingCash;
 
   let opening: string;
@@ -357,29 +378,23 @@ export async function startCashCheck(
     `INSERT INTO daily_cash_checks (user_id, business_date, opening_cash, opening_source)
      VALUES ($1, $2::date, $3, $4)
      ON CONFLICT (user_id, business_date) DO NOTHING`,
-    [emp.user_id, date, opening, source],
+    [userId, date, opening, source],
   );
 
-  const view = await dailyCashView(token);
-  if (!view) throw new CashCheckNotFoundError();
-  return view;
+  return dailyCashViewForUser(userId);
 }
-
-// ═══ รายจ่ายเงินสด / เงินเข้า-ถอนออก ═════════════════════════════
 
 /**
  * เพิ่มรายจ่ายเงินสด = insert expense_entries ธรรมดา (ตารางเดิม แหล่งเดียว)
  * ⚠️ ของที่ซื้อผ่านหน้ารับของ/ใบซื้อ ไม่ต้องกรอกซ้ำ — โผล่ในลิสต์อยู่แล้ว
  */
-export async function addCashExpense(
-  token: string,
+export async function addCashExpenseForUser(
+  userId: string,
   input: { label: string; amount: number; category?: string },
 ): Promise<DailyCashView> {
-  const emp = await managerByToken(token);
-  if (!emp) throw new CashCheckNotFoundError();
-  await assertNotCompleted(emp.user_id);
+  await assertNotCompleted(userId);
 
-  const cutoff = await getDayCutoffHour(emp.user_id);
+  const cutoff = await getDayCutoffHour(userId);
   const date = businessDate(cutoff);
   // หมวดต้องอยู่ใน CHECK ของ expense_entries (0009) — "อื่น ๆ" คือ expense_misc
   const cat = ["materials", "equipment", "utilities"].includes(input.category ?? "")
@@ -389,24 +404,21 @@ export async function addCashExpense(
   await pool.query(
     `INSERT INTO expense_entries (user_id, amount, category, payment_method, note, entry_date)
      VALUES ($1, $2, $3, 'cash', $4, $5::date)`,
-    [emp.user_id, input.amount.toFixed(2), cat, input.label.trim().slice(0, 255), date],
+    [userId, input.amount.toFixed(2), cat, input.label.trim().slice(0, 255), date],
   );
-  const view = await dailyCashView(token);
-  if (!view) throw new CashCheckNotFoundError();
-  return view;
+  return dailyCashViewForUser(userId);
 }
 
 /** เงินเข้า (เติมทอน — ไม่ใช่รายได้) / ถอนออก (ฝากธนาคาร — ไม่ใช่รายจ่าย) */
-export async function addCashMovement(
-  token: string,
+export async function addCashMovementForUser(
+  userId: string,
+  actor: CashActor,
   input: { movementType: "cash_in" | "withdrawal"; amount: number; reason: string },
 ): Promise<DailyCashView> {
-  const emp = await managerByToken(token);
-  if (!emp) throw new CashCheckNotFoundError();
-  await assertNotCompleted(emp.user_id);
+  await assertNotCompleted(userId);
   if (!input.reason.trim()) throw new CashReasonRequiredError();
 
-  const cutoff = await getDayCutoffHour(emp.user_id);
+  const cutoff = await getDayCutoffHour(userId);
   const date = businessDate(cutoff);
 
   await pool.query(
@@ -415,18 +427,16 @@ export async function addCashMovement(
         created_by_employee_id, created_by_name)
      VALUES ($1, $2::date, $3, $4, $5, $6, $7)`,
     [
-      emp.user_id,
+      userId,
       date,
       input.movementType,
       input.amount.toFixed(2),
       input.reason.trim().slice(0, 255),
-      emp.id,
-      emp.name,
+      actor.employeeId,
+      actor.name,
     ],
   );
-  const view = await dailyCashView(token);
-  if (!view) throw new CashCheckNotFoundError();
-  return view;
+  return dailyCashViewForUser(userId);
 }
 
 /** เช็คของวันนี้ปิดแล้วห้ามเพิ่มรายการเงินสดผ่านหน้านี้ (snapshot ต้องนิ่ง) */
@@ -440,16 +450,13 @@ async function assertNotCompleted(userId: string): Promise<void> {
   if (rows[0]?.status === "completed") throw new CashCheckCompletedError();
 }
 
-// ═══ ปิดเช็ค — จุดเดียวที่ client ส่งตัวเลข (นับจริง) ═══════════════
-
-export async function completeCashCheck(
-  token: string,
+/** ปิดเช็ค — จุดเดียวที่ client ส่งตัวเลข (นับจริง) */
+export async function completeCashCheckForUser(
+  userId: string,
+  actor: CashActor,
   input: { actualCash: number; differenceReason?: string | null },
 ): Promise<DailyCashView> {
-  const emp = await managerByToken(token);
-  if (!emp) throw new CashCheckNotFoundError();
-
-  const cutoff = await getDayCutoffHour(emp.user_id);
+  const cutoff = await getDayCutoffHour(userId);
   const date = businessDate(cutoff);
 
   const client = await pool.connect();
@@ -464,13 +471,13 @@ export async function completeCashCheck(
        FROM daily_cash_checks
        WHERE user_id = $1 AND business_date = $2::date
        FOR UPDATE`,
-      [emp.user_id, date],
+      [userId, date],
     );
     if (!checks[0]) throw new CashCheckNotFoundError();
     if (checks[0].status === "completed") throw new CashCheckCompletedError();
 
     // ★ ตัวเลขทุกตัวคำนวณสดฝั่ง server ณ วินาทีปิด — ไม่รับจาก client
-    const live = await liveTotals(emp.user_id, date);
+    const live = await liveTotals(userId, date);
     const expectedCents =
       toCents(checks[0].opening_cash) +
       toCents(live.cashSales) -
@@ -503,12 +510,14 @@ export async function completeCashCheck(
         centsToDecimalString(actualCents),
         centsToDecimalString(diffCents),
         diffCents === 0 ? null : reason,
-        emp.id,
-        emp.name,
+        actor.employeeId,
+        actor.name,
       ],
     );
 
     // Mission เงินสดในรอบงานวันนี้ → done อัตโนมัติ (System Evidence)
+    // 0092 ตัดข้อนี้ออกจาก template แล้ว — duty ใหม่ไม่มีข้อให้ติ๊ก = no-op ปลอดภัย
+    // duty เก่าที่ snapshot ข้อนี้ไว้ก่อน 0092 ยังถูกติ๊กให้ตามเดิม (ห้าม rewrite history)
     await client.query(
       `UPDATE manager_duty_items i SET
          status = 'done',
@@ -520,15 +529,16 @@ export async function completeCashCheck(
        WHERE i.duty_id = d.id AND d.user_id = $1 AND d.business_date = $2::date
          AND d.status = 'open'
          AND i.title LIKE '%เงินสด%' AND i.status = 'pending'`,
-      [emp.user_id, date, checks[0].id, centsToDecimalString(diffCents)],
+      [userId, date, checks[0].id, centsToDecimalString(diffCents)],
     );
 
     await client.query(
       `INSERT INTO hr_audit_logs (user_id, actor, employee_id, action, detail)
-       VALUES ($1, 'staff', $2, 'cash_check_completed', $3)`,
+       VALUES ($1, $2, $3, 'cash_check_completed', $4)`,
       [
-        emp.user_id,
-        emp.id,
+        userId,
+        actor.employeeId ? "staff" : "owner",
+        actor.employeeId,
         JSON.stringify({
           businessDate: date,
           expected: centsToDecimalString(expectedCents),
@@ -546,9 +556,123 @@ export async function completeCashCheck(
     client.release();
   }
 
-  const view = await dailyCashView(token);
-  if (!view) throw new CashCheckNotFoundError();
-  return view;
+  return dailyCashViewForUser(userId);
+}
+
+// ═══ ประวัติ (C-4) — อ่านจาก snapshot ล้วน ═══════════════════════
+
+export type CashHistoryEntry = {
+  businessDate: string;
+  expectedCash: string;
+  actualCash: string;
+  difference: string;
+  differenceReason: string | null;
+  countedByName: string | null;
+  completedAt: string;
+};
+
+/** รายการเช็คที่ปิดแล้ว เรียงวันล่าสุดก่อน — ตัวเลขจาก snapshot ไม่คำนวณใหม่ */
+export async function cashHistory(userId: string, limit = 30): Promise<CashHistoryEntry[]> {
+  const { rows } = await pool.query<{
+    business_date: string; expected_cash: string; actual_cash: string;
+    difference: string; difference_reason: string | null;
+    counted_by_name: string | null; completed_at: string;
+  }>(
+    `SELECT business_date::text AS business_date,
+            expected_cash::text AS expected_cash, actual_cash::text AS actual_cash,
+            difference::text AS difference, difference_reason,
+            counted_by_name, completed_at::text AS completed_at
+     FROM daily_cash_checks
+     WHERE user_id = $1 AND status = 'completed'
+     ORDER BY business_date DESC
+     LIMIT $2`,
+    [userId, Math.min(Math.max(limit, 1), 90)],
+  );
+  return rows.map((r) => ({
+    businessDate: r.business_date,
+    expectedCash: r.expected_cash,
+    actualCash: r.actual_cash,
+    difference: r.difference,
+    differenceReason: r.difference_reason,
+    countedByName: r.counted_by_name,
+    completedAt: r.completed_at,
+  }));
+}
+
+/**
+ * รายละเอียดเช็คที่ปิดแล้วของวันใดวันหนึ่ง (กดจาก history)
+ * ตัวเลขรวมมาจาก snapshot — รายการย่อย (expense/movement) เป็นข้อมูลประกอบ
+ * ตามสภาพปัจจุบันของ DB
+ */
+export async function cashDayDetail(
+  userId: string,
+  date: string,
+): Promise<DailyCashView | null> {
+  const { rows } = await pool.query<CheckRow>(
+    `SELECT ${CHECK_COLS} FROM daily_cash_checks
+     WHERE user_id = $1 AND business_date = $2::date AND status = 'completed'`,
+    [userId, date],
+  );
+  if (!rows[0]) return null;
+  return completedView(userId, rows[0]);
+}
+
+// ═══ token wrappers — ผู้จัดการจากแอปพนักงาน (สัญญาเดิม ไม่เปลี่ยน) ═══
+
+export async function dailyCashView(token: string): Promise<DailyCashView | null> {
+  const emp = await managerByToken(token);
+  if (!emp) return null;
+  return dailyCashViewForUser(emp.user_id);
+}
+
+export async function startCashCheck(
+  token: string,
+  input: { openingCash?: number | null },
+): Promise<DailyCashView> {
+  const emp = await managerByToken(token);
+  if (!emp) throw new CashCheckNotFoundError();
+  return startCashCheckForUser(emp.user_id, input);
+}
+
+export async function addCashExpense(
+  token: string,
+  input: { label: string; amount: number; category?: string },
+): Promise<DailyCashView> {
+  const emp = await managerByToken(token);
+  if (!emp) throw new CashCheckNotFoundError();
+  return addCashExpenseForUser(emp.user_id, input);
+}
+
+export async function addCashMovement(
+  token: string,
+  input: { movementType: "cash_in" | "withdrawal"; amount: number; reason: string },
+): Promise<DailyCashView> {
+  const emp = await managerByToken(token);
+  if (!emp) throw new CashCheckNotFoundError();
+  return addCashMovementForUser(emp.user_id, { employeeId: emp.id, name: emp.name }, input);
+}
+
+export async function completeCashCheck(
+  token: string,
+  input: { actualCash: number; differenceReason?: string | null },
+): Promise<DailyCashView> {
+  const emp = await managerByToken(token);
+  if (!emp) throw new CashCheckNotFoundError();
+  return completeCashCheckForUser(
+    emp.user_id,
+    { employeeId: emp.id, name: emp.name },
+    input,
+  );
+}
+
+/** history สำหรับผู้จัดการจากแอปพนักงาน */
+export async function cashHistoryByToken(
+  token: string,
+  limit = 30,
+): Promise<CashHistoryEntry[] | null> {
+  const emp = await managerByToken(token);
+  if (!emp) return null;
+  return cashHistory(emp.user_id, limit);
 }
 
 // ═══ รายงานสำหรับส่ง LINE (คัดลอก) ══════════════════════════════
