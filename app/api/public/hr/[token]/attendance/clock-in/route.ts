@@ -4,7 +4,7 @@ import {
   NoShiftError,
   staffClockIn,
 } from "@/lib/hr-attendance-queries";
-import { authRateLimitExceeded, clientIp } from "@/lib/rate-limit";
+import { clockRateLimitExceeded } from "@/lib/rate-limit";
 
 /**
  * POST /api/public/hr/:token/attendance/clock-in
@@ -14,7 +14,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ token: string }> },
 ) {
-  const retryAfter = authRateLimitExceeded(`hr_clock:${clientIp(req)}`);
+  const retryAfter = clockRateLimitExceeded(req);
   if (retryAfter !== null) {
     return NextResponse.json(
       { error: "rate_limited" },

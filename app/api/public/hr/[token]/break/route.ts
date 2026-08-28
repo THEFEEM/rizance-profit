@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { BreakStateError, staffBreak } from "@/lib/hr-ops-queries";
-import { authRateLimitExceeded, clientIp } from "@/lib/rate-limit";
+import { clockRateLimitExceeded } from "@/lib/rate-limit";
 
 /** POST /api/public/hr/:token/break {action: start|end} — บันทึกอย่างเดียว ไม่หักเงิน */
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ token: string }> },
 ) {
-  const retryAfter = authRateLimitExceeded(`hr_clock:${clientIp(req)}`);
+  const retryAfter = clockRateLimitExceeded(req);
   if (retryAfter !== null) {
     return NextResponse.json(
       { error: "rate_limited" },

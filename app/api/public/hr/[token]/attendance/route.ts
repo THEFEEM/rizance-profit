@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { staffAttendance } from "@/lib/hr-attendance-queries";
-import { authRateLimitExceeded, clientIp } from "@/lib/rate-limit";
+import { staffRateLimitExceeded } from "@/lib/rate-limit";
 
 /** GET /api/public/hr/:token/attendance — เวลาของฉัน (เฉพาะตัวเอง 7 วันขายล่าสุด) */
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ token: string }> },
 ) {
-  const retryAfter = authRateLimitExceeded(`hr_staff:${clientIp(req)}`);
+  const retryAfter = staffRateLimitExceeded(req);
   if (retryAfter !== null) {
     return NextResponse.json(
       { error: "rate_limited" },

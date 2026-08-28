@@ -10,7 +10,7 @@ import {
   openDuty,
   setDutyItemStatus,
 } from "@/lib/manager-duty-queries";
-import { authRateLimitExceeded, clientIp } from "@/lib/rate-limit";
+import { staffRateLimitExceeded } from "@/lib/rate-limit";
 import { z } from "zod";
 
 /**
@@ -28,7 +28,7 @@ import { z } from "zod";
  */
 
 function rateLimited(req: NextRequest): NextResponse | null {
-  const retryAfter = authRateLimitExceeded(`hr_staff:${clientIp(req)}`);
+  const retryAfter = staffRateLimitExceeded(req);
   return retryAfter === null
     ? null
     : NextResponse.json(

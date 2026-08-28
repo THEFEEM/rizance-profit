@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStaffOverview } from "@/lib/hr-staff-overview-queries";
-import { authRateLimitExceeded, clientIp } from "@/lib/rate-limit";
+import { staffRateLimitExceeded } from "@/lib/rate-limit";
 
 /**
  * GET /api/public/hr/:token/overview — ข้อมูลหน้าแรกแอปพนักงานครบใน 1 request
@@ -12,7 +12,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ token: string }> },
 ) {
-  const retryAfter = authRateLimitExceeded(`hr_staff:${clientIp(req)}`);
+  const retryAfter = staffRateLimitExceeded(req);
   if (retryAfter !== null) {
     return NextResponse.json(
       { error: "rate_limited" },

@@ -6,7 +6,7 @@ import {
   listLeaveByToken,
 } from "@/lib/hr-leave-queries";
 import { leaveCreateSchema } from "@/lib/hr-validation";
-import { authRateLimitExceeded, clientIp } from "@/lib/rate-limit";
+import { staffRateLimitExceeded } from "@/lib/rate-limit";
 
 /**
  * การลาของพนักงาน — /api/public/hr/:token/leave
@@ -15,7 +15,7 @@ import { authRateLimitExceeded, clientIp } from "@/lib/rate-limit";
  */
 
 function rateLimited(req: NextRequest): NextResponse | null {
-  const retryAfter = authRateLimitExceeded(`hr_staff:${clientIp(req)}`);
+  const retryAfter = staffRateLimitExceeded(req);
   return retryAfter === null
     ? null
     : NextResponse.json(

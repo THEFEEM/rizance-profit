@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { staffChecklist, staffToggleChecklistItem } from "@/lib/hr-ops-queries";
-import { authRateLimitExceeded, clientIp } from "@/lib/rate-limit";
+import { staffRateLimitExceeded } from "@/lib/rate-limit";
 
 function rateLimited(req: NextRequest): NextResponse | null {
-  const retryAfter = authRateLimitExceeded(`hr_staff:${clientIp(req)}`);
+  const retryAfter = staffRateLimitExceeded(req);
   return retryAfter === null
     ? null
     : NextResponse.json(
