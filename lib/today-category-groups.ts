@@ -20,6 +20,8 @@ export function buildTodayCategoryGroups(entries: EntryRow[]): TodayCategoryGrou
   const totals = new Map<string, { kind: "income" | "expense"; amounts: string[] }>();
 
   for (const e of entries) {
+    // บิล POS ที่ยกเลิกแล้วยังโชว์ในลิสต์ (พร้อมป้าย) แต่ห้ามเข้ายอดรวมหมวด
+    if (e.voided) continue;
     const category = e.category ?? (e.kind === "income" ? "storefront" : "expense_misc");
     const key = `${e.kind}:${category}`;
     const existing = totals.get(key);

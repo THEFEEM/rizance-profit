@@ -27,6 +27,8 @@ export type EntryRow = {
   paymentMethod?: PaymentMethod;
   createdAt: string;
   savingsGoalName?: string;
+  /** บิล POS ที่ถูกยกเลิก (soft-void) — โชว์ขีดฆ่า ไม่นับยอด ห้ามลบ/แก้ */
+  voided?: boolean;
 };
 
 function entryCategoryKey(e: EntryRow): string {
@@ -153,27 +155,48 @@ export function EntryList({
               <li
                 key={e.id}
                 data-cat-group={entryCategoryKey(e)}
-                className="flex items-center gap-3 px-4 py-3"
+                className={`flex items-center gap-3 px-4 py-3 ${e.voided ? "opacity-55" : ""}`}
               >
                 <div
                   className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                    isIncome ? "bg-rz-green/15 text-rz-green" : "bg-rz-red/15 text-rz-red"
+                    e.voided
+                      ? "bg-rz-hint/15 text-rz-hint"
+                      : isIncome
+                        ? "bg-rz-green/15 text-rz-green"
+                        : "bg-rz-red/15 text-rz-red"
                   }`}
                 >
                   {isIncome ? <IncomeArrowIcon /> : <ExpenseArrowIcon />}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] text-rz-text">{title}</p>
-                  <p className="text-[10px] text-rz-hint">{categoryLabel}</p>
+                  <p
+                    className={`truncate text-[13px] ${
+                      e.voided ? "text-rz-hint line-through" : "text-rz-text"
+                    }`}
+                  >
+                    {title}
+                  </p>
+                  <p className="text-[10px] text-rz-hint">
+                    {e.voided ? "ยกเลิกบิลแล้ว — ไม่นับในยอด" : categoryLabel}
+                  </p>
                 </div>
                 <span
                   className={`rz-tabular shrink-0 text-[13px] font-medium ${
-                    isIncome ? "text-rz-green" : "text-rz-red"
+                    e.voided
+                      ? "text-rz-hint line-through"
+                      : isIncome
+                        ? "text-rz-green"
+                        : "text-rz-red"
                   }`}
                 >
                   {displayAmount}
                 </span>
-                {!readOnly && (
+                {e.voided ? (
+                  <span className="shrink-0 rounded-md bg-rz-red/15 px-1.5 py-0.5 text-[10px] font-medium text-rz-red">
+                    ยกเลิก
+                  </span>
+                ) : null}
+                {!readOnly && !e.voided && (
                   <button
                     onClick={() => setPending(e)}
                     disabled={deleting === e.id}
@@ -191,20 +214,31 @@ export function EntryList({
             <li
               key={e.id}
               data-cat-group={entryCategoryKey(e)}
-              className="flex items-center gap-3 px-4 py-3"
+              className={`flex items-center gap-3 px-4 py-3 ${e.voided ? "opacity-55" : ""}`}
             >
               <span className="text-xl" aria-hidden>
-                {isIncome ? "💰" : "🧾"}
+                {e.voided ? "🚫" : isIncome ? "💰" : "🧾"}
               </span>
-              <span className="min-w-0 flex-1 truncate text-sm text-slate-700">{title}</span>
+              <span
+                className={`min-w-0 flex-1 truncate text-sm ${
+                  e.voided ? "text-slate-400 line-through" : "text-slate-700"
+                }`}
+              >
+                {title}
+                {e.voided ? " · ยกเลิกบิลแล้ว" : ""}
+              </span>
               <span
                 className={`text-sm font-semibold tabular-nums ${
-                  isIncome ? "text-emerald-600" : "text-red-600"
+                  e.voided
+                    ? "text-slate-400 line-through"
+                    : isIncome
+                      ? "text-emerald-600"
+                      : "text-red-600"
                 }`}
               >
                 {displayAmount}
               </span>
-              {!readOnly && (
+              {!readOnly && !e.voided && (
                 <button
                   onClick={() => setPending(e)}
                   disabled={deleting === e.id}

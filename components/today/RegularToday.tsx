@@ -48,6 +48,8 @@ export async function RegularToday({ user }: { user: User }) {
       category: i.category,
       paymentMethod: i.paymentMethod as PaymentMethod | undefined,
       createdAt: i.createdAt,
+      // บิล POS ที่ยกเลิก — โชว์ขีดฆ่าพร้อมป้าย ไม่นับยอด (สอดคล้อง summary ที่กรองแล้ว)
+      voided: i.voidedAt != null,
     })),
     ...expenses.map((e) => ({
       id: e.id,

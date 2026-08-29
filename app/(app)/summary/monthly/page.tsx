@@ -56,6 +56,7 @@ export default async function ShopSummaryPage({
         category: i.category,
         paymentMethod: i.paymentMethod as PaymentMethod | undefined,
         createdAt: i.createdAt,
+        voided: i.voidedAt != null,
       })),
       ...expenses.map((e) => ({
         id: e.id,

@@ -121,7 +121,11 @@ export async function RegularStatsSummary({
 
   const incomeRows = toCategoryProgressRows(breakdown.income, "income", totalIncome);
   const expenseRows = toCategoryProgressRows(breakdown.expense, "expense", totalExpense);
-  const incomeEntries = groupEntriesByCategory(periodIncomes);
+  // บิล POS ที่ยกเลิกไม่เข้าหน้าสถิติเลย (ยอดรวมจาก server กรองแล้ว —
+  // ถ้าปล่อยเข้ากลุ่มรายการ ตัวเลขสองที่จะไม่ตรงกัน)
+  const incomeEntries = groupEntriesByCategory(
+    periodIncomes.filter((i) => i.voidedAt == null),
+  );
   const expenseEntries = groupEntriesByCategory(periodExpenses);
 
   const useWeekdayLabels = period === "last_7";

@@ -25,7 +25,8 @@ export default async function EntryPage({
   return (
     <ShopEntryForm
       initialTab={tab}
-      incomes={incomes}
+      // บิล POS ที่ยกเลิกห้ามโผล่ในหน้าแก้ไขรายการ — แก้/ลบใบ void ไม่ได้
+      incomes={incomes.filter((i) => i.voidedAt == null)}
       expenses={expenses}
       transfers={transfers}
       currency={user.currency}
