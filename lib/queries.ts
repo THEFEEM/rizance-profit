@@ -548,9 +548,9 @@ export async function allTimeSummary(userId: string): Promise<AllTimeSummary> {
     expense_count: string;
   }>(
     `SELECT
-       COALESCE((SELECT SUM(amount) FROM income_entries  WHERE user_id = $1), 0)::text AS income,
+       COALESCE((SELECT SUM(amount) FROM income_entries  WHERE user_id = $1 AND voided_at IS NULL), 0)::text AS income,
        COALESCE((SELECT SUM(amount) FROM expense_entries WHERE user_id = $1), 0)::text AS expense,
-       (SELECT COUNT(*) FROM income_entries  WHERE user_id = $1)::text AS income_count,
+       (SELECT COUNT(*) FROM income_entries  WHERE user_id = $1 AND voided_at IS NULL)::text AS income_count,
        (SELECT COUNT(*) FROM expense_entries WHERE user_id = $1)::text AS expense_count`,
     [userId],
   );
@@ -577,11 +577,11 @@ export async function monthToDateSummary(userId: string): Promise<AllTimeSummary
   }>(
     `SELECT
        COALESCE((SELECT SUM(amount) FROM income_entries
-                 WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date), 0)::text AS income,
+                 WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date AND voided_at IS NULL), 0)::text AS income,
        COALESCE((SELECT SUM(amount) FROM expense_entries
                  WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date), 0)::text AS expense,
        (SELECT COUNT(*) FROM income_entries
-        WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date)::text AS income_count,
+        WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date AND voided_at IS NULL)::text AS income_count,
        (SELECT COUNT(*) FROM expense_entries
         WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date)::text AS expense_count`,
     [userId, start, end],
@@ -606,11 +606,11 @@ export async function periodSummary(userId: string, period: PeriodKey): Promise<
   }>(
     `SELECT
        COALESCE((SELECT SUM(amount) FROM income_entries
-                 WHERE user_id = $1 AND entry_date >= $2 AND entry_date <= $3), 0)::text AS income,
+                 WHERE user_id = $1 AND entry_date >= $2 AND entry_date <= $3 AND voided_at IS NULL), 0)::text AS income,
        COALESCE((SELECT SUM(amount) FROM expense_entries
                  WHERE user_id = $1 AND entry_date >= $2 AND entry_date <= $3), 0)::text AS expense,
        (SELECT COUNT(*) FROM income_entries
-        WHERE user_id = $1 AND entry_date >= $2 AND entry_date <= $3)::text AS income_count,
+        WHERE user_id = $1 AND entry_date >= $2 AND entry_date <= $3 AND voided_at IS NULL)::text AS income_count,
        (SELECT COUNT(*) FROM expense_entries
         WHERE user_id = $1 AND entry_date >= $2 AND entry_date <= $3)::text AS expense_count`,
     [userId, start, end],
@@ -653,7 +653,7 @@ export async function categoryBreakdown(
               COALESCE(SUM(amount), 0)::text AS amount,
               COUNT(*)::text AS count
        FROM income_entries
-       WHERE user_id = $1 AND entry_date >= $2 AND entry_date <= $3
+       WHERE user_id = $1 AND entry_date >= $2 AND entry_date <= $3 AND voided_at IS NULL
        GROUP BY category`,
       [userId, start, end],
     ),
@@ -687,7 +687,7 @@ export async function periodIncomeByCashTransfer(
        COALESCE(SUM(CASE WHEN payment_method = 'cash' THEN amount ELSE 0 END), 0)::text AS cash_income,
        COALESCE(SUM(CASE WHEN payment_method = 'transfer' THEN amount ELSE 0 END), 0)::text AS transfer_income
      FROM income_entries
-     WHERE user_id = $1 AND entry_date >= $2 AND entry_date <= $3`,
+     WHERE user_id = $1 AND entry_date >= $2 AND entry_date <= $3 AND voided_at IS NULL`,
     [userId, start, end],
   );
   const r = rows[0];
@@ -705,7 +705,7 @@ export async function allTimeIncomeByCashTransfer(
        COALESCE(SUM(CASE WHEN payment_method = 'cash' THEN amount ELSE 0 END), 0)::text AS cash_income,
        COALESCE(SUM(CASE WHEN payment_method = 'transfer' THEN amount ELSE 0 END), 0)::text AS transfer_income
      FROM income_entries
-     WHERE user_id = $1`,
+     WHERE user_id = $1 AND voided_at IS NULL`,
     [userId],
   );
   const r = rows[0];
@@ -782,7 +782,7 @@ export async function dailyProfitSeries(
   const { rows } = await query<{ entry_date: string; income: string; expense: string }>(
     `WITH combined AS (
        SELECT entry_date, amount, 'income' AS type FROM income_entries
-       WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date
+       WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date AND voided_at IS NULL
        UNION ALL
        SELECT entry_date, amount, 'expense' AS type FROM expense_entries
        WHERE user_id = $1 AND entry_date >= $2::date AND entry_date <= $3::date
@@ -819,9 +819,9 @@ export async function dailySummary(userId: string, date: string): Promise<DailyS
     expense_count: string;
   }>(
     `SELECT
-       COALESCE((SELECT SUM(amount) FROM income_entries  WHERE user_id = $1 AND entry_date = $2), 0)::text AS income,
+       COALESCE((SELECT SUM(amount) FROM income_entries  WHERE user_id = $1 AND entry_date = $2 AND voided_at IS NULL), 0)::text AS income,
        COALESCE((SELECT SUM(amount) FROM expense_entries WHERE user_id = $1 AND entry_date = $2), 0)::text AS expense,
-       (SELECT COUNT(*) FROM income_entries  WHERE user_id = $1 AND entry_date = $2)::text AS income_count,
+       (SELECT COUNT(*) FROM income_entries  WHERE user_id = $1 AND entry_date = $2 AND voided_at IS NULL)::text AS income_count,
        (SELECT COUNT(*) FROM expense_entries WHERE user_id = $1 AND entry_date = $2)::text AS expense_count`,
     [userId, date],
   );
@@ -841,7 +841,7 @@ export async function monthlySummary(userId: string, month: string): Promise<Mon
   const { rows } = await query<{ date: string; income: string; expense: string }>(
     `WITH inc AS (
        SELECT entry_date, SUM(amount) AS income FROM income_entries
-       WHERE user_id = $1 AND entry_date >= $2 AND entry_date < $3
+       WHERE user_id = $1 AND entry_date >= $2 AND entry_date < $3 AND voided_at IS NULL
        GROUP BY entry_date
      ),
      exp AS (
@@ -885,7 +885,7 @@ export async function monthsWithActivity(
   const { rows } = await query<{ month: string; income: string; expense: string }>(
     `WITH combined AS (
        SELECT to_char(entry_date, 'YYYY-MM') AS month, amount, 'income' AS type
-       FROM income_entries WHERE user_id = $1
+       FROM income_entries WHERE user_id = $1 AND voided_at IS NULL
        UNION ALL
        SELECT to_char(entry_date, 'YYYY-MM'), amount, 'expense'
        FROM expense_entries WHERE user_id = $1
@@ -922,7 +922,7 @@ export async function yearMonthlySeries(
     `WITH combined AS (
        SELECT to_char(entry_date, 'YYYY-MM') AS month, amount, 'income' AS type
        FROM income_entries
-       WHERE user_id = $1 AND to_char(entry_date, 'YYYY') = $2
+       WHERE user_id = $1 AND to_char(entry_date, 'YYYY') = $2 AND voided_at IS NULL
        UNION ALL
        SELECT to_char(entry_date, 'YYYY-MM'), amount, 'expense'
        FROM expense_entries
