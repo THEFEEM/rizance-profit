@@ -80,6 +80,13 @@ export class ProductionRecipeExistsError extends Error {
     this.name = "ProductionRecipeExistsError";
   }
 }
+/** รหัสสูตรซ้ำในร้านเดียวกัน (0093 · idx_production_recipes_code) */
+export class ProductionDuplicateCodeError extends Error {
+  constructor() {
+    super("production_recipe_duplicate_code");
+    this.name = "ProductionDuplicateCodeError";
+  }
+}
 
 /** วัตถุดิบไม่พอ — บอกครบว่าขาดอะไรเท่าไร เพื่อให้หน้าจอแสดงได้ทันที */
 export class InsufficientRawMaterialError extends Error {
@@ -130,8 +137,13 @@ export type ProductionRecipe = {
   outputName: string;
   outputUnit: string;
   name: string;
+  /** รหัสสูตรที่คนอ่านออก เช่น PRD-WRAP-SAUCE (0093) — คนละตัวกับ batchPrefix */
+  recipeCode: string | null;
+  /** คำนำหน้าเลขใบผลิต เช่น WZS → WZS-20260831-001 */
   batchPrefix: string;
   expectedOutputQty: string;
+  /** ใช้กี่หน่วยต่อ 1 เมนู (0093) — planning เท่านั้น ไม่ใช่แหล่งตัดสต็อก */
+  usagePerPortion: string | null;
   isActive: boolean;
   note: string | null;
   items: ProductionRecipeItem[];
@@ -139,6 +151,12 @@ export type ProductionRecipe = {
   batchCost: string;
   /** batchCost ÷ expectedOutputQty */
   expectedUnitCost: string;
+  /** ผลผลิต ÷ ใช้ต่อเมนู (null = ยังไม่ระบุ usagePerPortion) */
+  portionsPerBatch: number | null;
+  /** expectedUnitCost × usagePerPortion (null = ยังไม่ระบุ) */
+  costPerPortion: string | null;
+  /** มีวัตถุดิบที่ยังไม่มีต้นทุนกี่รายการ — UI เตือน "ต้นทุนยังไม่สมบูรณ์" */
+  missingCostCount: number;
 };
 
 export type ProductionBatchItem = {
@@ -184,16 +202,19 @@ type RecipeRow = {
   output_name: string;
   output_unit: string;
   name: string;
+  recipe_code: string | null;
   batch_prefix: string;
   expected_output_qty: string;
+  usage_per_portion: string | null;
   is_active: boolean;
   note: string | null;
 };
 
 const RECIPE_SELECT = `
   SELECT r.id, r.output_ingredient_id, i.name AS output_name,
-         i.purchase_unit AS output_unit, r.name, r.batch_prefix,
-         r.expected_output_qty::text AS expected_output_qty, r.is_active, r.note
+         i.purchase_unit AS output_unit, r.name, r.recipe_code, r.batch_prefix,
+         r.expected_output_qty::text AS expected_output_qty,
+         r.usage_per_portion::text AS usage_per_portion, r.is_active, r.note
   FROM production_recipes r
   JOIN ingredients i ON i.id = r.output_ingredient_id`;
 
@@ -252,20 +273,32 @@ async function mapRecipe(
   const items = await recipeItems(db, r.id);
   const batchCostCents = items.reduce((s, it) => s + toCents(it.lineCost), 0);
   const expected = Number(r.expected_output_qty);
+  const unitCost = expected > 0 ? batchCostCents / 100 / expected : 0;
+  // ใช้ต่อเมนู (0093) — ตัวเลข "ประมาณ" สำหรับวางแผน ไม่ผูกกับการตัดสต็อก
+  const usage = r.usage_per_portion == null ? null : Number(r.usage_per_portion);
   return {
     id: r.id,
     outputIngredientId: r.output_ingredient_id,
     outputName: r.output_name,
     outputUnit: r.output_unit,
     name: r.name,
+    recipeCode: r.recipe_code,
     batchPrefix: r.batch_prefix,
     expectedOutputQty: r.expected_output_qty,
+    usagePerPortion: r.usage_per_portion,
     isActive: r.is_active,
     note: r.note,
     items,
     batchCost: centsToDecimalString(batchCostCents),
-    expectedUnitCost:
-      expected > 0 ? (batchCostCents / 100 / expected).toFixed(4) : "0.0000",
+    expectedUnitCost: expected > 0 ? unitCost.toFixed(4) : "0.0000",
+    portionsPerBatch:
+      usage != null && usage > 0 && expected > 0 ? Math.floor(expected / usage) : null,
+    costPerPortion: usage != null && usage > 0 ? (unitCost * usage).toFixed(2) : null,
+    // ต้นทุนไม่ครบ ≠ สูตรผิด — บันทึกได้ แต่ต้องบอกให้เห็น (ห้ามโชว์ ฿0 เงียบ ๆ)
+    // นับทั้ง NULL และ 0: ของที่ยังไม่เคยซื้อเข้าระบบ avg_cost เป็น 0 ไม่ใช่ NULL
+    missingCostCount: items.filter(
+      (it) => it.unitCost == null || Number(it.unitCost) <= 0,
+    ).length,
   };
 }
 
@@ -309,8 +342,12 @@ export async function activeRecipeFor(
 export type RecipeInput = {
   outputIngredientId: string;
   name: string;
+  /** รหัสสูตร (0093) — ไม่ส่ง = ไม่มีรหัส (สูตรเก่าใช้งานได้ปกติ) */
+  recipeCode?: string | null;
   batchPrefix?: string;
   expectedOutputQty: number;
+  /** ใช้ต่อเมนู (0093) — planning เท่านั้น */
+  usagePerPortion?: number | null;
   note?: string | null;
   items: { ingredientId: string; quantity: number }[];
 };
@@ -342,15 +379,20 @@ export async function createProductionRecipe(
     try {
       const { rows } = await client.query<{ id: string }>(
         `INSERT INTO production_recipes
-           (user_id, output_ingredient_id, name, batch_prefix, expected_output_qty, note)
-         VALUES ($1, $2, $3, $4, $5, $6)
+           (user_id, output_ingredient_id, name, recipe_code, batch_prefix,
+            expected_output_qty, usage_per_portion, note)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING id`,
         [
           userId,
           input.outputIngredientId,
           input.name.trim(),
+          input.recipeCode?.trim().toUpperCase().slice(0, 32) || null,
           (input.batchPrefix?.trim() || "PRD").toUpperCase().slice(0, 8),
           input.expectedOutputQty,
+          input.usagePerPortion != null && input.usagePerPortion > 0
+            ? input.usagePerPortion
+            : null,
           input.note?.trim() || null,
         ],
       );
@@ -358,6 +400,7 @@ export async function createProductionRecipe(
     } catch (err) {
       // สองเคสนี้ทั้งคู่เป็น 23505 แต่ผู้ใช้ต้องเห็นข้อความต่างกัน
       if (isDuplicate(err, "active_output")) throw new ProductionRecipeExistsError();
+      if (isDuplicate(err, "recipes_code")) throw new ProductionDuplicateCodeError();
       if (isDuplicate(err)) throw new ProductionDuplicateNameError();
       throw err;
     }
@@ -409,8 +452,10 @@ export async function updateProductionRecipe(
   recipeId: string,
   input: {
     name?: string;
+    recipeCode?: string | null;
     batchPrefix?: string;
     expectedOutputQty?: number;
+    usagePerPortion?: number | null;
     note?: string | null;
     isActive?: boolean;
     items?: { ingredientId: string; quantity: number }[];
@@ -439,12 +484,16 @@ export async function updateProductionRecipe(
 
     try {
       await client.query(
+        // recipe_code / usage_per_portion ใช้ pattern CASE WHEN sent
+        // เพราะต้องแยก "ไม่ส่งมา" (คงเดิม) ออกจาก "ส่ง null" (ล้างค่า)
         `UPDATE production_recipes SET
            name                = COALESCE($3, name),
            batch_prefix        = COALESCE($4, batch_prefix),
            expected_output_qty = COALESCE($5, expected_output_qty),
            note                = CASE WHEN $6::boolean THEN $7 ELSE note END,
            is_active           = COALESCE($8, is_active),
+           recipe_code         = CASE WHEN $9::boolean THEN $10 ELSE recipe_code END,
+           usage_per_portion   = CASE WHEN $11::boolean THEN $12 ELSE usage_per_portion END,
            updated_at          = now()
          WHERE id = $2 AND user_id = $1`,
         [
@@ -456,10 +505,17 @@ export async function updateProductionRecipe(
           input.note !== undefined,
           input.note?.trim() || null,
           input.isActive ?? null,
+          input.recipeCode !== undefined,
+          input.recipeCode?.trim().toUpperCase().slice(0, 32) || null,
+          input.usagePerPortion !== undefined,
+          input.usagePerPortion != null && input.usagePerPortion > 0
+            ? input.usagePerPortion
+            : null,
         ],
       );
     } catch (err) {
       if (isDuplicate(err, "active_output")) throw new ProductionRecipeExistsError();
+      if (isDuplicate(err, "recipes_code")) throw new ProductionDuplicateCodeError();
       if (isDuplicate(err)) throw new ProductionDuplicateNameError();
       throw err;
     }

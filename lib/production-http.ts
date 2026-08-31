@@ -4,6 +4,7 @@ import {
   InsufficientRawMaterialError,
   ProductionBatchNotDraftError,
   ProductionBatchNotFoundError,
+  ProductionDuplicateCodeError,
   ProductionDuplicateNameError,
   ProductionOutputNotProducedError,
   ProductionRecipeEmptyError,
@@ -37,6 +38,7 @@ export function productionErrorResponse(err: unknown): NextResponse | null {
   if (
     err instanceof ProductionRecipeExistsError ||
     err instanceof ProductionDuplicateNameError ||
+    err instanceof ProductionDuplicateCodeError ||
     err instanceof ProductionBatchNotDraftError
   ) {
     return NextResponse.json({ error: err.message }, { status: 409 });

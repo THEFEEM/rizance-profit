@@ -28,8 +28,10 @@ export async function GET(req: NextRequest) {
 const bodySchema = z.object({
   outputIngredientId: z.string().uuid(),
   name: z.string().trim().min(1).max(120),
+  recipeCode: z.string().trim().max(32).nullish(),
   batchPrefix: z.string().trim().min(1).max(8).optional(),
   expectedOutputQty: z.number().positive().max(1_000_000),
+  usagePerPortion: z.number().positive().max(1_000_000).nullish(),
   note: z.string().trim().max(255).nullish(),
   items: z
     .array(

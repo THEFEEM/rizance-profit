@@ -50,8 +50,10 @@ export async function GET(
 
 const patchSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
+  recipeCode: z.string().trim().max(32).nullish(),
   batchPrefix: z.string().trim().min(1).max(8).optional(),
   expectedOutputQty: z.number().positive().max(1_000_000).optional(),
+  usagePerPortion: z.number().positive().max(1_000_000).nullish(),
   note: z.string().trim().max(255).nullish(),
   isActive: z.boolean().optional(),
   items: z
