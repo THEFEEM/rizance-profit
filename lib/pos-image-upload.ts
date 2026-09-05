@@ -45,6 +45,21 @@ export async function readImageFromForm(
   return { file, ext };
 }
 
+/**
+ * แปล error จาก Supabase Storage เป็น hint ที่เจ้าของร้านทำอะไรต่อได้
+ *   storage_quota_restricted  โปรเจกต์เกินโควตา Free plan → Storage ถูกตั้งเป็น read-only
+ *   storage_bucket_missing    bucket ไม่มี / ชื่อ env ผิด
+ *   storage_auth              service key ผิด/หมดอายุ
+ *   storage_rejected          อื่น ๆ (ดู upstreamStatus)
+ */
+function classifyStorageError(e: SupabaseStorageError): string {
+  const t = e.message.toLowerCase();
+  if (e.status === 402 || /exceed|quota|restrict|payment|read-only|readonly/.test(t)) return "storage_quota_restricted";
+  if (e.status === 404 || /bucket not found|not found/.test(t)) return "storage_bucket_missing";
+  if (e.status === 401 || e.status === 403 || /jwt|invalid.*key|unauthorized/.test(t)) return "storage_auth";
+  return "storage_rejected";
+}
+
 /** อัปโหลดลง bucket public เดิม — path มี timestamp กัน cache (bucket ตั้ง max-age ปี) */
 export async function uploadPublicImage(
   path: string,
@@ -54,7 +69,15 @@ export async function uploadPublicImage(
     const buf = await file.arrayBuffer();
     return await uploadPublicObject(posMenuBucket(), path, buf, file.type);
   } catch (err) {
-    if (err instanceof SupabaseStorageError) return posErrorResponse("image_upload_failed", 502);
+    if (err instanceof SupabaseStorageError) {
+      const hint = classifyStorageError(err);
+      // ลง Vercel log ให้ไล่ได้ — ไม่มี key/ความลับใน message (แค่ status + ข้อความจาก Supabase)
+      console.error(`[pos-image-upload] ${hint} bucket=${posMenuBucket()} path=${path} :: ${err.message}`);
+      return NextResponse.json(
+        { error: "image_upload_failed", data: { hint, upstreamStatus: err.status } },
+        { status: 502 },
+      );
+    }
     throw err;
   }
 }
