@@ -48,6 +48,10 @@ export type PosShopSettings = {
   feedbackEnabled: boolean;
   /** แต้มโบนัสต่อ 1 feedback (0 = ไม่ให้แต้ม แต่ยังรับ feedback) */
   feedbackPoints: number;
+  /** Branding ของร้าน (0095) — โลโก้ + สี ใช้กับ voucher card (และใบเสร็จ/บัตร ในอนาคต) */
+  brandLogoUrl: string | null;
+  brandPrimaryColor: string | null;
+  brandSecondaryColor: string | null;
 };
 
 type SettingsRow = {
@@ -79,6 +83,9 @@ type SettingsRow = {
   reward_value: string | null;
   feedback_enabled: boolean;
   feedback_points: number;
+  brand_logo_url: string | null;
+  brand_primary_color: string | null;
+  brand_secondary_color: string | null;
 };
 
 const SETTINGS_RETURN = `default_payment_method, promptpay_id, receipt_header,
@@ -89,7 +96,8 @@ const SETTINGS_RETURN = `default_payment_method, promptpay_id, receipt_header,
   card_theme, redeem_points,
   loyalty_return_pct::text AS loyalty_return_pct, point_value_satang, loyalty_use_pct,
   reward_value::text AS reward_value,
-  feedback_enabled, feedback_points`;
+  feedback_enabled, feedback_points,
+  brand_logo_url, brand_primary_color, brand_secondary_color`;
 
 function mapSettings(r: SettingsRow): PosShopSettings {
   return {
@@ -126,6 +134,9 @@ function mapSettings(r: SettingsRow): PosShopSettings {
     rewardValue: r.reward_value ?? null,
     feedbackEnabled: r.feedback_enabled ?? true,
     feedbackPoints: Number(r.feedback_points ?? 20),
+    brandLogoUrl: r.brand_logo_url ?? null,
+    brandPrimaryColor: r.brand_primary_color ?? null,
+    brandSecondaryColor: r.brand_secondary_color ?? null,
   };
 }
 

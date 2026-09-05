@@ -16,17 +16,47 @@ const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "hex เช่น #16368f
 /** รูปอนุญาตเฉพาะ https — ห้าม data:/javascript: ในหน้า public */
 const httpsUrl = z.string().url().max(500).refine((u) => u.startsWith("https://"), "ต้องเป็น https");
 
+/**
+ * design_config ของแคมเปญ = "override" ทับโปรไฟล์ร้าน (0095) เท่านั้น
+ *   สี null/ไม่ส่ง  → ใช้สีประจำร้าน (brand_primary/secondary) → ไม่มีก็ดีฟอลต์แพลตฟอร์ม
+ *   logoUrl null   → ใช้โลโก้ร้าน (brand_logo_url) → ไม่มีก็ตัวอักษรย่อ
+ *   brandName      → legacy override ชื่อบนการ์ด (UI ไม่เสนอแล้ว แต่รับค่าเดิมได้)
+ * แถวเดิมที่มีสีชัดเจนอยู่แล้วยังอ่านได้เหมือนเดิม (backward compatible)
+ */
 export const designConfigSchema = z.object({
   template: z.enum(VOUCHER_TEMPLATES).default("minimal"),
-  primaryColor: hexColor.default("#16368f"),
-  backgroundColor: hexColor.default("#ffffff"),
-  /** ชื่อแบรนด์บนการ์ด — ว่าง = ใช้ shop_name */
+  primaryColor: hexColor.nullable().optional(),
+  backgroundColor: hexColor.nullable().optional(),
   brandName: trimmed(60).nullable().optional(),
   logoUrl: httpsUrl.nullable().optional(),
   heroImageUrl: httpsUrl.nullable().optional(),
   showSponsor: z.boolean().default(true),
 });
 export type VoucherDesignConfig = z.infer<typeof designConfigSchema>;
+
+/** สีดีฟอลต์แพลตฟอร์ม — ใช้เมื่อทั้งแคมเปญและร้านไม่ได้ตั้ง (ไม่ใช่สีของร้านใดร้านหนึ่ง) */
+export const PLATFORM_CARD_PRIMARY = "#1f2a44";
+export const PLATFORM_CARD_BACKGROUND = "#ffffff";
+
+export type ResolvedCardBrand = {
+  merchantName: string;
+  logoUrl: string | null;
+  primaryColor: string;
+  backgroundColor: string;
+};
+
+/** Business Profile → Branding → Campaign override — ที่เดียวที่ตัดสินว่าการ์ดใช้อะไร */
+export function resolveCardBrand(
+  design: VoucherDesignConfig,
+  merchant: { name: string; logoUrl: string | null; primaryColor: string | null; secondaryColor: string | null },
+): ResolvedCardBrand {
+  return {
+    merchantName: design.brandName?.trim() || merchant.name,
+    logoUrl: design.logoUrl ?? merchant.logoUrl ?? null,
+    primaryColor: design.primaryColor ?? merchant.primaryColor ?? PLATFORM_CARD_PRIMARY,
+    backgroundColor: design.backgroundColor ?? merchant.secondaryColor ?? PLATFORM_CARD_BACKGROUND,
+  };
+}
 
 export const VOUCHER_TYPES = [
   "fixed_amount",

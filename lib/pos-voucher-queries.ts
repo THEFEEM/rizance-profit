@@ -20,6 +20,8 @@ import {
 } from "@/lib/pos-campaign-engine";
 import {
   designConfigSchema,
+  resolveCardBrand,
+  type ResolvedCardBrand,
   type VoucherCampaignInput,
   type VoucherDesignConfig,
 } from "@/lib/pos-voucher-schema";
@@ -682,8 +684,13 @@ export async function reissueVoucherToken(
 
 /** ข้อมูลที่หน้า /v/[token] เห็น — ไม่มี id ภายใน, hash, member, metadata */
 export type PublicVoucherCard = {
+  /** @deprecated ใช้ merchant.name — คงไว้ให้ client เก่าอ่านได้ */
   brandName: string;
+  /** Merchant identity ที่ resolve แล้ว (โปรไฟล์ร้าน → campaign override) */
+  merchant: { name: string; logoUrl: string | null };
   campaignName: string;
+  /** คำอธิบายสั้น ๆ ของแคมเปญ — บรรทัดใต้มูลค่า */
+  description: string | null;
   sponsor: string | null;
   voucherType: string;
   value: string;
@@ -693,25 +700,36 @@ export type PublicVoucherCard = {
   startAt: string;
   redeemedAt: string | null;
   terms: string | null;
-  design: VoucherDesignConfig;
+  /** สี/ template ที่ resolve แล้ว — client ไม่ต้องรู้ว่ามาจากร้านหรือแคมเปญ */
+  design: {
+    template: VoucherDesignConfig["template"];
+    primaryColor: string;
+    backgroundColor: string;
+    heroImageUrl: string | null;
+    showSponsor: boolean;
+  };
 };
 
 export async function getPublicVoucherCard(scan: string): Promise<PublicVoucherCard | null> {
   const token = parseVoucherToken(scan);
   if (!token) return null;
   const { rows } = await pool.query<{
-    user_id: string; shop_name: string; campaign_name: string; sponsor: string | null;
+    user_id: string; shop_name: string; campaign_name: string; description: string | null;
+    sponsor: string | null;
     voucher_type: string; value: string; public_code: string; status: VoucherStatus;
     expires_at: Date | string; start_at: Date | string; redeemed_at: Date | string | null;
     terms: string | null; design_config: unknown; campaign_status: string; voucher_id: string; campaign_id: string;
+    brand_logo_url: string | null; brand_primary_color: string | null; brand_secondary_color: string | null;
   }>(
-    `SELECT v.user_id, u.shop_name, c.name AS campaign_name, c.sponsor, c.voucher_type,
+    `SELECT v.user_id, u.shop_name, c.name AS campaign_name, c.description, c.sponsor, c.voucher_type,
             c.value::text AS value, v.public_code, v.status, c.expires_at, c.start_at,
             v.redeemed_at, c.terms, c.design_config, c.status AS campaign_status,
-            v.id AS voucher_id, c.id AS campaign_id
+            v.id AS voucher_id, c.id AS campaign_id,
+            s.brand_logo_url, s.brand_primary_color, s.brand_secondary_color
      FROM pos_vouchers v
      JOIN pos_voucher_campaigns c ON c.id = v.campaign_id
      JOIN users u ON u.id = v.user_id
+     LEFT JOIN pos_shop_settings s ON s.user_id = v.user_id
      WHERE v.token_hash = $1`,
     [hashVoucherToken(token)],
   );
@@ -737,9 +755,17 @@ export async function getPublicVoucherCard(scan: string): Promise<PublicVoucherC
       [r.user_id, r.campaign_id, r.voucher_id],
     )
     .catch(() => undefined);
+  const brand: ResolvedCardBrand = resolveCardBrand(d, {
+    name: r.shop_name,
+    logoUrl: r.brand_logo_url,
+    primaryColor: r.brand_primary_color,
+    secondaryColor: r.brand_secondary_color,
+  });
   return {
-    brandName: d.brandName || r.shop_name,
+    brandName: brand.merchantName,
+    merchant: { name: brand.merchantName, logoUrl: brand.logoUrl },
     campaignName: r.campaign_name,
+    description: r.description,
     sponsor: d.showSponsor ? r.sponsor : null,
     voucherType: r.voucher_type,
     value: r.value,
@@ -749,7 +775,13 @@ export async function getPublicVoucherCard(scan: string): Promise<PublicVoucherC
     startAt: iso(r.start_at),
     redeemedAt: r.redeemed_at ? iso(r.redeemed_at) : null,
     terms: r.terms,
-    design: d,
+    design: {
+      template: d.template,
+      primaryColor: brand.primaryColor,
+      backgroundColor: brand.backgroundColor,
+      heroImageUrl: d.heroImageUrl ?? null,
+      showSponsor: d.showSponsor,
+    },
   };
 }
 
