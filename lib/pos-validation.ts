@@ -69,6 +69,10 @@ export const closePosBillSchema = z
     couponCode: z
       .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(1).max(40))
       .optional(),
+    /** Gift Voucher (0094) — token/URL ที่สแกนได้ · server แกะและตรวจเองทั้งหมด */
+    voucherToken: z
+      .preprocess((v) => (typeof v === "string" ? v.trim() : v), z.string().min(4).max(600))
+      .optional(),
     /** เบอร์สมาชิกสะสมแต้ม (ไม่บังคับ) — แต้มไม่ใช่เงิน ไม่กระทบยอดบิล */
     memberPhone: z.preprocess(
       (v) => (typeof v === "string" ? v.trim() : v),

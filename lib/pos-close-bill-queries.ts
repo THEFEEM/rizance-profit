@@ -22,6 +22,11 @@ import {
   upsertPosMember,
 } from "@/lib/pos-member-queries";
 import { expandComboToLines } from "@/lib/pos-combo-queries";
+import {
+  PosVoucherRejectedError,
+  redeemVoucherInTx,
+  validateVoucherForCart,
+} from "@/lib/pos-voucher-queries";
 import type {
   ClosePosBillInput,
   ClosePosBillResult,
@@ -509,6 +514,64 @@ export async function closePosBill(
       }
     }
 
+    /**
+     * ═══ Gift Voucher (0094) ═══════════════════════════════════════
+     *
+     * ลำดับเดียวกับ campaign/partner: หลังคอมโบ ก่อน surcharge → ค่าส่งไม่ถูกลด
+     * ส่วนลดฝังบรรทัด discount_source='voucher' → invariant Σ line_total = total ยังจริง
+     * Voucher = Revenue Reduction (decision D-3 A) — ไม่แตะ payments / journal
+     *
+     * client ส่งแค่ voucherToken (จาก QR) — มูลค่า/สถานะอ่านจาก DB ใน transaction นี้
+     * FOR UPDATE ล็อกใบไว้จนกว่าจะ COMMIT → POS สองเครื่องใช้ใบเดียวกันพร้อมกันไม่ได้
+     * D-5 A: 1 บิล 1 voucher · ห้ามซ้อน coupon/partner
+     */
+    let voucherApplied: {
+      voucherId: string;
+      campaignId: string;
+      publicCode: string;
+      campaignName: string;
+      faceValue: string;
+      discountAmount: string;
+      subtotalBefore: string;
+    } | null = null;
+
+    if (input.voucherToken) {
+      if (campaignApplied || partnerApplied) {
+        throw new PosVoucherRejectedError("STACKED_DISCOUNT");
+      }
+      const engineLines: EngineLine[] = computedLines.map((l, index) => ({
+        index,
+        productId: l.product.id,
+        lineTotalCents: toCents(l.lineTotal),
+        alreadyDiscounted: l.discountSource !== null,
+      }));
+      const { voucher, evaluation } = await validateVoucherForCart({
+        userId,
+        scan: input.voucherToken,
+        lines: engineLines,
+        client,
+      });
+      const subtotalBefore = sumDecimals(...computedLines.map((l) => l.lineTotal));
+      for (const [index, discCents] of evaluation.perLineDiscountCents) {
+        if (discCents <= 0) continue;
+        const line = computedLines[index];
+        const newCents = toCents(line.lineTotal) - discCents;
+        line.listUnitPrice = line.listUnitPrice ?? line.unitSellPrice;
+        line.lineTotal = centsToDecimalString(newCents);
+        line.unitSellPrice = centsToDecimalString(Math.floor(newCents / line.qty));
+        line.discountSource = "voucher";
+      }
+      voucherApplied = {
+        voucherId: voucher.id,
+        campaignId: voucher.campaignId,
+        publicCode: voucher.publicCode,
+        campaignName: voucher.campaignName,
+        faceValue: voucher.value,
+        discountAmount: evaluation.discountAmount,
+        subtotalBefore,
+      };
+    }
+
     // ค่าบริการเพิ่ม (เช่น ค่าส่งเดลิเวอรี่) — เก็บเป็นบรรทัดในบิลที่ไม่มี product_id
     // เพื่อให้ SUM(bill_items.line_total) = total_amount = journal เสมอ
     const surchargeLines = (input.surcharges ?? [])
@@ -546,8 +609,8 @@ export async function closePosBill(
       `INSERT INTO pos_bills
          (user_id, bill_no, status, total_amount, payment_method, entry_date,
           partner_id, partner_name, partner_regular_total, partner_paid_total,
-          partner_discount_amount, partner_cost_total, partner_contribution)
-       VALUES ($1, $2, 'paid', $3, $4, $5::date, $6, $7, $8, $9, $10, $11, $12)
+          partner_discount_amount, partner_cost_total, partner_contribution, voucher_id)
+       VALUES ($1, $2, 'paid', $3, $4, $5::date, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING id, user_id, bill_no, status, total_amount::text, payment_method,
          entry_date::text, income_entry_id, created_at`,
       [
@@ -559,6 +622,7 @@ export async function closePosBill(
         partnerApplied?.discountAmount ?? null,
         partnerApplied?.costTotal ?? null,
         partnerApplied?.contribution ?? null,
+        voucherApplied?.voucherId ?? null,
       ],
     );
     const bill = billRows[0];
@@ -694,6 +758,9 @@ export async function closePosBill(
     const insertedPayments = [];
     for (let i = 0; i < payments.length; i++) {
       const p = payments[i];
+      // บิล ฿0 (voucher ครอบทั้งบิล, 0094) — ไม่มีเงินเปลี่ยนมือ จึงไม่มีแถวชำระเงิน
+      // เหมือน income_entries ที่ข้ามยอด 0 อยู่แล้ว · CHECK amount > 0 ของ 0051 ยังคงเดิม
+      if (toCents(p.amount) <= 0) continue;
       const bucket = POS_TO_INCOME_PAYMENT_METHOD[p.method];
       const { rows: payRows } = await client.query<{
         id: string;
@@ -768,6 +835,26 @@ export async function closePosBill(
       });
     }
 
+    // Voucher redeem — atomic UPDATE + UNIQUE redemption ใน transaction เดียวกับบิล
+    // ใบยังล็อกอยู่จาก FOR UPDATE ข้างบน → ไม่มีใครแทรกได้ระหว่างตรวจกับใช้
+    if (voucherApplied) {
+      await redeemVoucherInTx(client, userId, {
+        voucherId: voucherApplied.voucherId,
+        campaignId: voucherApplied.campaignId,
+        billId: mappedBill.id,
+        billNo: mappedBill.billNo,
+        // บิลปิดใต้ session เจ้าของ (POS ไม่ส่งตัวตนพนักงานมากับบิล — ช่องว่างเดิม, Known Limitation)
+        employeeId: null,
+        orderSubtotal: voucherApplied.subtotalBefore,
+        voucherFaceValue: voucherApplied.faceValue,
+        voucherAmount: voucherApplied.discountAmount,
+        // final = subtotal − voucher (ไม่รวม surcharge — CHECK ใน DB บังคับสมการนี้)
+        finalTotal: centsToDecimalString(
+          toCents(voucherApplied.subtotalBefore) - toCents(voucherApplied.discountAmount),
+        ),
+      });
+    }
+
     /**
      * สมาชิก + แต้ม (0068) — ใน transaction เดียวกับบิล
      *
@@ -831,6 +918,14 @@ export async function closePosBill(
             name: campaignApplied.campaignName,
             discountAmount: campaignApplied.discountAmount,
             subtotalBefore: campaignApplied.subtotalBefore,
+          }
+        : undefined,
+      voucher: voucherApplied
+        ? {
+            publicCode: voucherApplied.publicCode,
+            campaignName: voucherApplied.campaignName,
+            discountAmount: voucherApplied.discountAmount,
+            subtotalBefore: voucherApplied.subtotalBefore,
           }
         : undefined,
     };

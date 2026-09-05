@@ -86,3 +86,11 @@ export function clockRateLimitExceeded(req: NextRequest): number | null {
   const byIp = slidingWindowExceeded(`hr_clock_ip:${clientIp(req)}`, 120, 60_000);
   return byToken ?? byIp;
 }
+
+/**
+ * หน้าการ์ด voucher สาธารณะ /v/[token] — 60 ครั้ง/นาที ต่อ IP
+ * token ยาว 129 bit เดาไม่ได้อยู่แล้ว ด่านนี้กัน scraping/spam view-log มากกว่า
+ */
+export function publicVoucherRateLimitExceeded(req: NextRequest): number | null {
+  return slidingWindowExceeded(`voucher_public:${clientIp(req)}`, 60, 60_000);
+}

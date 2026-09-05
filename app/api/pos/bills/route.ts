@@ -20,6 +20,7 @@ import {
   PartnerNotFoundError,
   PartnerStackingError,
 } from "@/lib/pos-partner-queries";
+import { PosVoucherRejectedError } from "@/lib/pos-voucher-queries";
 import { today } from "@/lib/date";
 
 export async function GET(req: NextRequest) {
@@ -104,6 +105,13 @@ export async function POST(req: NextRequest) {
       // reason เป็น machine code — POS แปลเป็นข้อความไทยเอง
       return NextResponse.json(
         { error: "campaign_rejected", data: { reason: err.reason } },
+        { status: 409 },
+      );
+    }
+    if (err instanceof PosVoucherRejectedError) {
+      // reason + info ที่เปิดเผยได้ (redeemedAt/billNo) — ไม่มี staff/customer
+      return NextResponse.json(
+        { error: "voucher_rejected", data: { reason: err.reason, ...err.info } },
         { status: 409 },
       );
     }

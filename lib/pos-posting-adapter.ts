@@ -97,10 +97,15 @@ export function buildPosBillPaidLines(
           },
         ];
 
-  const lines: JournalLineInput[] = [
-    ...debitLines,
-    { accountCode: REVENUE_ACCOUNT, debit: 0, credit: totalRevenue },
-  ];
+  /**
+   * บิล ฿0 (0094: voucher ครอบทั้งบิล) — ไม่มีเงินเข้า ไม่มีรายได้ให้บันทึก
+   * เหลือแค่ COGS/Inventory (ของออกจากคลังจริง) — ถ้าไม่มีต้นทุนด้วยก็ไม่มีอะไรจะโพสต์
+   * ห้ามใส่บรรทัด 0/0 — validateJournalLines ปฏิเสธถูกต้องแล้ว
+   */
+  const lines: JournalLineInput[] =
+    toCents(totalRevenue) > 0
+      ? [...debitLines, { accountCode: REVENUE_ACCOUNT, debit: 0, credit: totalRevenue }]
+      : [];
 
   if (toCents(cogs) > 0) {
     lines.push(
@@ -125,8 +130,10 @@ export async function postPosBillJournal(
   bill: PosPostingBillInput,
   items: PosPostingItemInput[],
   payments?: PosPostingPaymentInput[],
-): Promise<JournalEntry> {
+): Promise<JournalEntry | null> {
   const lines = buildPosBillPaidLines(bill, items, payments);
+  // บิล ฿0 ที่ไม่มีต้นทุน — ไม่มีรายการบัญชีเกิดขึ้น (ดู buildPosBillPaidLines)
+  if (lines.length === 0) return null;
   return postJournalEntry(client, {
     userId: bill.userId,
     entryDate: billEntryDate(bill),
@@ -141,7 +148,7 @@ export async function postPosBillJournal(
 export async function voidPosBillJournal(
   client: PoolClient,
   bill: Pick<PosPostingBillInput, "id" | "billNo">,
-): Promise<JournalEntry> {
+): Promise<JournalEntry | null> {
   const { rows } = await client.query<{ id: string }>(
     `SELECT id FROM journal_entries
      WHERE source_module = 'pos'
@@ -150,6 +157,16 @@ export async function voidPosBillJournal(
     [bill.id],
   );
 
+  if (rows.length === 0) {
+    // บิล ฿0 ไม่มีต้นทุน (0094) ไม่เคยโพสต์ journal — void ได้โดยไม่มีอะไรต้องกลับรายการ
+    // บิลยอด > 0 ที่ไม่มี journal = ข้อมูลเสีย ยัง throw เหมือนเดิม
+    const { rows: b } = await client.query<{ total_amount: string }>(
+      `SELECT total_amount::text FROM pos_bills WHERE id = $1`,
+      [bill.id],
+    );
+    if (b[0] && toCents(b[0].total_amount) === 0) return null;
+    throw new JournalEntryNotFoundError(bill.id);
+  }
   if (rows.length !== 1) {
     throw new JournalEntryNotFoundError(bill.id);
   }

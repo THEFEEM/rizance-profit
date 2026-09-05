@@ -272,7 +272,10 @@ async function itemsTable(userId: string, start: string, end: string): Promise<C
 
 /** escape ตามมาตรฐาน RFC 4180 — คั่นด้วย , และครอบ " เมื่อจำเป็น */
 function csvCell(v: string | number): string {
-  const s = String(v ?? "");
+  let s = String(v ?? "");
+  // กัน CSV formula injection: ชื่อสินค้า/แคมเปญที่เริ่มด้วย = + - @ จะถูก Excel รันเป็นสูตร
+  // (ตัวเลขติดลบเป็น number อยู่แล้ว จึงไม่โดน — เฉพาะ string ที่เริ่มด้วยอักขระเหล่านี้)
+  if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 

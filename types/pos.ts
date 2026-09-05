@@ -111,6 +111,11 @@ export type ClosePosBillInput = {
    *    ไม่มีทางที่ client จะกำหนดราคาหุ้นส่วนเองได้
    */
   partnerId?: string;
+  /**
+   * Gift Voucher (0094) — client ส่งได้แค่ token ที่สแกนจาก QR (หรือ URL การ์ด)
+   * ⚠️ มูลค่า/สถานะ/วันหมดอายุ อ่านจาก DB ใน transaction — QR เป็นแค่ identifier
+   */
+  voucherToken?: string;
 };
 
 export type PosModifier = {
@@ -141,6 +146,13 @@ export type ClosePosBillResult = {
   pointsEarned?: number;
   memberPoints?: number;  /** ส่วนลดแคมเปญที่ apply ไป (0074) — undefined เมื่อไม่ได้ใช้ */
   campaign?: { name: string; discountAmount: string; subtotalBefore: string };
+  /** Gift Voucher ที่ใช้ในบิลนี้ (0094) — undefined เมื่อไม่ได้ใช้ */
+  voucher?: {
+    publicCode: string;
+    campaignName: string;
+    discountAmount: string;
+    subtotalBefore: string;
+  };
 };
 
 export type PosCategory = {
