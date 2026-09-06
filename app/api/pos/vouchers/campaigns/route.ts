@@ -2,14 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { requirePosSessionAndPlan } from "@/lib/pos-auth";
 import { voucherCampaignSchema } from "@/lib/pos-voucher-schema";
 import { createVoucherCampaign, listVoucherCampaigns } from "@/lib/pos-voucher-queries";
-import { readJson, voucherErrorResponse } from "@/lib/pos-voucher-route-helpers";
+import { readJson, voucherRouteError } from "@/lib/pos-voucher-route-helpers";
 
 /** GET /api/pos/vouchers/campaigns — รายการแคมเปญ + สถิติ (aggregate ใน SQL ไม่โหลดใบ) */
 export async function GET(req: NextRequest) {
   const userId = await requirePosSessionAndPlan(req);
   if (userId instanceof NextResponse) return userId;
-  const campaigns = await listVoucherCampaigns(userId);
-  return NextResponse.json({ data: { campaigns } });
+  try {
+    const campaigns = await listVoucherCampaigns(userId);
+    return NextResponse.json({ data: { campaigns } });
+  } catch (err) {
+    return voucherRouteError(err, "campaigns.list");
+  }
 }
 
 /** POST /api/pos/vouchers/campaigns — สร้างแคมเปญ (status=draft) */
@@ -30,6 +34,6 @@ export async function POST(req: NextRequest) {
     const campaign = await createVoucherCampaign(userId, parsed.data);
     return NextResponse.json({ data: { campaign } }, { status: 201 });
   } catch (err) {
-    return voucherErrorResponse(err) ?? Promise.reject(err);
+    return voucherRouteError(err, "campaigns");
   }
 }

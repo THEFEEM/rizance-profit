@@ -24,8 +24,9 @@ import {
 import { expandComboToLines } from "@/lib/pos-combo-queries";
 import {
   PosVoucherRejectedError,
-  redeemVoucherInTx,
+  redeemAppliedVoucherInTx,
   validateVoucherForCart,
+  type ValidatedVoucher,
 } from "@/lib/pos-voucher-queries";
 import type {
   ClosePosBillInput,
@@ -526,14 +527,10 @@ export async function closePosBill(
      * D-5 A: 1 บิล 1 voucher · ห้ามซ้อน coupon/partner
      */
     let voucherApplied: {
-      voucherId: string;
-      campaignId: string;
-      /** snapshot สำหรับ redemption (V2 analytics ต่อ batch/ประเภท) */
-      batchId: string | null;
-      voucherType: string;
+      /** ใบที่ตรวจแล้ว (secure = มี id · manual (V2.1) = range + code · redeem ผ่านจุดเดียว) */
+      voucher: ValidatedVoucher;
       publicCode: string;
       campaignName: string;
-      faceValue: string;
       discountAmount: string;
       subtotalBefore: string;
     } | null = null;
@@ -567,13 +564,9 @@ export async function closePosBill(
         line.discountSource = "voucher";
       }
       voucherApplied = {
-        voucherId: voucher.id,
-        campaignId: voucher.campaignId,
-        batchId: voucher.batchId,
-        voucherType: voucher.voucherType,
+        voucher,
         publicCode: voucher.publicCode,
         campaignName: voucher.campaignName,
-        faceValue: voucher.value,
         discountAmount: evaluation.discountAmount,
         subtotalBefore,
       };
@@ -629,7 +622,8 @@ export async function closePosBill(
         partnerApplied?.discountAmount ?? null,
         partnerApplied?.costTotal ?? null,
         partnerApplied?.contribution ?? null,
-        voucherApplied?.voucherId ?? null,
+        // manual code ไม่มีแถวใบ → NULL (ประวัติอยู่ที่ redemptions.manual_code)
+        voucherApplied?.voucher.id ?? null,
       ],
     );
     const bill = billRows[0];
@@ -845,17 +839,13 @@ export async function closePosBill(
     // Voucher redeem — atomic UPDATE + UNIQUE redemption ใน transaction เดียวกับบิล
     // ใบยังล็อกอยู่จาก FOR UPDATE ข้างบน → ไม่มีใครแทรกได้ระหว่างตรวจกับใช้
     if (voucherApplied) {
-      await redeemVoucherInTx(client, userId, {
-        voucherId: voucherApplied.voucherId,
-        campaignId: voucherApplied.campaignId,
-        batchId: voucherApplied.batchId,
-        voucherType: voucherApplied.voucherType,
+      await redeemAppliedVoucherInTx(client, userId, {
+        voucher: voucherApplied.voucher,
         billId: mappedBill.id,
         billNo: mappedBill.billNo,
         // บิลปิดใต้ session เจ้าของ (POS ไม่ส่งตัวตนพนักงานมากับบิล — ช่องว่างเดิม, Known Limitation)
         employeeId: null,
         orderSubtotal: voucherApplied.subtotalBefore,
-        voucherFaceValue: voucherApplied.faceValue,
         voucherAmount: voucherApplied.discountAmount,
         // final = subtotal − voucher (ไม่รวม surcharge — CHECK ใน DB บังคับสมการนี้)
         finalTotal: centsToDecimalString(

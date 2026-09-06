@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requirePosSessionAndPlan } from "@/lib/pos-auth";
 import { voucherListQuerySchema } from "@/lib/pos-voucher-schema";
 import { getVoucherCampaign, listVouchers } from "@/lib/pos-voucher-queries";
-import { UUID_RE, notFound, voucherErrorResponse } from "@/lib/pos-voucher-route-helpers";
+import { UUID_RE, notFound, voucherRouteError } from "@/lib/pos-voucher-route-helpers";
 
 /** GET /api/pos/vouchers/campaigns/:id/vouchers?status=&q=&page=&pageSize= — server-side pagination */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -28,6 +28,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const page = await listVouchers(userId, id, parsed.data);
     return NextResponse.json({ data: page });
   } catch (err) {
-    return voucherErrorResponse(err) ?? Promise.reject(err);
+    return voucherRouteError(err, "vouchers");
   }
 }

@@ -8,7 +8,7 @@ import {
   reissueVoucherToken,
   setVoucherStatus,
 } from "@/lib/pos-voucher-queries";
-import { UUID_RE, notFound, readJson, voucherErrorResponse } from "@/lib/pos-voucher-route-helpers";
+import { UUID_RE, notFound, readJson, voucherRouteError } from "@/lib/pos-voucher-route-helpers";
 
 type Ctx = { params: Promise<{ vid: string }> };
 
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest, { params }: Ctx) {
     const voucher = await getVoucherDetail(userId, vid);
     return NextResponse.json({ data: { voucher } });
   } catch (err) {
-    return voucherErrorResponse(err) ?? Promise.reject(err);
+    return voucherRouteError(err, "voucher");
   }
 }
 
@@ -56,6 +56,6 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     const voucher = await setVoucherStatus(userId, vid, next, parsed.data.reason ?? null);
     return NextResponse.json({ data: { voucher } });
   } catch (err) {
-    return voucherErrorResponse(err) ?? Promise.reject(err);
+    return voucherRouteError(err, "voucher");
   }
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePosSessionAndPlan } from "@/lib/pos-auth";
 import { exportVouchersCsv, getVoucherCampaign } from "@/lib/pos-voucher-queries";
-import { UUID_RE, notFound, voucherErrorResponse } from "@/lib/pos-voucher-route-helpers";
+import { UUID_RE, notFound, voucherRouteError } from "@/lib/pos-voucher-route-helpers";
 
 /**
  * GET /api/pos/vouchers/campaigns/:id/export — CSV (BOM + CRLF เหมือน summary/export)
@@ -24,6 +24,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       },
     });
   } catch (err) {
-    return voucherErrorResponse(err) ?? Promise.reject(err);
+    return voucherRouteError(err, "export");
   }
 }

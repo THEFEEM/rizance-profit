@@ -3,7 +3,7 @@ import { requireManagerUnlock, requirePosSessionAndPlan } from "@/lib/pos-auth";
 import { generateVouchersSchema } from "@/lib/pos-voucher-schema";
 import { generateVouchers } from "@/lib/pos-voucher-queries";
 import { getPublicPosAppUrl } from "@/lib/env";
-import { UUID_RE, notFound, readJson, voucherErrorResponse } from "@/lib/pos-voucher-route-helpers";
+import { UUID_RE, notFound, readJson, voucherRouteError } from "@/lib/pos-voucher-route-helpers";
 
 /**
  * POST /api/pos/vouchers/campaigns/:id/generate  { quantity }
@@ -32,6 +32,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     });
     return NextResponse.json({ data: result }, { status: 201 });
   } catch (err) {
-    return voucherErrorResponse(err) ?? Promise.reject(err);
+    return voucherRouteError(err, "generate");
   }
 }

@@ -10,7 +10,7 @@ import {
   validateVoucherForCart,
 } from "@/lib/pos-voucher-queries";
 import { voucherValidateSchema } from "@/lib/pos-voucher-schema";
-import { readJson } from "@/lib/pos-voucher-route-helpers";
+import { readJson, voucherRouteError } from "@/lib/pos-voucher-route-helpers";
 
 /**
  * POST /api/pos/vouchers/validate — ตรวจ voucher "ก่อน" เก็บเงิน (read-only, ไม่เปลี่ยน state)
@@ -38,29 +38,29 @@ export async function POST(req: NextRequest) {
   const input = parsed.data;
 
   const lines: EngineLine[] = [];
-  for (let i = 0; i < input.items.length; i++) {
-    const it = input.items[i];
-    const { rows } = await pool.query<{ sell_price: string }>(
-      `SELECT sell_price::text AS sell_price FROM pos_products WHERE id = $2 AND user_id = $1`,
-      [userId, it.productId],
-    );
-    if (!rows[0]) continue;
-    lines.push({
-      index: i,
-      productId: it.productId,
-      lineTotalCents: toCents(rows[0].sell_price) * it.qty,
-      alreadyDiscounted: false,
-    });
-  }
-  if (input.comboTotal && input.comboTotal > 0) {
-    lines.push({
-      index: -1,
-      productId: null,
-      lineTotalCents: toCents(input.comboTotal.toFixed(2)),
-      alreadyDiscounted: true,
-    });
-  }
   try {
+    for (let i = 0; i < input.items.length; i++) {
+      const it = input.items[i];
+      const { rows } = await pool.query<{ sell_price: string }>(
+        `SELECT sell_price::text AS sell_price FROM pos_products WHERE id = $2 AND user_id = $1`,
+        [userId, it.productId],
+      );
+      if (!rows[0]) continue;
+      lines.push({
+        index: i,
+        productId: it.productId,
+        lineTotalCents: toCents(rows[0].sell_price) * it.qty,
+        alreadyDiscounted: false,
+      });
+    }
+    if (input.comboTotal && input.comboTotal > 0) {
+      lines.push({
+        index: -1,
+        productId: null,
+        lineTotalCents: toCents(input.comboTotal.toFixed(2)),
+        alreadyDiscounted: true,
+      });
+    }
     // ตะกร้าว่าง → ตรวจแค่สถานะใบ (statusOnly) · มีของ → คิดส่วนลด/ยอดขั้นต่ำจริง
     const { voucher, evaluation } = await validateVoucherForCart({
       userId, scan: input.scan, lines, statusOnly: lines.length === 0,
@@ -68,6 +68,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       data: {
         valid: true,
+        /** secure (QR/token) | manual (code — V2.1) · POS โชว์ป้ายต่างกัน */
+        mode: voucher.mode,
         publicCode: voucher.publicCode,
         campaignName: voucher.campaignName,
         voucherType: voucher.voucherType,
@@ -82,10 +84,10 @@ export async function POST(req: NextRequest) {
     if (err instanceof PosVoucherRejectedError) {
       void logVoucherEvent(pool, userId, {
         campaignId: err.internal.campaignId, voucherId: err.internal.voucherId,
-        actor: "staff", action: "redeem_rejected", detail: { reason: err.reason },
+        actor: "staff", action: "redeem_rejected", detail: { reason: err.reason, code: err.info.manualCode ?? undefined },
       }).catch(() => undefined);
       return NextResponse.json({ data: { valid: false, reason: err.reason, ...err.info } });
     }
-    throw err;
+    return voucherRouteError(err, "validate");
   }
 }

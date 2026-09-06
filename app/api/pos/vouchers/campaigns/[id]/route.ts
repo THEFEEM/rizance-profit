@@ -7,7 +7,7 @@ import {
   setVoucherCampaignStatus,
   updateVoucherCampaign,
 } from "@/lib/pos-voucher-queries";
-import { UUID_RE, notFound, readJson, voucherErrorResponse } from "@/lib/pos-voucher-route-helpers";
+import { UUID_RE, notFound, readJson, voucherRouteError } from "@/lib/pos-voucher-route-helpers";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest, { params }: Ctx) {
     const campaign = await getVoucherCampaign(userId, id);
     return NextResponse.json({ data: { campaign } });
   } catch (err) {
-    return voucherErrorResponse(err) ?? Promise.reject(err);
+    return voucherRouteError(err, "campaign");
   }
 }
 
@@ -51,6 +51,6 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         : await updateVoucherCampaign(userId, id, parsed.data as z.infer<typeof voucherCampaignSchema>);
     return NextResponse.json({ data: { campaign } });
   } catch (err) {
-    return voucherErrorResponse(err) ?? Promise.reject(err);
+    return voucherRouteError(err, "campaign");
   }
 }

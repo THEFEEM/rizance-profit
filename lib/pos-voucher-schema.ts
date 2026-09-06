@@ -78,9 +78,20 @@ export type VoucherType = (typeof VOUCHER_TYPES)[number];
 /** ที่ MVP รองรับจริงตั้งแต่ต้นจนจบ (สร้าง → การ์ด → POS → redeem) */
 export const REDEEMABLE_VOUCHER_TYPES: readonly VoucherType[] = ["fixed_amount", "percentage", "fixed_discount"];
 
+/**
+ * วิธีออกใบ (V2.1)
+ *   secure       = ใบละ 1 แถว + token ลับ + QR (เดิม) — gift / มูลค่าสูง
+ *   manual_range = เก็บช่วงเลข · code derive เอง · แถวเกิดตอน redeem — ส่วนลดจำนวนมาก/event
+ * gift (fixed_amount) ห้าม manual (code เดาได้ = เงินสดลอย) — บังคับที่ schema และ DB-side ใน query
+ */
+export const GENERATION_MODES = ["secure", "manual_range"] as const;
+export type GenerationMode = (typeof GENERATION_MODES)[number];
+export const MANUAL_ALLOWED_VOUCHER_TYPES: readonly VoucherType[] = ["percentage", "fixed_discount"];
+
 export const voucherCampaignSchema = z
   .object({
     name: trimmed(120, 1),
+    generationMode: z.enum(GENERATION_MODES).default("secure"),
     description: trimmed(500).nullable().optional(),
     sponsor: trimmed(120).nullable().optional(),
     /** MVP เปิดใช้จริงเฉพาะ fixed_amount — ค่าอื่นรับได้แต่ engine จะปฏิเสธตอน redeem */
@@ -115,8 +126,45 @@ export const voucherCampaignSchema = z
     if (new Date(v.expiresAt) <= new Date(v.startAt)) {
       ctx.addIssue({ code: "custom", path: ["expiresAt"], message: "หมดอายุต้องหลังวันเริ่ม" });
     }
+    if (v.generationMode === "manual_range" && !MANUAL_ALLOWED_VOUCHER_TYPES.includes(v.voucherType)) {
+      ctx.addIssue({ code: "custom", path: ["generationMode"], message: "Manual Code ใช้ได้กับส่วนลด % / ลดบาท เท่านั้น (Gift ต้อง Secure)" });
+    }
   });
 export type VoucherCampaignInput = z.infer<typeof voucherCampaignSchema>;
+
+/**
+ * Manual range (V2.1) — range: prefix ใช้ของแคมเปญเสมอ (ไม่รับจาก client) · custom: code เดียว
+ * ขนาดช่วง ≤ 100,000 (CHECK ใน DB ด้วย) · padding 1–8
+ */
+export const manualRangeCreateSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("range"),
+    startNumber: z.number().int().min(1).max(99_999_999),
+    endNumber: z.number().int().min(1).max(99_999_999),
+    padding: z.number().int().min(1).max(8).default(4),
+    name: trimmed(120).nullable().optional(),
+    distributionSource: trimmed(60).nullable().optional(),
+  }).refine((r) => r.endNumber >= r.startNumber, { path: ["endNumber"], message: "เลขสุดท้ายต้องไม่น้อยกว่าเลขเริ่ม" })
+    .refine((r) => r.endNumber - r.startNumber + 1 <= 100_000, { path: ["endNumber"], message: "ช่วงเดียวไม่เกิน 100,000 code" }),
+  z.object({
+    kind: z.literal("custom"),
+    /** normalize ที่ server อีกที (uppercase/trim) — regex ตรวจหลัง normalize ใน query */
+    code: trimmed(32, 3),
+    name: trimmed(120).nullable().optional(),
+    distributionSource: trimmed(60).nullable().optional(),
+  }),
+]);
+export type ManualRangeCreateInput = z.infer<typeof manualRangeCreateSchema>;
+
+export const manualRangeStatusSchema = z.object({
+  status: z.enum(["active", "paused", "archived"]),
+});
+
+export const manualRedemptionListQuerySchema = z.object({
+  rangeId: z.string().uuid().optional(),
+  page: z.coerce.number().int().min(1).max(100_000).default(1),
+  pageSize: z.coerce.number().int().min(10).max(100).default(50),
+});
 
 export const voucherCampaignStatusSchema = z.object({
   status: z.enum(["draft", "active", "paused", "ended", "archived"]),
