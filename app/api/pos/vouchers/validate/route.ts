@@ -60,22 +60,22 @@ export async function POST(req: NextRequest) {
       alreadyDiscounted: true,
     });
   }
-  // ตะกร้าว่าง: ตรวจสถานะใบได้ แต่ส่วนลด = 0 — ใส่บรรทัดหลอกให้ engine ไม่ตอบ NO_ELIGIBLE_ITEMS
-  const probeLines: EngineLine[] =
-    lines.length > 0 ? lines : [{ index: 0, productId: null, lineTotalCents: 1, alreadyDiscounted: false }];
-
   try {
+    // ตะกร้าว่าง → ตรวจแค่สถานะใบ (statusOnly) · มีของ → คิดส่วนลด/ยอดขั้นต่ำจริง
     const { voucher, evaluation } = await validateVoucherForCart({
-      userId, scan: input.scan, lines: probeLines,
+      userId, scan: input.scan, lines, statusOnly: lines.length === 0,
     });
     return NextResponse.json({
       data: {
         valid: true,
         publicCode: voucher.publicCode,
         campaignName: voucher.campaignName,
+        voucherType: voucher.voucherType,
         value: voucher.value,
+        minimumSpend: voucher.minimumSpend,
+        maximumDiscount: voucher.maximumDiscount,
         expiresAt: voucher.expiresAt,
-        discountAmount: lines.length > 0 ? evaluation.discountAmount : null,
+        discountAmount: evaluation?.discountAmount ?? null,
       },
     });
   } catch (err) {

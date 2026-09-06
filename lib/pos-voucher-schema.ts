@@ -58,13 +58,25 @@ export function resolveCardBrand(
   };
 }
 
+/**
+ * ประเภท voucher (V2)
+ *   fixed_amount   = GIFT VALUE — มูลค่าแทนเงิน · ไม่มีเงินทอน · ไม่มียอดขั้นต่ำ (ชื่อเดิมจาก V1 คงไว้เพื่อ backward compat)
+ *   percentage     = ส่วนลด % — มี minimum_spend / maximum_discount
+ *   fixed_discount = ลดเป็นบาท — promotion · มี minimum_spend
+ *   free_item / buy_x_get_y / store_credit = เผื่ออนาคต (engine ปฏิเสธ)
+ * gift กับ fixed_discount คำนวณคล้ายกันแต่ "ความหมายทางธุรกิจ" ต่างกัน → ห้ามยุบรวม (UI/analytics/บัญชี)
+ */
 export const VOUCHER_TYPES = [
   "fixed_amount",
   "percentage",
+  "fixed_discount",
   "free_item",
   "buy_x_get_y",
   "store_credit",
 ] as const;
+export type VoucherType = (typeof VOUCHER_TYPES)[number];
+/** ที่ MVP รองรับจริงตั้งแต่ต้นจนจบ (สร้าง → การ์ด → POS → redeem) */
+export const REDEEMABLE_VOUCHER_TYPES: readonly VoucherType[] = ["fixed_amount", "percentage", "fixed_discount"];
 
 export const voucherCampaignSchema = z
   .object({
@@ -73,7 +85,12 @@ export const voucherCampaignSchema = z
     sponsor: trimmed(120).nullable().optional(),
     /** MVP เปิดใช้จริงเฉพาะ fixed_amount — ค่าอื่นรับได้แต่ engine จะปฏิเสธตอน redeem */
     voucherType: z.enum(VOUCHER_TYPES).default("fixed_amount"),
+    /** gift/fixed = บาท · percentage = 0–100 */
     value: z.number().finite().gt(0).max(999_999.99),
+    /** ยอดซื้อขั้นต่ำ (บาท) — 0 = ไม่มี · gift ควรเป็น 0 */
+    minimumSpend: z.number().finite().min(0).max(999_999.99).default(0),
+    /** ลดสูงสุด (บาท) — percentage เท่านั้น · null = ไม่จำกัด */
+    maximumDiscount: z.number().finite().gt(0).max(999_999.99).nullable().optional(),
     quantityPlanned: z.number().int().min(1).max(100_000).nullable().optional(),
     startAt: z.string().datetime({ offset: true }),
     expiresAt: z.string().datetime({ offset: true }),
@@ -89,6 +106,12 @@ export const voucherCampaignSchema = z
     if (v.voucherType === "percentage" && v.value > 100) {
       ctx.addIssue({ code: "custom", path: ["value"], message: "percentage ≤ 100" });
     }
+    if (v.voucherType !== "percentage" && v.maximumDiscount != null) {
+      ctx.addIssue({ code: "custom", path: ["maximumDiscount"], message: "ลดสูงสุดใช้กับส่วนลด % เท่านั้น" });
+    }
+    if (v.voucherType === "fixed_discount" && v.minimumSpend > 0 && v.minimumSpend < v.value) {
+      ctx.addIssue({ code: "custom", path: ["minimumSpend"], message: "ยอดขั้นต่ำต้องไม่น้อยกว่าส่วนลด" });
+    }
     if (new Date(v.expiresAt) <= new Date(v.startAt)) {
       ctx.addIssue({ code: "custom", path: ["expiresAt"], message: "หมดอายุต้องหลังวันเริ่ม" });
     }
@@ -99,9 +122,15 @@ export const voucherCampaignStatusSchema = z.object({
   status: z.enum(["draft", "active", "paused", "ended", "archived"]),
 });
 
+/**
+ * Bulk generate — ขีดจำกัดจาก V1: 1–1,000 ต่อ request (1 INSERT unnest · token 1,000 ตัวใน memory ≈ 40 KB ·
+ * Vercel function ไม่ค้าง) · แคมเปญใหญ่กว่านั้นยิงหลาย batch · cap รวมด้วย campaign.quantity_planned
+ * V2: ทุกการ generate สร้าง batch เสมอ (ชื่อ + ช่องทางแจก) — ไม่บังคับกรอก ใช้ดีฟอลต์ "Batch #n"
+ */
 export const generateVouchersSchema = z.object({
-  /** ต่อครั้ง ≤ 1,000 — แคมเปญใหญ่ให้ยิงหลายรอบ (ป้องกัน request ค้าง) */
   quantity: z.number().int().min(1).max(1000),
+  batchName: trimmed(120).nullable().optional(),
+  distributionSource: trimmed(60).nullable().optional(),
 });
 
 export const voucherListQuerySchema = z.object({
@@ -109,6 +138,8 @@ export const voucherListQuerySchema = z.object({
     .enum(["all", "active", "redeemed", "expired", "cancelled", "blocked", "issued"])
     .default("all"),
   q: trimmed(40).optional(),
+  batchId: z.string().uuid().optional(),
+  source: trimmed(60).optional(),
   page: z.coerce.number().int().min(1).max(100_000).default(1),
   pageSize: z.coerce.number().int().min(10).max(100).default(50),
 });

@@ -26,8 +26,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!parsed.success) return NextResponse.json({ error: "invalid_input" }, { status: 400 });
 
   try {
-    const vouchers = await generateVouchers(userId, id, parsed.data.quantity, getPublicPosAppUrl());
-    return NextResponse.json({ data: { vouchers } }, { status: 201 });
+    const result = await generateVouchers(userId, id, parsed.data.quantity, getPublicPosAppUrl(), {
+      name: parsed.data.batchName ?? null,
+      distributionSource: parsed.data.distributionSource ?? null,
+    });
+    return NextResponse.json({ data: result }, { status: 201 });
   } catch (err) {
     return voucherErrorResponse(err) ?? Promise.reject(err);
   }

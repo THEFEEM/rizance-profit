@@ -528,6 +528,9 @@ export async function closePosBill(
     let voucherApplied: {
       voucherId: string;
       campaignId: string;
+      /** snapshot สำหรับ redemption (V2 analytics ต่อ batch/ประเภท) */
+      batchId: string | null;
+      voucherType: string;
       publicCode: string;
       campaignName: string;
       faceValue: string;
@@ -551,6 +554,8 @@ export async function closePosBill(
         lines: engineLines,
         client,
       });
+      // statusOnly ไม่เคยถูกส่งจากที่นี่ — evaluation ต้องมีเสมอ (type guard ป้องกันการเรียกผิดในอนาคต)
+      if (!evaluation) throw new PosVoucherRejectedError("NO_ELIGIBLE_ITEMS");
       const subtotalBefore = sumDecimals(...computedLines.map((l) => l.lineTotal));
       for (const [index, discCents] of evaluation.perLineDiscountCents) {
         if (discCents <= 0) continue;
@@ -564,6 +569,8 @@ export async function closePosBill(
       voucherApplied = {
         voucherId: voucher.id,
         campaignId: voucher.campaignId,
+        batchId: voucher.batchId,
+        voucherType: voucher.voucherType,
         publicCode: voucher.publicCode,
         campaignName: voucher.campaignName,
         faceValue: voucher.value,
@@ -841,6 +848,8 @@ export async function closePosBill(
       await redeemVoucherInTx(client, userId, {
         voucherId: voucherApplied.voucherId,
         campaignId: voucherApplied.campaignId,
+        batchId: voucherApplied.batchId,
+        voucherType: voucherApplied.voucherType,
         billId: mappedBill.id,
         billNo: mappedBill.billNo,
         // บิลปิดใต้ session เจ้าของ (POS ไม่ส่งตัวตนพนักงานมากับบิล — ช่องว่างเดิม, Known Limitation)

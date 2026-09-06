@@ -15,6 +15,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const parsed = voucherListQuerySchema.safeParse({
     status: sp.get("status") ?? undefined,
     q: sp.get("q") ?? undefined,
+    batchId: sp.get("batchId") ?? undefined,
+    source: sp.get("source") ?? undefined,
     page: sp.get("page") ?? undefined,
     pageSize: sp.get("pageSize") ?? undefined,
   });
