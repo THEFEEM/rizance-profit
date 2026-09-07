@@ -24,7 +24,7 @@ export function voucherErrorResponse(err: unknown): NextResponse | null {
     );
   }
   if (err instanceof VoucherStateError) {
-    return NextResponse.json({ error: "voucher_state", data: { reason: err.reason } }, { status: 409 });
+    return NextResponse.json({ error: "voucher_state", data: { reason: err.reason, ...err.detail } }, { status: 409 });
   }
   if (err instanceof PosVoucherRejectedError) {
     return NextResponse.json(

@@ -72,7 +72,11 @@ export class VoucherCampaignImmutableError extends Error {
   }
 }
 export class VoucherStateError extends Error {
-  constructor(public readonly reason: string) {
+  constructor(
+    public readonly reason: string,
+    /** ข้อมูลที่เปิดเผยให้ client ได้ (ของร้านเดียวกันเท่านั้น) เช่น แคมเปญที่ prefix ชน — route ส่งต่อใน data */
+    public readonly detail: Record<string, string | null> = {},
+  ) {
     super(`voucher_state:${reason}`);
     this.name = "VoucherStateError";
   }
@@ -388,13 +392,20 @@ const isUniqueViolation = (e: unknown, constraint?: string): boolean => {
  * (บั๊ก V1: UNIQUE(user_id, public_code) + เลขรันต่อแคมเปญ → prefix ซ้ำ = generate ล้ม 23505 → "unknown_error")
  */
 async function assertPrefixAvailable(c: Q, userId: string, prefix: string, exceptCampaignId: string | null): Promise<void> {
-  const { rows } = await c.query<{ id: string }>(
-    `SELECT id FROM pos_voucher_campaigns
+  const { rows } = await c.query<{ id: string; name: string; status: string }>(
+    `SELECT id, name, status FROM pos_voucher_campaigns
      WHERE user_id = $1 AND code_prefix = $2 AND status <> 'archived' AND ($3::uuid IS NULL OR id <> $3)
-     LIMIT 1`,
+     ORDER BY created_at DESC LIMIT 1`,
     [userId, prefix, exceptCampaignId],
   );
-  if (rows[0]) throw new VoucherStateError("prefix_in_use");
+  // บอกว่าชนกับใคร (ร้านเดียวกัน — เปิดเผยได้) → client พาไปแก้ที่แคมเปญนั้นได้เลย ไม่ต้องไล่หา
+  if (rows[0]) {
+    throw new VoucherStateError("prefix_in_use", {
+      conflictCampaignId: rows[0].id,
+      conflictCampaignName: rows[0].name,
+      conflictCampaignStatus: rows[0].status,
+    });
+  }
 }
 
 export async function createVoucherCampaign(
