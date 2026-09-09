@@ -3,6 +3,14 @@ import { pool } from "@/lib/db";
 import { today } from "@/lib/date";
 import { centsToDecimalString, toCents } from "@/lib/money";
 import { recipeQuantityInPurchaseUnits } from "@/lib/pricing-units";
+import {
+  demandFor,
+  finalSuggested,
+  totalShortfallByInput,
+  usageStats,
+  type DemandRecipe,
+  type ProductionDemand,
+} from "@/lib/stock-usage";
 import type { PurchaseUnit } from "@/types/pricing";
 
 /**
@@ -44,6 +52,14 @@ export type PosIngredient = {
    * คนละเรื่องกับ category ซึ่งเป็น "หมวดของ" (Mayo ก็อยู่หมวดซอส แต่ซื้อมา)
    */
   kind: IngredientKind;
+  /**
+   * Inventory I-2 (C2 = DERIVE · ไม่มีคอลัมน์ usage_group) — มีเฉพาะจาก listPosIngredients
+   *   isProductionInput = อยู่ในสูตรผลิตที่ active อย่างน้อย 1 สูตร (→ กลุ่ม "ทำซอส")
+   *   isInMenuRecipe    = ผูกกับสินค้า/ตัวเลือกในเมนูอย่างน้อย 1 ตัว (→ กลุ่ม "หลัก")
+   * optional เพราะ RETURNING ของ mutation ไม่คำนวณ (client ใช้ค่าจาก list เป็นหลัก)
+   */
+  isProductionInput?: boolean;
+  isInMenuRecipe?: boolean;
 };
 
 export type IngredientKind = "purchased" | "produced";
@@ -152,14 +168,40 @@ export class PosIngredientNotFoundError extends Error {
 // Master (reuse ตาราง ingredients ของโหมด Pricing)
 // ---------------------------------------------------------------------------
 
+/**
+ * รายการวัตถุดิบทั้งร้าน + ธงจัดกลุ่ม (Inventory I-2)
+ *
+ * ธง 2 ตัวคำนวณใน query เดียวด้วย EXISTS ต่อแถว (index ที่ ingredient_id มีอยู่แล้ว
+ * ทั้ง production_recipe_items · pos_product_ingredients · pos_modifier_ingredients)
+ * → ไม่มี N+1 · ไม่มีคอลัมน์ใหม่ · เปลี่ยนสูตรแล้วกลุ่มเปลี่ยนเองทันที
+ *
+ * ไม่ใส่ใน INGREDIENT_RETURN เพราะตัวนั้นถูกใช้ใน RETURNING ของ INSERT/UPDATE ด้วย
+ * (subquery ใน RETURNING ทำได้แต่ไม่คุ้ม — client รีเฟรชจาก list อยู่แล้ว)
+ */
 export async function listPosIngredients(userId: string): Promise<PosIngredient[]> {
-  const { rows } = await pool.query<IngredientRow>(
-    `SELECT ${INGREDIENT_RETURN} FROM ingredients
+  const { rows } = await pool.query<
+    IngredientRow & { is_production_input: boolean; is_in_menu_recipe: boolean }
+  >(
+    `SELECT ${INGREDIENT_RETURN},
+       EXISTS (
+         SELECT 1 FROM production_recipe_items ri
+         JOIN production_recipes r ON r.id = ri.recipe_id
+         WHERE ri.ingredient_id = ingredients.id AND r.user_id = $1 AND r.is_active
+       ) AS is_production_input,
+       (
+         EXISTS (SELECT 1 FROM pos_product_ingredients pi WHERE pi.ingredient_id = ingredients.id)
+         OR EXISTS (SELECT 1 FROM pos_modifier_ingredients mi WHERE mi.ingredient_id = ingredients.id)
+       ) AS is_in_menu_recipe
+     FROM ingredients
      WHERE user_id = $1
      ORDER BY name ASC`,
     [userId],
   );
-  return rows.map(mapIngredient);
+  return rows.map((r) => ({
+    ...mapIngredient(r),
+    isProductionInput: r.is_production_input === true,
+    isInMenuRecipe: r.is_in_menu_recipe === true,
+  }));
 }
 
 export type UpsertIngredientInput = {
@@ -966,25 +1008,65 @@ export type ShoppingListItem = {
   targetStock: string | null;
   /** 0085: คำแนะนำแปลงเป็นหีบห่อ เช่น "≈ 2 แพ็ค" (null = ซื้อเป็นหน่วยสต็อก) */
   suggestedPack: { unitName: string; quantity: string } | null;
+  /** I-5: ใช้ไปตั้งแต่เริ่มวันขายวันนี้ (คิด day_cutoff_hour · จาก created_at ของ movement) */
+  usedToday: string;
+  /** I-5: ของนี้ซื้อเข้าหรือผลิตเอง */
+  kind: IngredientKind;
+  /** I-7 (C4): ขาดจากการผลิตที่วางแผน (รวมทุกสูตร) — "0.000" เมื่อไม่ขาด · เฉพาะของซื้อเข้า */
+  productionShortfall: string;
 };
 
-export async function getShoppingList(
-  userId: string,
-  days = 14,
-): Promise<{ days: number; items: ShoppingListItem[] }> {
-  const lookback = Math.min(Math.max(days, 1), 90);
-  const { rows } = await pool.query<{
-    id: string;
-    name: string;
-    purchase_unit: string;
-    stock_qty: string;
-    low_stock_threshold: string | null;
-    target_stock: string | null;
-    pack_unit: string | null;
-    pack_factor: string | null;
-    used: string;
-  }>(
-    `SELECT i.id, i.name, i.purchase_unit,
+export type ShoppingListResult = {
+  days: number;
+  /** ของที่ต้องซื้อ (kind = purchased) — suggestedPurchase = max(forecast, production shortfall) */
+  items: ShoppingListItem[];
+  /** I-5: ของผลิตเอง (kind = produced) shape เดียวกัน — suggestedPurchase = ปริมาณที่ควรผลิตเพิ่ม */
+  produced: ShoppingListItem[];
+  /** I-7: ก้อน "ต้องผลิต" แยกจากลิสต์ซื้อ — เช็คลิสต์ input ต่อสูตร (ต้องมี · มี · ขาด) */
+  productionDemand: ProductionDemand[];
+};
+
+type UsageRow = {
+  id: string;
+  name: string;
+  purchase_unit: string;
+  kind: IngredientKind;
+  stock_qty: string;
+  low_stock_threshold: string | null;
+  target_stock: string | null;
+  pack_unit: string | null;
+  pack_factor: string | null;
+  used: string;
+  used_today: string;
+};
+
+/**
+ * อัตราการใช้ต่อวัตถุดิบ (I-5 · helper กลางที่ shopping list ใช้)
+ *
+ * 1 query · GROUP ผ่าน correlated subquery บน index (ingredient_id, created_at)
+ *   used       = Σ(-qty_change) ของ sale + production_input ในช่วง lookback
+ *   used_today = เหมือนกันแต่ตั้งแต่ "ต้นวันขายวันนี้" (day_cutoff_hour ของร้าน · เวลาไทย)
+ *
+ * 0089: วัตถุดิบถูกใช้ไป 2 ทาง ต้องนับทั้งคู่ — sale (ขายตรง) + production_input (ถูกใช้ผลิตซอส)
+ *   ถ้านับแค่ sale: Mayo ที่ถูกใช้ผลิต 2,000g จะรายงานว่าใช้ 0g → daysLeft ผิด → ไม่เตือน
+ * ⚠️ production_output ห้ามนับ — มันคือของ "เข้า" (qty_change บวก) ถ้าเผลอนับจะหักกลบจนเพี้ยน
+ *
+ * ⚠️ movement ไม่มี entry_date — "วันนี้" จึงคิดจาก created_at เทียบต้นวันขาย (ต่างจาก pos_bills.entry_date
+ *    ได้เฉพาะบิลที่ปิดคาบเกี่ยวช่วง cutoff) · โน้ตใน UI ว่า "ตามเวลาบันทึก"
+ */
+async function ingredientUsageRows(userId: string, lookback: number): Promise<UsageRow[]> {
+  const { rows } = await pool.query<UsageRow>(
+    `WITH cfg AS (
+       SELECT CASE WHEN s.day_cutoff_hour BETWEEN 1 AND 11 THEN s.day_cutoff_hour ELSE 0 END AS cutoff
+       FROM (SELECT COALESCE((SELECT day_cutoff_hour FROM pos_shop_settings WHERE user_id = $1), 0) AS day_cutoff_hour) s
+     ),
+     bounds AS (
+       -- ต้นวันขายวันนี้ (เวลาไทย): (วันนี้ − cutoff ชม.)::date + cutoff ชม. → แปลงกลับเป็น timestamptz
+       SELECT ((((now() AT TIME ZONE 'Asia/Bangkok') - make_interval(hours => cutoff))::date
+               + make_interval(hours => cutoff)) AT TIME ZONE 'Asia/Bangkok') AS today_start
+       FROM cfg
+     )
+     SELECT i.id, i.name, i.purchase_unit, i.kind,
             i.stock_qty::text AS stock_qty,
             i.low_stock_threshold::text AS low_stock_threshold,
             i.target_stock::text AS target_stock,
@@ -994,77 +1076,175 @@ export async function getShoppingList(
               SELECT SUM(-m.qty_change)
               FROM ingredient_stock_movements m
               WHERE m.ingredient_id = i.id
-                -- 0089: วัตถุดิบถูกใช้ไป 2 ทาง ต้องนับทั้งคู่
-                --   sale             = ขายอาหารตรง ๆ
-                --   production_input = ถูกใช้ผลิตซอส
-                -- ถ้านับแค่ sale: Mayo ที่ถูกใช้ผลิต 2,000g จะรายงานว่าใช้ 0g
-                -- → daysLeft ผิด → ไม่เตือนให้ซื้อ → Mayo หมดกลางร้าน
-                --
-                -- ⚠️ production_output ห้ามนับ — มันคือของ "เข้า" ไม่ใช่ของใช้ไป
-                --    (ตัวเลข qty_change เป็นบวก ถ้าเผลอนับจะหักกลบกันจนเพี้ยน)
                 AND m.movement_type IN ('sale', 'production_input')
                 AND m.created_at >= now() - ($2 || ' days')::interval
-            ), 0)::text AS used
+            ), 0)::text AS used,
+            COALESCE((
+              SELECT SUM(-m.qty_change)
+              FROM ingredient_stock_movements m
+              WHERE m.ingredient_id = i.id
+                AND m.movement_type IN ('sale', 'production_input')
+                AND m.created_at >= b.today_start
+            ), 0)::text AS used_today
      FROM ingredients i
+     CROSS JOIN bounds b
      LEFT JOIN ingredient_purchase_units u
             ON u.ingredient_id = i.id AND u.is_active AND u.is_default
      WHERE i.user_id = $1 AND i.track_stock = true
      ORDER BY i.name ASC`,
     [userId, String(lookback)],
   );
+  return rows;
+}
 
-  const items = rows.map((r) => {
+type DemandRecipeRow = {
+  recipe_id: string;
+  recipe_name: string;
+  output_ingredient_id: string;
+  expected_output_qty: string;
+  ingredient_id: string;
+  ingredient_name: string;
+  purchase_unit: string;
+  track_stock: boolean;
+  stock_qty: string;
+  per_batch: string;
+};
+
+/** สูตร active ทั้งร้าน + input (1 query · แถว = บรรทัดสูตร) — ใช้คิดความต้องการจากการผลิต (I-7) */
+async function activeDemandRecipes(userId: string): Promise<DemandRecipe[]> {
+  const { rows } = await pool.query<DemandRecipeRow>(
+    `SELECT r.id AS recipe_id, r.name AS recipe_name, r.output_ingredient_id,
+            r.expected_output_qty::text AS expected_output_qty,
+            pri.ingredient_id, i.name AS ingredient_name, i.purchase_unit, i.track_stock,
+            i.stock_qty::text AS stock_qty,
+            fn_recipe_qty_in_purchase_unit(pri.quantity, i.purchase_unit)::text AS per_batch
+     FROM production_recipes r
+     JOIN production_recipe_items pri ON pri.recipe_id = r.id
+     JOIN ingredients i ON i.id = pri.ingredient_id
+     WHERE r.user_id = $1 AND r.is_active
+     ORDER BY r.name, pri.sort_order, i.name`,
+    [userId],
+  );
+  const byRecipe = new Map<string, DemandRecipe>();
+  for (const r of rows) {
+    let rec = byRecipe.get(r.recipe_id);
+    if (!rec) {
+      rec = {
+        recipeId: r.recipe_id,
+        recipeName: r.recipe_name,
+        outputIngredientId: r.output_ingredient_id,
+        expectedOutputQty: Number(r.expected_output_qty),
+        inputs: [],
+      };
+      byRecipe.set(r.recipe_id, rec);
+    }
+    rec.inputs.push({
+      ingredientId: r.ingredient_id,
+      name: r.ingredient_name,
+      purchaseUnit: r.purchase_unit,
+      trackStock: r.track_stock,
+      perBatch: Number(r.per_batch),
+      stock: r.track_stock ? Number(r.stock_qty) : null,
+    });
+  }
+  return [...byRecipe.values()];
+}
+
+/**
+ * ลิสต์ต้องซื้อ + ของผลิตเอง + ความต้องการจากการผลิต — 2 query คงที่
+ *
+ * เปลี่ยนจากเดิม (I-5/I-7):
+ *   · สูตรคำนวณย้ายไป lib/stock-usage.ts (ค่าเท่าเดิมทุกตัว — เทส stock-guard/stock-filter คุม)
+ *   · ของผลิตเอง (kind = produced) ไม่อยู่ใน items อีก (บั๊กเดิม: ซอสโฮมเมดโผล่ในลิสต์ "ต้องซื้อ")
+ *     → แยกไป `produced` shape เดียวกัน · `suggestedPurchase` ของมัน = ปริมาณที่ควรผลิตเพิ่ม
+ *   · + usedToday · kind
+ *   · C4: items ที่เป็น input ของสูตรที่ "ต้องผลิต" → suggestedPurchase = max(forecast, shortfall) ห้ามบวก
+ */
+export async function getShoppingList(userId: string, days = 14): Promise<ShoppingListResult> {
+  const lookback = Math.min(Math.max(days, 1), 90);
+  const [rows, recipes] = await Promise.all([
+    ingredientUsageRows(userId, lookback),
+    activeDemandRecipes(userId),
+  ]);
+
+  type Draft = Omit<ShoppingListItem, "suggestedPurchase" | "suggestedPack" | "productionShortfall"> & {
+    forecast: number;
+    packUnit: string | null;
+    packFactor: number | null;
+  };
+
+  const drafts: Draft[] = rows.map((r) => {
     const stock = Number(r.stock_qty);
-    const used = Math.max(Number(r.used), 0);
-    const daily = used / lookback;
-    const daysLeft = daily > 0 ? Math.floor(stock / daily) : null;
-    const threshold = r.low_stock_threshold == null ? null : Number(r.low_stock_threshold);
-
-    // ควรซื้อให้พอ ~7 วัน (เผื่อ buffer) หรือเติมถึง threshold ถ้าตั้งไว้
-    const targetFor7Days = daily * 7;
-    const target = Math.max(targetFor7Days, threshold ?? 0);
-    const forecastSuggested = Math.max(target - stock, 0);
-
-    // 0085: target_stock เป็นตัวเสริม ไม่ทับการพยากรณ์
-    // NULL → พฤติกรรมเดิม 100% · มีค่า → ใช้ค่าที่มากกว่า และไม่ติดลบ
-    const targetStock = r.target_stock == null ? null : Number(r.target_stock);
-    const suggested =
-      targetStock == null
-        ? forecastSuggested
-        : Math.max(forecastSuggested, Math.max(targetStock - stock, 0));
-
-    // แปลงคำแนะนำเป็นหีบห่อ — ปัดขึ้นเพราะซื้อครึ่งแพ็คไม่ได้
-    const packFactor = r.pack_factor == null ? null : Number(r.pack_factor);
-    const suggestedPack =
-      r.pack_unit && packFactor && packFactor > 0 && suggested > 0
-        ? { unitName: r.pack_unit, quantity: String(Math.ceil(suggested / packFactor)) }
-        : null;
-
-    const urgency: ShoppingListItem["urgency"] =
-      (daysLeft !== null && daysLeft <= 1) || (threshold !== null && stock <= threshold * 0.5)
-        ? "critical"
-        : (daysLeft !== null && daysLeft <= 3) || (threshold !== null && stock <= threshold)
-          ? "low"
-          : "ok";
-
+    const stats = usageStats({
+      stock,
+      used: Number(r.used),
+      lookbackDays: lookback,
+      lowStockThreshold: r.low_stock_threshold == null ? null : Number(r.low_stock_threshold),
+      targetStock: r.target_stock == null ? null : Number(r.target_stock),
+    });
     return {
       ingredientId: r.id,
       name: r.name,
       purchaseUnit: r.purchase_unit as PurchaseUnit,
       stockQty: stock.toFixed(3),
       lowStockThreshold: r.low_stock_threshold,
-      usedInPeriod: used.toFixed(3),
-      dailyUsage: daily.toFixed(3),
-      daysLeft,
-      suggestedPurchase: suggested.toFixed(3),
-      urgency,
+      usedInPeriod: stats.used.toFixed(3),
+      dailyUsage: stats.daily.toFixed(3),
+      daysLeft: stats.daysLeft,
+      urgency: stats.urgency,
       targetStock: r.target_stock,
-      suggestedPack,
+      usedToday: Math.max(Number(r.used_today), 0).toFixed(3),
+      kind: r.kind ?? "purchased",
+      forecast: stats.suggested,
+      packUnit: r.pack_unit,
+      packFactor: r.pack_factor == null ? null : Number(r.pack_factor),
     };
   });
 
-  const order = { critical: 0, low: 1, ok: 2 } as const;
-  items.sort((a, b) => order[a.urgency] - order[b.urgency] || a.name.localeCompare(b.name, "th"));
+  // ── I-7: ของผลิตเองที่ "ต้องผลิต" (urgency ≠ ok) และมีสูตร active → เช็คลิสต์ input ──
+  const recipeByOutput = new Map(recipes.map((r) => [r.outputIngredientId, r]));
+  const productionDemand: ProductionDemand[] = drafts
+    .filter((d) => d.kind === "produced" && d.urgency !== "ok" && recipeByOutput.has(d.ingredientId))
+    .map((d) => demandFor(recipeByOutput.get(d.ingredientId)!, d.name, d.forecast));
 
-  return { days: lookback, items };
+  // ขาดรวมต่อ input — Σ required ทุกสูตร − stock ครั้งเดียว (ไม่หักสต็อกซ้ำ)
+  const stockById = new Map(drafts.map((d) => [d.ingredientId, Number(d.stockQty)]));
+  const shortfallById = totalShortfallByInput(productionDemand, (id) => stockById.get(id) ?? null);
+
+  const finish = (d: Draft): ShoppingListItem => {
+    const shortfall = d.kind === "purchased" ? shortfallById.get(d.ingredientId) ?? 0 : 0;
+    // C4: max ไม่ใช่บวก — forecast นับ production_input อยู่แล้ว
+    const suggested = finalSuggested(d.forecast, shortfall);
+    // แปลงคำแนะนำเป็นหีบห่อ — ปัดขึ้นเพราะซื้อครึ่งแพ็คไม่ได้
+    const suggestedPack =
+      d.packUnit && d.packFactor && d.packFactor > 0 && suggested > 0
+        ? { unitName: d.packUnit, quantity: String(Math.ceil(suggested / d.packFactor)) }
+        : null;
+    return {
+      ingredientId: d.ingredientId,
+      name: d.name,
+      purchaseUnit: d.purchaseUnit,
+      stockQty: d.stockQty,
+      lowStockThreshold: d.lowStockThreshold,
+      usedInPeriod: d.usedInPeriod,
+      dailyUsage: d.dailyUsage,
+      daysLeft: d.daysLeft,
+      suggestedPurchase: suggested.toFixed(3),
+      urgency: d.urgency,
+      targetStock: d.targetStock,
+      suggestedPack,
+      usedToday: d.usedToday,
+      kind: d.kind,
+      productionShortfall: shortfall.toFixed(3),
+    };
+  };
+
+  const order = { critical: 0, low: 1, ok: 2 } as const;
+  const byUrgency = (a: ShoppingListItem, b: ShoppingListItem) =>
+    order[a.urgency] - order[b.urgency] || a.name.localeCompare(b.name, "th");
+
+  const items = drafts.filter((d) => d.kind !== "produced").map(finish).sort(byUrgency);
+  const produced = drafts.filter((d) => d.kind === "produced").map(finish).sort(byUrgency);
+
+  return { days: lookback, items, produced, productionDemand };
 }

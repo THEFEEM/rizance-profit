@@ -3,6 +3,7 @@ import { pool } from "@/lib/db";
 import { businessDate } from "@/lib/date";
 import { centsToDecimalString, toCents } from "@/lib/money";
 import { getDayCutoffHour } from "@/lib/pos-settings-queries";
+import { batchesFor, computeCapacity, type RecipeCapacity } from "@/lib/production-capacity";
 import {
   INGREDIENT_RETURN,
   PosIngredientNotFoundError,
@@ -129,6 +130,12 @@ export type ProductionRecipeItem = {
   /** ต้นทุนบรรทัดนี้ต่อ 1 รอบการผลิต */
   lineCost: string;
   sortOrder: number;
+  /** I-4: สต็อกปัจจุบันของ input ตัวนี้ (หน่วยสต็อก) */
+  currentStock: string;
+  /** I-4: input ตัวนี้นับสต็อกไหม — false = ไม่จำกัดกำลังผลิต */
+  trackStock: boolean;
+  /** I-4: batch ที่ input ตัวนี้รองรับได้ · null = ไม่นับสต็อก */
+  batchesAvailable: number | null;
 };
 
 export type ProductionRecipe = {
@@ -157,6 +164,11 @@ export type ProductionRecipe = {
   costPerPortion: string | null;
   /** มีวัตถุดิบที่ยังไม่มีต้นทุนกี่รายการ — UI เตือน "ต้นทุนยังไม่สมบูรณ์" */
   missingCostCount: number;
+  /**
+   * I-4: กำลังผลิตจากสต็อกตอนนี้ (lib/production-capacity · คำนวณจาก items แถวเดียวกัน ไม่มี query เพิ่ม)
+   *   maxBatches null = ไม่มี input ที่นับสต็อก · bottleneck = input ที่จำกัดการผลิต
+   */
+  capacity: RecipeCapacity;
 };
 
 export type ProductionBatchItem = {
@@ -219,6 +231,7 @@ const RECIPE_SELECT = `
   JOIN ingredients i ON i.id = r.output_ingredient_id`;
 
 type RecipeItemRow = {
+  recipe_id: string;
   ingredient_id: string;
   ingredient_name: string;
   unit: string;
@@ -226,29 +239,23 @@ type RecipeItemRow = {
   stock_qty: string;
   unit_cost: string | null;
   sort_order: number;
+  current_stock: string;
+  track_stock: boolean;
 };
 
-/**
- * บรรทัดวัตถุดิบของสูตร + ต้นทุนปัจจุบัน
- * แปลงหน่วยด้วยฟังก์ชันของ 0088 ใน SQL เลย เพื่อให้ตรงกับที่ trigger ใช้เป๊ะ
- */
-async function recipeItems(
-  db: PoolClient | typeof pool,
-  recipeId: string,
-): Promise<ProductionRecipeItem[]> {
-  const { rows } = await db.query<RecipeItemRow>(
-    `SELECT pri.ingredient_id, i.name AS ingredient_name, i.purchase_unit AS unit,
-            pri.quantity::text AS quantity,
-            fn_recipe_qty_in_purchase_unit(pri.quantity, i.purchase_unit)::text AS stock_qty,
-            i.avg_cost::text AS unit_cost,
-            pri.sort_order
-     FROM production_recipe_items pri
-     JOIN ingredients i ON i.id = pri.ingredient_id
-     WHERE pri.recipe_id = $1
-     ORDER BY pri.sort_order, i.name`,
-    [recipeId],
-  );
-  return rows.map((r) => ({
+const RECIPE_ITEM_SELECT = `
+  SELECT pri.recipe_id, pri.ingredient_id, i.name AS ingredient_name, i.purchase_unit AS unit,
+         pri.quantity::text AS quantity,
+         fn_recipe_qty_in_purchase_unit(pri.quantity, i.purchase_unit)::text AS stock_qty,
+         i.avg_cost::text AS unit_cost,
+         pri.sort_order,
+         i.stock_qty::text AS current_stock,
+         i.track_stock
+  FROM production_recipe_items pri
+  JOIN ingredients i ON i.id = pri.ingredient_id`;
+
+function mapRecipeItem(r: RecipeItemRow): ProductionRecipeItem {
+  return {
     ingredientId: r.ingredient_id,
     ingredientName: r.ingredient_name,
     unit: r.unit,
@@ -257,7 +264,68 @@ async function recipeItems(
     unitCost: r.unit_cost,
     lineCost: centsToDecimalString(lineCostCents(r.stock_qty, r.unit_cost)),
     sortOrder: r.sort_order,
-  }));
+    currentStock: r.current_stock,
+    trackStock: r.track_stock,
+    batchesAvailable: batchesFor({
+      ingredientId: r.ingredient_id,
+      ingredientName: r.ingredient_name,
+      perBatch: Number(r.stock_qty),
+      stock: r.track_stock ? Number(r.current_stock) : null,
+    }),
+  };
+}
+
+/**
+ * บรรทัดวัตถุดิบของสูตร + ต้นทุนปัจจุบัน + สต็อกตอนนี้ (I-4)
+ * แปลงหน่วยด้วยฟังก์ชันของ 0088 ใน SQL เลย เพื่อให้ตรงกับที่ trigger ใช้เป๊ะ
+ */
+async function recipeItems(
+  db: PoolClient | typeof pool,
+  recipeId: string,
+): Promise<ProductionRecipeItem[]> {
+  const { rows } = await db.query<RecipeItemRow>(
+    `${RECIPE_ITEM_SELECT}
+     WHERE pri.recipe_id = $1
+     ORDER BY pri.sort_order, i.name`,
+    [recipeId],
+  );
+  return rows.map(mapRecipeItem);
+}
+
+/**
+ * I-4: บรรทัดของหลายสูตรใน query เดียว (เดิม list ยิงทีละสูตร = 1+N — /stock เรียกทุกครั้งที่เปิด จึงต้องเลิก)
+ * ลำดับต่อสูตรเหมือน recipeItems ทุกประการ
+ */
+async function recipeItemsForMany(
+  db: PoolClient | typeof pool,
+  recipeIds: string[],
+): Promise<Map<string, ProductionRecipeItem[]>> {
+  const out = new Map<string, ProductionRecipeItem[]>();
+  if (recipeIds.length === 0) return out;
+  const { rows } = await db.query<RecipeItemRow>(
+    `${RECIPE_ITEM_SELECT}
+     WHERE pri.recipe_id = ANY($1::uuid[])
+     ORDER BY pri.recipe_id, pri.sort_order, i.name`,
+    [recipeIds],
+  );
+  for (const r of rows) {
+    const list = out.get(r.recipe_id) ?? [];
+    list.push(mapRecipeItem(r));
+    out.set(r.recipe_id, list);
+  }
+  return out;
+}
+
+/** กำลังผลิตของสูตรจาก items ที่ดึงมาแล้ว — ไม่มี query เพิ่ม */
+function capacityOf(items: ProductionRecipeItem[]): RecipeCapacity {
+  return computeCapacity(
+    items.map((it) => ({
+      ingredientId: it.ingredientId,
+      ingredientName: it.ingredientName,
+      perBatch: Number(it.stockQty),
+      stock: it.trackStock ? Number(it.currentStock) : null,
+    })),
+  );
 }
 
 /** ปริมาณ × ต้นทุนต่อหน่วย → สตางค์ · ปัดครั้งเดียวตอนท้าย */
@@ -269,8 +337,10 @@ function lineCostCents(stockQty: string | number, unitCost: string | null): numb
 async function mapRecipe(
   db: PoolClient | typeof pool,
   r: RecipeRow,
+  /** I-4: ส่ง items ที่ดึงมาแล้ว (จาก recipeItemsForMany) เพื่อไม่ยิง query ต่อสูตร */
+  prefetched?: ProductionRecipeItem[],
 ): Promise<ProductionRecipe> {
-  const items = await recipeItems(db, r.id);
+  const items = prefetched ?? (await recipeItems(db, r.id));
   const batchCostCents = items.reduce((s, it) => s + toCents(it.lineCost), 0);
   const expected = Number(r.expected_output_qty);
   const unitCost = expected > 0 ? batchCostCents / 100 / expected : 0;
@@ -299,9 +369,11 @@ async function mapRecipe(
     missingCostCount: items.filter(
       (it) => it.unitCost == null || Number(it.unitCost) <= 0,
     ).length,
+    capacity: capacityOf(items),
   };
 }
 
+/** สูตรทั้งหมด (หรือเฉพาะ active) — 2 query คงที่ไม่ว่ากี่สูตร (I-4: เดิม 1+N) */
 export async function listProductionRecipes(
   userId: string,
   activeOnly = false,
@@ -312,7 +384,8 @@ export async function listProductionRecipes(
      ORDER BY r.is_active DESC, r.name ASC`,
     [userId],
   );
-  return Promise.all(rows.map((r) => mapRecipe(pool, r)));
+  const itemsByRecipe = await recipeItemsForMany(pool, rows.map((r) => r.id));
+  return Promise.all(rows.map((r) => mapRecipe(pool, r, itemsByRecipe.get(r.id) ?? [])));
 }
 
 export async function getProductionRecipe(
