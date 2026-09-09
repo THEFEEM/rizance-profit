@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   posErrorResponse,
   posNotFoundResponse,
+  requireManagerUnlock,
   requirePosSessionAndPlan,
 } from "@/lib/pos-auth";
 import {
@@ -10,10 +11,15 @@ import {
 } from "@/lib/pos-ingredient-queries";
 import { restockIngredientSchema } from "@/lib/pos-validation";
 
-/** POST /api/pos/ingredients/restock — รับของเข้า (+ บันทึกรายจ่ายวัตถุดิบอัตโนมัติ) */
+/**
+ * POST /api/pos/ingredients/restock — รับของเข้า (+ บันทึกรายจ่ายวัตถุดิบอัตโนมัติ)
+ * I-1b: เพิ่มสต็อก + ลงรายจ่าย → ต้องอยู่ในโหมดผู้จัดการ
+ */
 export async function POST(req: NextRequest) {
   const userId = await requirePosSessionAndPlan(req);
   if (userId instanceof NextResponse) return userId;
+  const gate = await requireManagerUnlock(req, userId);
+  if (gate) return gate;
 
   let body: unknown;
   try {

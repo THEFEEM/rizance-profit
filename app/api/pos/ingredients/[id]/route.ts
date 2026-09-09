@@ -2,17 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   posErrorResponse,
   posNotFoundResponse,
+  requireManagerUnlock,
   requirePosSessionAndPlan,
 } from "@/lib/pos-auth";
 import { updatePosIngredient } from "@/lib/pos-ingredient-queries";
 import { updatePosIngredientSchema } from "@/lib/pos-validation";
 
+/** PATCH /api/pos/ingredients/:id — แก้ข้อมูลวัตถุดิบ (I-1b: โหมดผู้จัดการเท่านั้น) */
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const userId = await requirePosSessionAndPlan(req);
   if (userId instanceof NextResponse) return userId;
+  const gate = await requireManagerUnlock(req, userId);
+  if (gate) return gate;
 
   const { id } = await params;
 

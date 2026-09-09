@@ -62,8 +62,13 @@ export async function requirePosSessionAndPlan(
  * ⚠️ ไม่ได้แทน requirePosSessionAndPlan — ต้องเรียกคู่กันเสมอ
  *    คุกกี้ผู้จัดการเป็น "ชั้นเพิ่ม" ไม่ใช่ตัวยืนยันตัวตนของร้าน
  *
- * ⚠️ restricted API เดิมทั้งหมดคงนโยบายเดิมไว้โดยตั้งใจ (รักษา compatibility)
+ * ⚠️ restricted API เดิมส่วนใหญ่คงนโยบายเดิมไว้โดยตั้งใจ (รักษา compatibility)
  *    การเปลี่ยนทั้งระบบพร้อมกันเสี่ยงทำของที่ใช้อยู่พัง
+ *
+ * ═══ Inventory I-1b (8 ก.ย. 2569) ═══════════════════════════════
+ * mutation ของคลังใช้ตัวนี้แล้ว: ingredients POST/PATCH · adjust · restock ·
+ * stock/purchases POST · stock/purchase-units POST/DELETE · production/* (เดิม)
+ * ยกเว้นโดยตั้งใจ: ingredients/market-trip (TTL 15 นาทีอาจหมดกลางตลาด) และ GET ทุกตัว
  *
  * ตรวจ 2 ชั้น: ลายเซ็น+อายุของคุกกี้ และเวอร์ชันของรหัสปัจจุบัน
  * เปลี่ยนรหัสเมื่อไร คุกกี้เก่าตายทันทีทุกเครื่อง

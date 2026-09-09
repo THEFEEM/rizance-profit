@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePosSessionAndPlan } from "@/lib/pos-auth";
+import { requireManagerUnlock, requirePosSessionAndPlan } from "@/lib/pos-auth";
 import {
   PurchaseUnitNotFoundError,
   deactivatePurchaseUnit,
@@ -13,8 +13,10 @@ import { z } from "zod";
  * หน่วยบรรจุของวัตถุดิบ — "1 แพ็ค = 84 แผ่น"
  *
  * GET    ?ingredientId=  → หน่วยที่ซื้อได้ (รวมหน่วยสต็อกเองตัวคูณ 1)
- * POST                   → เพิ่ม/แก้
- * DELETE ?id=            → ปิดใช้งาน (ไม่ลบ เพราะเอกสารเก่าอ้างชื่อไว้)
+ * POST                   → เพิ่ม/แก้           (I-1b: โหมดผู้จัดการ)
+ * DELETE ?id=            → ปิดใช้งาน (ไม่ลบ เพราะเอกสารเก่าอ้างชื่อไว้)  (I-1b: โหมดผู้จัดการ)
+ *
+ * ตัวคูณหน่วยผิด = สต็อกและต้นทุนต่อหน่วยผิดทุกใบรับของหลังจากนั้น
  */
 
 export async function GET(req: NextRequest) {
@@ -44,6 +46,8 @@ const upsertSchema = z.object({
 export async function POST(req: NextRequest) {
   const userId = await requirePosSessionAndPlan(req);
   if (userId instanceof NextResponse) return userId;
+  const gate = await requireManagerUnlock(req, userId);
+  if (gate) return gate;
 
   let body: unknown;
   try {
@@ -70,6 +74,8 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const userId = await requirePosSessionAndPlan(req);
   if (userId instanceof NextResponse) return userId;
+  const gate = await requireManagerUnlock(req, userId);
+  if (gate) return gate;
 
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return NextResponse.json({ error: "invalid_input" }, { status: 400 });

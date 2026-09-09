@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePosSessionAndPlan } from "@/lib/pos-auth";
+import { requireManagerUnlock, requirePosSessionAndPlan } from "@/lib/pos-auth";
 import {
   PurchaseUnitNotFoundError,
   listPurchases,
@@ -14,6 +14,9 @@ import { z } from "zod";
  *
  * POST ต้องส่ง idempotencyKey เสมอ — ยิงซ้ำด้วย key เดิมคืนเอกสารเดิม
  * ไม่เพิ่มสต็อก ไม่เพิ่มรายจ่าย (ตอบ 200 พร้อม reused: true)
+ *
+ * I-1b: POST ต้องอยู่ในโหมดผู้จัดการ — หน้า /stock/receive อยู่หลัง ManagerGate อยู่แล้ว
+ * (ตะกร้าจากโหมดไปตลาดถูกส่งต่อผ่าน localStorage draft · ไม่หายตอนต้องปลดล็อกใหม่)
  */
 
 export async function GET(req: NextRequest) {
@@ -50,6 +53,8 @@ const bodySchema = z.object({
 export async function POST(req: NextRequest) {
   const userId = await requirePosSessionAndPlan(req);
   if (userId instanceof NextResponse) return userId;
+  const gate = await requireManagerUnlock(req, userId);
+  if (gate) return gate;
 
   let body: unknown;
   try {
