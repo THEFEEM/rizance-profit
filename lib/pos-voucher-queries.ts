@@ -160,6 +160,11 @@ export type VoucherCampaign = {
   allowedBranchIds: string[] | null;
   createdAt: string;
   updatedAt: string;
+  /**
+   * เลขรันตัวถัดไปของ prefix นี้ *ทั้งร้าน* (รวมใบของแคมเปญที่ archive แล้ว) — UNIQUE(user_id, public_code) ครอบทั้งร้าน
+   * แคมเปญใหม่ที่ใช้ prefix เดิมจึงเริ่มต่อจากเลขล่าสุด ไม่ใช่ 0001 (บั๊กเดิม: ชน public_code_conflict เป็นทางตัน)
+   */
+  nextSequence: number;
   /** นับจาก pos_vouchers */
   stats: VoucherCampaignStats;
 };
@@ -223,6 +228,7 @@ type CampaignRow = {
   m_configured: string;
   m_ranges: string;
   m_redeemed: string;
+  prefix_max_seq: string;
 };
 
 const iso = (v: Date | string): string => (v instanceof Date ? v.toISOString() : String(v));
@@ -293,6 +299,7 @@ function mapCampaign(r: CampaignRow): VoucherCampaign {
     allowedBranchIds: r.allowed_branch_ids,
     createdAt: iso(r.created_at),
     updatedAt: iso(r.updated_at),
+    nextSequence: int(r.prefix_max_seq) + 1,
     stats,
   };
 }
@@ -311,8 +318,13 @@ const CAMPAIGN_SELECT = `
     COALESCE(s.n_blocked, 0)::text         AS n_blocked,
     COALESCE(m.configured, 0)::text        AS m_configured,
     COALESCE(m.n_ranges, 0)::text          AS m_ranges,
-    COALESCE(mr.n, 0)::text                AS m_redeemed
+    COALESCE(mr.n, 0)::text                AS m_redeemed,
+    COALESCE(px.max_seq, 0)::text          AS prefix_max_seq
   FROM pos_voucher_campaigns c
+  LEFT JOIN LATERAL (
+    SELECT MAX(split_part(v2.public_code, '-', 2)::int) AS max_seq
+    FROM pos_vouchers v2 WHERE v2.user_id = c.user_id AND v2.public_code LIKE c.code_prefix || '-%'
+  ) px ON true
   LEFT JOIN LATERAL (
     SELECT count(*)                                              AS n_issued,
            count(*) FILTER (WHERE v.status IN ('active','issued')) AS n_active,
@@ -406,6 +418,44 @@ async function assertPrefixAvailable(c: Q, userId: string, prefix: string, excep
       conflictCampaignStatus: rows[0].status,
     });
   }
+}
+
+export type PrefixCheck = {
+  prefix: string;
+  /** แคมเปญที่ยังไม่ archive ที่จอง prefix นี้อยู่ — มี = ใช้ไม่ได้ */
+  inUseBy: { id: string; name: string; status: VoucherCampaignStatus; issued: number } | null;
+  /** ใบ secure ที่เคยออกด้วย prefix นี้ทั้งร้าน (รวมแคมเปญที่ archive แล้ว) */
+  historyCount: number;
+  maxSequence: number;
+  /** เลขแรกที่แคมเปญใหม่จะได้ (secure) / เลขเริ่มต่ำสุดที่ manual range ตั้งได้ */
+  nextSequence: number;
+};
+
+/**
+ * ตรวจ prefix ก่อนสร้าง (wizard เรียกตอนพิมพ์) — server เป็นคนตัดสิน ไม่ใช่รายการที่ client โหลดไว้
+ * ตอบทั้ง "ใครจองอยู่" และ "รหัสจะเริ่มเลขไหน" → ไม่มีทางตัน public_code_conflict ตอน generate
+ */
+export async function checkPrefix(userId: string, prefix: string): Promise<PrefixCheck> {
+  const { rows: live } = await pool.query<{ id: string; name: string; status: VoucherCampaignStatus; n: string }>(
+    `SELECT c.id, c.name, c.status, (SELECT count(*) FROM pos_vouchers v WHERE v.campaign_id = c.id)::text AS n
+     FROM pos_voucher_campaigns c
+     WHERE c.user_id = $1 AND c.code_prefix = $2 AND c.status <> 'archived'
+     ORDER BY c.created_at DESC LIMIT 1`,
+    [userId, prefix],
+  );
+  const { rows: hist } = await pool.query<{ n: string; max_seq: string | null }>(
+    `SELECT count(*)::text AS n, MAX(split_part(public_code, '-', 2)::int)::text AS max_seq
+     FROM pos_vouchers WHERE user_id = $1 AND public_code LIKE $2 || '-%'`,
+    [userId, prefix],
+  );
+  const maxSequence = Number(hist[0]?.max_seq ?? 0);
+  return {
+    prefix,
+    inUseBy: live[0] ? { id: live[0].id, name: live[0].name, status: live[0].status, issued: Number(live[0].n) } : null,
+    historyCount: Number(hist[0]?.n ?? 0),
+    maxSequence,
+    nextSequence: maxSequence + 1,
+  };
 }
 
 export async function createVoucherCampaign(
@@ -602,15 +652,21 @@ export async function generateVouchers(
     // แคมเปญ Manual Code ไม่มีใบ secure — ต้องไปเพิ่ม range แทน (คนละโครงสร้าง ห้ามปนใน campaign เดียว)
     if (camp[0].generation_mode === "manual_range") throw new VoucherStateError("manual_campaign");
 
-    const { rows: seqRow } = await client.query<{ max_seq: string | null; n: string }>(
-      `SELECT MAX(split_part(public_code, '-', 2)::int)::text AS max_seq, count(*)::text AS n
-       FROM pos_vouchers WHERE campaign_id = $1`,
+    // เลขรันต่อจากเลขล่าสุดของ prefix นี้ *ทั้งร้าน* (ไม่ใช่ต่อแคมเปญ) — UNIQUE(user_id, public_code) ครอบทั้งร้าน
+    // แคมเปญเก่าที่ archive แล้วเคยออก RIZANCE-0001..0010 → แคมเปญใหม่ prefix เดิมเริ่ม 0011 ไม่ชน ไม่ตัน
+    const { rows: seqRow } = await client.query<{ max_seq: string | null }>(
+      `SELECT MAX(split_part(public_code, '-', 2)::int)::text AS max_seq
+       FROM pos_vouchers WHERE user_id = $1 AND public_code LIKE $2 || '-%'`,
+      [userId, camp[0].code_prefix],
+    );
+    const { rows: cntRow } = await client.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM pos_vouchers WHERE campaign_id = $1`,
       [campaignId],
     );
     let seq = Number(seqRow[0]?.max_seq ?? 0);
     // ออกเกินแผนไม่ได้เงียบ ๆ — เจ้าของต้องแก้แผนก่อน (กันมือลั่น 1,000 แทน 100)
     const planned = camp[0].quantity_planned;
-    if (planned !== null && Number(seqRow[0]?.n ?? 0) + quantity > planned) {
+    if (planned !== null && Number(cntRow[0]?.n ?? 0) + quantity > planned) {
       throw new VoucherStateError("quantity_planned_exceeded");
     }
 
@@ -1514,6 +1570,16 @@ export async function createManualRange(
       if (!check.ok) throw new VoucherStateError("invalid_range");
       const ranges = existing.filter((r) => r.kind === "range");
       if (ranges.length && ranges.some((r) => Number(r.padding) !== input.padding)) throw new VoucherStateError("padding_mismatch");
+      // ใบ secure ของแคมเปญเก่า (archive แล้ว) ที่ใช้ prefix เดียวกันยังอยู่ใน pos_vouchers → code ห้ามทับเลขเหล่านั้น
+      const { rows: hist } = await client.query<{ max_seq: string | null }>(
+        `SELECT MAX(split_part(public_code, '-', 2)::int)::text AS max_seq
+         FROM pos_vouchers WHERE user_id = $1 AND public_code LIKE $2 || '-%'`,
+        [userId, prefix],
+      );
+      const secureMax = Number(hist[0]?.max_seq ?? 0);
+      if (secureMax > 0 && input.startNumber <= secureMax) {
+        throw new VoucherStateError("range_overlap", { nextStart: String(secureMax + 1), reason_detail: "secure_history" });
+      }
       if (ranges.some((r) => manualRangesOverlap(
         { startNumber: Number(r.start_number), endNumber: Number(r.end_number) },
         { startNumber: input.startNumber, endNumber: input.endNumber },
