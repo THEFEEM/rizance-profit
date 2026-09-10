@@ -16,11 +16,12 @@ import { createPosIngredientSchema } from "@/lib/pos-validation";
  * GET  /api/pos/ingredients — วัตถุดิบ + สูตร (สินค้า/modifier) ทั้งร้าน
  * POST /api/pos/ingredients — เพิ่มวัตถุดิบ
  *
- * ═══ Inventory I-1b (8 ก.ย. 2569 · C3 = B) ═══════════════════════
- * mutation ของคลังต้องอยู่ในโหมดผู้จัดการ (requireManagerUnlock)
- * — การซ่อนแท็บ "คลัง" ฝั่ง client เป็นแค่การวาดจอ ไม่ใช่สิทธิ์
- * GET คงนโยบายเดิม (session + plan) เพราะหน้าขาย/สินค้าใช้อ่านสูตร
- * market-trip ยังไม่ gate (TTL 15 นาทีอาจหมดระหว่างเดินตลาด)
+ * ═══ Inventory policy (10 ก.ย. 2569 · /stock เป็นหน้า staff) ═══════════
+ * GET  = staff-safe (session + plan) — พนักงานดูสต็อก/กลุ่ม/ค้นหาได้ · หน้าขาย/สินค้าก็ใช้อ่านสูตร
+ *        ⚠️ payload มี avg_cost/purchase_price (ต้นทุน) — ยังไม่ตัดเพราะ Data Guard ฝั่ง client ใช้ตรวจ
+ *        ข้อมูลเพี้ยน (staff-safe "report issue") · โน้ตเป็น residual ในรายงาน policy
+ * POST = owner-sensitive (master data) → requireManagerUnlock
+ * การซ่อนปุ่ม/แท็บฝั่ง client เป็นแค่การวาดจอ ไม่ใช่สิทธิ์
  */
 export async function GET(req: NextRequest) {
   const userId = await requirePosSessionAndPlan(req);

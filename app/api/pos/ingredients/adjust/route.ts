@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   posErrorResponse,
   posNotFoundResponse,
-  requireManagerUnlock,
   requirePosSessionAndPlan,
 } from "@/lib/pos-auth";
 import {
@@ -13,13 +12,21 @@ import { adjustIngredientSchema } from "@/lib/pos-validation";
 
 /**
  * POST /api/pos/ingredients/adjust — ตรวจนับ/ปรับสต๊อกเป็นจำนวนจริง
- * I-1b: เขียนทับยอดสต็อก → ต้องอยู่ในโหมดผู้จัดการ
+ *
+ * ═══ Policy (10 ก.ย. 2569 · /stock เป็นหน้า staff) ═══════════════════
+ * staff-safe: ตรวจนับเป็นงานประจำวันของพนักงานหน้าร้าน → ไม่ต้องปลดล็อกผู้จัดการ
+ * (I-1b เคย gate ไว้ · ถอดออกตามนโยบายใหม่ — เฉพาะ endpoint นี้ ไม่ใช่เหมารวม)
+ *
+ * สิ่งที่ยังคุมอยู่:
+ *   · requirePosSessionAndPlan — ต้องเป็นเซสชันร้าน + แพ็กที่ใช้ POS ได้
+ *   · adjustIngredientStock ล็อกแถวด้วย user_id → ข้ามร้านได้ 404 เสมอ
+ *   · ทุกครั้งเกิด movement 'adjustment' พร้อมส่วนต่าง → ย้อนดูได้ ไม่หายไปเฉย ๆ
+ *   · Data Guard ฝั่ง client เตือน/ให้ยืนยัน 2 ชั้นเมื่อตัวเลขผิดปกติ
+ * ⚠️ ไม่มี "ปรับสต็อกด้วยมือ" แยกจาก "ตรวจนับ" — endpoint เดียวกัน (โน้ตไว้ในรายงาน policy)
  */
 export async function POST(req: NextRequest) {
   const userId = await requirePosSessionAndPlan(req);
   if (userId instanceof NextResponse) return userId;
-  const gate = await requireManagerUnlock(req, userId);
-  if (gate) return gate;
 
   let body: unknown;
   try {

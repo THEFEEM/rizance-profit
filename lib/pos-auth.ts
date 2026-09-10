@@ -65,10 +65,12 @@ export async function requirePosSessionAndPlan(
  * ⚠️ restricted API เดิมส่วนใหญ่คงนโยบายเดิมไว้โดยตั้งใจ (รักษา compatibility)
  *    การเปลี่ยนทั้งระบบพร้อมกันเสี่ยงทำของที่ใช้อยู่พัง
  *
- * ═══ Inventory I-1b (8 ก.ย. 2569) ═══════════════════════════════
- * mutation ของคลังใช้ตัวนี้แล้ว: ingredients POST/PATCH · adjust · restock ·
- * stock/purchases POST · stock/purchase-units POST/DELETE · production/* (เดิม)
- * ยกเว้นโดยตั้งใจ: ingredients/market-trip (TTL 15 นาทีอาจหมดกลางตลาด) และ GET ทุกตัว
+ * ═══ Inventory policy (10 ก.ย. 2569 · /stock เป็นหน้า staff) ═══════════
+ * owner-sensitive (ต้อง unlock): ingredients POST/PATCH · restock · stock/purchases POST ·
+ *   stock/purchase-units POST/DELETE · production/* ทุก method (สูตร/ใบผลิต = master data)
+ * staff-safe (session + plan): GET ทุกตัว · ingredients/adjust (ตรวจนับ) · shopping-list
+ *   (productionDemand ส่งเฉพาะตอน unlock — ดู route)
+ * ยกเว้นโดยตั้งใจ: ingredients/market-trip (TTL 15 นาทีอาจหมดกลางตลาด — คงเดิม)
  *
  * ตรวจ 2 ชั้น: ลายเซ็น+อายุของคุกกี้ และเวอร์ชันของรหัสปัจจุบัน
  * เปลี่ยนรหัสเมื่อไร คุกกี้เก่าตายทันทีทุกเครื่อง
