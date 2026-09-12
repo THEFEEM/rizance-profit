@@ -53,6 +53,50 @@ export class PosPaymentMismatchError extends Error {
   }
 }
 
+/**
+ * Cash Payment invariant (12 ก.ย. 2569): เงินสดที่ยื่นมาน้อยกว่าส่วนที่ต้องจ่ายเงินสด
+ * ตัวเลขทั้งหมดเป็น decimal string จาก money helper — client เอาไปแสดง "ขาดอีก ฿X" ได้ตรง ๆ
+ */
+export class PosCashInsufficientError extends Error {
+  constructor(
+    public readonly cashDue: string,
+    public readonly cashReceived: string,
+    public readonly shortfall: string,
+  ) {
+    super(`cash received ${cashReceived} < due ${cashDue}`);
+    this.name = "PosCashInsufficientError";
+  }
+}
+
+/**
+ * ตรวจเงินสด + คิดเงินทอน — pure · cents ล้วน (ห้าม float)
+ *   ไม่มีการจ่ายเงินสดในบิล → undefined (non-cash ไม่บังคับ cashReceived · ส่งมาก็เมิน)
+ *   มีเงินสดแต่ caller ไม่ส่ง cashReceived (rider/สคริปต์ภายใน) → undefined · HTTP route บังคับผ่าน schema แล้ว
+ *   ส่งมา → ต้อง ≥ ส่วนเงินสด ไม่งั้นโยน PosCashInsufficientError · เงินทอน = received − due
+ * "เงินทอน" ที่ client ส่งมาไม่มีทางถึงฟังก์ชันนี้ (schema strip) — server คิดเองเสมอ
+ */
+export function settleCash(
+  payments: { method: PosPaymentMethod; amount: string }[],
+  cashReceived: number | undefined,
+): { cashDue: string; cashReceived: string; changeAmount: string } | undefined {
+  const cashPayment = payments.find((p) => p.method === "cash");
+  if (!cashPayment || cashReceived === undefined) return undefined;
+  const dueCents = toCents(cashPayment.amount);
+  const receivedCents = toCents(cashReceived);
+  if (receivedCents < dueCents) {
+    throw new PosCashInsufficientError(
+      centsToDecimalString(dueCents),
+      centsToDecimalString(receivedCents),
+      centsToDecimalString(dueCents - receivedCents),
+    );
+  }
+  return {
+    cashDue: centsToDecimalString(dueCents),
+    cashReceived: centsToDecimalString(receivedCents),
+    changeAmount: centsToDecimalString(receivedCents - dueCents),
+  };
+}
+
 type UserSubRow = {
   subscription_plan: string;
   subscription_expires_at: Date | string | null;
@@ -601,6 +645,10 @@ export async function closePosBill(
       throw new PosPaymentMismatchError();
     }
 
+    // Cash Payment invariant — ตรวจกับส่วนเงินสดของยอดจริง (หลังส่วนลด/หุ้นส่วน/voucher ที่ server ตัดสิน)
+    // ก่อน INSERT ใด ๆ → ไม่พอ = โยนทิ้ง ไม่มีบิลครึ่งใบ
+    const cash = settleCash(payments, input.cashReceived);
+
     const billMethod = payments.length === 1 ? payments[0].method : "split";
 
     const { rows: billRows } = await client.query<BillRow>(
@@ -909,6 +957,7 @@ export async function closePosBill(
       bill: mappedBill,
       items: insertedItems,
       payments: insertedPayments,
+      cash,
       negativeStockProductIds,
       pointsEarned,
       memberPoints,

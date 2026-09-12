@@ -3,6 +3,7 @@ import { posErrorResponse, posNotFoundResponse, requirePosSessionAndPlan } from 
 import { closePosBillSchema, listPosBillsQuerySchema } from "@/lib/pos-validation";
 import { listPosBillsByDate } from "@/lib/pos-bill-queries";
 import {
+  PosCashInsufficientError,
   PosEmptyCartError,
   PosOrderLinkFailedError,
   PosCampaignRejectedError,
@@ -63,6 +64,11 @@ export async function POST(req: NextRequest) {
         data: {
           bill: result.bill,
           items: result.items,
+          // เงินสด (12 ก.ย. 2569) — due/received/เงินทอน ที่ server คำนวณ · undefined เมื่อไม่ใช่เงินสด
+          cash: result.cash,
+          // ส่วนลดที่ apply จริง — POS ใช้โชว์ toast (เดิม lib คืนมาแต่ route ไม่ได้ส่งต่อ)
+          campaign: result.campaign,
+          voucher: result.voucher,
           // แต้มสมาชิก — ของแถม ไม่ใช่ยอดเงิน (ดู 0068)
           pointsEarned: result.pointsEarned ?? 0,
           memberPoints: result.memberPoints,
@@ -117,6 +123,16 @@ export async function POST(req: NextRequest) {
     }
     if (err instanceof PosPaymentMismatchError) {
       return posErrorResponse("payment_mismatch", 400);
+    }
+    // เงินสดไม่พอ — บอกตัวเลขให้ POS แสดง "ขาดอีก ฿X" (ยอดจริงหลังส่วนลดที่ server ตัดสิน)
+    if (err instanceof PosCashInsufficientError) {
+      return NextResponse.json(
+        {
+          error: "cash_insufficient",
+          data: { cashDue: err.cashDue, cashReceived: err.cashReceived, shortfall: err.shortfall },
+        },
+        { status: 400 },
+      );
     }
     if (err instanceof PosModifierRuleError) {
       return posErrorResponse("modifier_required", 400);

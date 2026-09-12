@@ -86,6 +86,13 @@ export type ClosePosBillInput = {
   paymentMethod?: PosPaymentMethod;
   /** Split payment: 1..3 entries, Σ amount must equal the bill total exactly. */
   payments?: { method: PosPaymentMethod; amount: number }[];
+  /**
+   * เงินสดที่ลูกค้ายื่นมา (บาท · ทศนิยม ≤ 2) — ใช้เมื่อบิลมีการจ่ายด้วยเงินสด
+   * ⚠️ server ตรวจ cashReceived ≥ ส่วนที่จ่ายเงินสดจริง (คิดจากยอดที่ server คำนวณ) และคำนวณเงินทอนเอง
+   *    client ส่ง "เงินทอน" มาไม่มีผล (zod strip) · ถ้าจ่ายไม่ใช่เงินสด field นี้ถูกเมิน
+   * HTTP route บังคับให้มีเมื่อจ่ายเงินสด (closePosBillSchema) · caller ภายใน (rider/สคริปต์) ส่งยอดพอดีเอง
+   */
+  cashReceived?: number;
   entryDate?: string;
   /**
    * ผูกบิลนี้เข้าออเดอร์ใน transaction เดียวกัน (กันบิลกำพร้า)
@@ -141,6 +148,14 @@ export type ClosePosBillResult = {
   bill: PosBill;
   items: PosBillItem[];
   payments: PosBillPayment[];
+  /**
+   * เงินสด (มีเมื่อบิลมีการจ่ายเงินสดและ caller ส่ง cashReceived มา) — server คำนวณทั้งคู่
+   *   cashDue      = ส่วนที่จ่ายด้วยเงินสด (ยอดจริงหลังส่วนลดที่ server ตัดสิน)
+   *   cashReceived = ที่ยื่นมา (ปัด 2 ตำแหน่ง)
+   *   changeAmount = cashReceived − cashDue (≥ 0 เสมอ ไม่งั้นบิลถูกปฏิเสธก่อนหน้านี้)
+   * ไม่ persist ลง DB (ไม่มี migration รอบนี้) — ใช้แสดงผล/ยืนยันเท่านั้น
+   */
+  cash?: { cashDue: string; cashReceived: string; changeAmount: string };
   negativeStockProductIds: string[];
   /** แต้มที่ให้จากบิลนี้ (0 = ร้านปิดใช้แต้ม / ไม่มีสมาชิก / ยอดไม่ถึง 1 แต้ม) */
   pointsEarned?: number;

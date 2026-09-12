@@ -52,6 +52,20 @@ export const closePosBillSchema = z
     surcharges: z.array(surcharge).max(3).optional(),
     paymentMethod: paymentMethodEnum.optional(),
     payments: z.array(billPayment).min(1).max(3).optional(),
+    /**
+     * เงินสดที่ลูกค้ายื่น (บาท ≤ 2 ตำแหน่ง · ≥ 0) — บังคับเมื่อบิลจ่ายเงินสด (refine ด้านล่าง)
+     * ยอด "พอไหม/ทอนเท่าไร" ตัดสินใน closePosBill กับยอดจริงที่ server คำนวณ ไม่ใช่ที่นี่
+     * field เงินทอนจาก client ไม่มีใน schema → strip ทิ้ง
+     */
+    cashReceived: z
+      .number()
+      .finite()
+      .gte(0)
+      .max(9_999_999.99)
+      .refine((n) => Math.abs(n * 100 - Math.round(n * 100)) < 1e-6, {
+        message: "cashReceived can have at most 2 decimal places",
+      })
+      .optional(),
     entryDate: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -96,7 +110,22 @@ export const closePosBillSchema = z
       return new Set(methods).size === methods.length;
     },
     { message: "Duplicate payment method" },
-  );
+  )
+  .refine((d) => !billHasCashPayment(d) || d.cashReceived !== undefined, {
+    // Cash Payment invariant (12 ก.ย. 2569): จ่ายเงินสดต้องบอกว่ารับเงินมาเท่าไร — ปุ่มยืนยันฝั่ง POS ก็ปิดอยู่
+    // แต่ห้ามเชื่อ client · non-cash (PromptPay/ไทยช่วยไทย) ไม่บังคับ
+    message: "cashReceived is required for cash payment",
+    path: ["cashReceived"],
+  });
+
+/** บิลนี้มีการจ่ายด้วยเงินสดไหม — legacy paymentMethod หรือ payments[] ที่มี cash */
+export function billHasCashPayment(d: {
+  paymentMethod?: string;
+  payments?: { method: string }[];
+}): boolean {
+  if (d.payments?.length) return d.payments.some((p) => p.method === "cash");
+  return d.paymentMethod === "cash";
+}
 
 export type ClosePosBillBody = z.infer<typeof closePosBillSchema>;
 

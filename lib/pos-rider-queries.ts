@@ -327,6 +327,8 @@ export async function deliverRiderJob(
       })),
     surcharges: fee > 0 ? [{ label: "ค่าส่งเดลิเวอรี่", amount: fee }] : undefined,
     payments: [{ method, amount: total }],
+    // เก็บเงินปลายทาง = รับพอดี ไม่มีช่องกรอกเงินทอนฝั่งคนส่ง (Cash Payment invariant 12 ก.ย.)
+    cashReceived: method === "cash" ? total : undefined,
     // ผูกบิลในทรานแซกชันเดียวกับการปิดบิล — เส้นทางคนส่งก็ต้องกันบิลกำพร้าเหมือนหน้าร้าน
     // (เดิมผูกทีหลังผ่าน updatePosOrderStatus({billId}) ซึ่งเป็นสาเหตุของบิลกำพร้า 29 ก.ค.)
     linkOrderId: orderId,
