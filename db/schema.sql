@@ -440,7 +440,7 @@ CREATE INDEX IF NOT EXISTS idx_project_members_project ON project_members (proje
 -- =========================================================
 CREATE TABLE IF NOT EXISTS personal_income_entries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   amount NUMERIC(12,2) NOT NULL CHECK (amount > 0),
   category VARCHAR(30) NOT NULL
     CHECK (category IN ('salary','business','freelance','scholarship',
@@ -456,7 +456,7 @@ CREATE INDEX IF NOT EXISTS idx_personal_income_user
 
 CREATE TABLE IF NOT EXISTS personal_expense_entries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   amount NUMERIC(12,2) NOT NULL CHECK (amount > 0),
   category VARCHAR(30) NOT NULL
     CHECK (category IN ('food','transport','education','rent','water',
@@ -473,7 +473,7 @@ CREATE INDEX IF NOT EXISTS idx_personal_expense_user
 
 CREATE TABLE IF NOT EXISTS savings_goals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name VARCHAR(160) NOT NULL,
   target_amount NUMERIC(12,2) NOT NULL CHECK (target_amount > 0),
   current_amount NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (current_amount >= 0),
