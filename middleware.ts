@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/jwt";
 import { getAppUrl, getPosAppOrigin, isVercel } from "@/lib/env";
 
-const PUBLIC_PATHS = ["/", "/login", "/register", "/pricing"];
+// /privacy และ /terms ต้องเปิดได้โดยไม่ล็อกอิน — Google Play ตรวจ URL จากภายนอก
+const PUBLIC_PATHS = ["/", "/login", "/register", "/pricing", "/privacy", "/terms"];
 const LEGACY_APP_HOST = "rizance-profit.vercel.app";
 
 function isPublicStaticFile(pathname: string): boolean {

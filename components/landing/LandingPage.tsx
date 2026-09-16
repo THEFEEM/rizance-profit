@@ -54,6 +54,13 @@ export function LandingPage() {
             <a href="#contact" className={`rounded-md text-[13px] text-[var(--rz-muted)] transition-colors hover:text-[var(--rz-text)] ${focusRing}`}>
               ติดต่อ
             </a>
+            {/* Google Play ต้องเข้าถึงนโยบายความเป็นส่วนตัวจากภายนอกได้ — ลิงก์จากหน้าแรกคือทางที่ผู้ตรวจหาเจอแน่นอน */}
+            <Link href="/privacy" className={`rounded-md text-[13px] text-[var(--rz-muted)] transition-colors hover:text-[var(--rz-text)] ${focusRing}`}>
+              ความเป็นส่วนตัว
+            </Link>
+            <Link href="/terms" className={`rounded-md text-[13px] text-[var(--rz-muted)] transition-colors hover:text-[var(--rz-text)] ${focusRing}`}>
+              ข้อกำหนด
+            </Link>
           </div>
         </footer>
       </div>
