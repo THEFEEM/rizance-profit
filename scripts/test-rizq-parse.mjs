@@ -77,10 +77,21 @@ function pass(caseDef, action) {
   return action.type === "reply";
 }
 
+// A-3.SEC: /api/dev/test-rizq ต้องมีผู้ใช้จริงแล้ว (และถูกปิดบน production)
+// ใส่ค่า cookie rizance_session ของ dev ลง TEST_RIZQ_SESSION ก่อนรัน เช่น
+//   $env:TEST_RIZQ_SESSION="<ค่าจาก DevTools → Application → Cookies>"
+const SESSION = process.env.TEST_RIZQ_SESSION?.trim();
+if (!SESSION) {
+  console.error(
+    "ต้องตั้ง TEST_RIZQ_SESSION ก่อน — คัดลอกค่า cookie `rizance_session` จากเบราว์เซอร์ที่ล็อกอิน dev อยู่",
+  );
+  process.exit(2);
+}
+
 async function parseOne(text) {
   const res = await fetch(BASE, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Cookie: `rizance_session=${SESSION}` },
     body: JSON.stringify({ text }),
   });
   const body = await res.json();
