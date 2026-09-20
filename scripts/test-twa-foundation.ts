@@ -20,6 +20,14 @@ const head = (t: string) => console.log(`\n== ${t} ${"=".repeat(Math.max(0, 56 -
 
 const ROOT = process.cwd();
 
+/**
+ * SHA-256 จาก Play App Signing ของ `app.rizance`
+ * ค่านี้ต้องตรงกับ Play Console → Release → Setup → App integrity เป๊ะ
+ * ถ้าไม่ตรง Google จะ verify ไม่ผ่าน และ TWA จะโชว์แถบ URL ของ Chrome
+ */
+const EXPECTED_SHA256 =
+  "FF:60:AD:69:0F:CF:7E:1D:85:FD:4C:60:A0:CD:26:80:EE:98:89:E3:33:4E:DA:D8:91:F3:04:AC:9C:32:49:C9";
+
 async function main(): Promise<void> {
   // ══ 1 · MANIFEST ═══════════════════════════════════════════════════
   head("1 · MANIFEST");
@@ -73,15 +81,22 @@ async function main(): Promise<void> {
   check("2.7 package_name = app.rizance ตรงเป๊ะ",
     st?.target?.package_name === "app.rizance", st?.target?.package_name);
 
-  const fp = st?.target?.sha256_cert_fingerprints?.[0];
-  check("2.8 fingerprint ยังเป็น placeholder", fp === "<PLAY_APP_SIGNING_SHA256>", String(fp));
-  check("2.9 fingerprint ไม่ใช่ SHA-256 จริง (กันเผลอใส่ค่าเดา)",
-    !/^([0-9A-Fa-f]{2}:){31}[0-9A-Fa-f]{2}$/.test(String(fp)));
-  check("2.10 placeholder → Cache-Control ต้องเป็น no-store",
-    (res.headers.get("cache-control") ?? "").includes("no-store"),
+  const fp = String(st?.target?.sha256_cert_fingerprints?.[0]);
+
+  check("2.8 fingerprint ไม่ใช่ placeholder แล้ว",
+    !/^<.*>$/.test(fp) && fp.length > 0, fp);
+  check("2.9 fingerprint ตรงกับ Play App Signing SHA-256 เป๊ะทุกตัวอักษร",
+    fp === EXPECTED_SHA256, fp);
+  check("2.9b รูปแบบถูกต้อง: 32 ไบต์ hex ตัวพิมพ์ใหญ่ คั่นด้วย :",
+    /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/.test(fp));
+  check("2.10 configured → Cache-Control ใช้ branch production",
+    (res.headers.get("cache-control") ?? "") === "public, max-age=3600",
     res.headers.get("cache-control") ?? "-");
-  check("2.11 header บอกสถานะว่ายังไม่พร้อม",
-    res.headers.get("x-rizance-assetlinks-status") === "placeholder");
+  check("2.10b configured → ต้องไม่มี no-store หลงเหลือ",
+    !(res.headers.get("cache-control") ?? "").includes("no-store"));
+  check("2.11 header สถานะ = configured",
+    res.headers.get("x-rizance-assetlinks-status") === "configured",
+    res.headers.get("x-rizance-assetlinks-status") ?? "-");
 
   // ไม่มีความลับหลุดออกไปกับ response
   const raw = JSON.stringify(body);
@@ -135,6 +150,9 @@ async function main(): Promise<void> {
   check("5.1 assetlinks route ไม่ import lib/db", !routeSrc.includes("lib/db"));
   check("5.2 assetlinks route ไม่มี SQL", !/\b(SELECT|INSERT|UPDATE|DELETE)\b/i.test(routeSrc));
   check("5.3 assetlinks route ไม่อ่าน process.env", !routeSrc.includes("process.env"));
+  // กันการ deploy ทั้งที่ยังมี placeholder ค้างอยู่ในซอร์ส (รูปแบบ ALL_CAPS ในวงเล็บแหลม)
+  check("5.4 ไม่มี placeholder แบบ ALL_CAPS หลงเหลือในซอร์สของ route",
+    !/<[A-Z][A-Z0-9_]{3,}>/.test(routeSrc));
 
   head("SUMMARY");
   console.log(`PASS ${pass} · FAIL ${fail}`);

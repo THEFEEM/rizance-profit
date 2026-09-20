@@ -7,30 +7,26 @@ import { NextResponse } from "next/server";
  * แอปนั้นเปิด URL ของโดเมนนี้แบบเต็มจอ (Trusted Web Activity)
  * ถ้า verify ไม่ผ่าน แอปจะยังเปิดได้ แต่มีแถบ URL ของ Chrome ค้างอยู่ด้านบน
  *
- * ═══ 🔴 ยังใช้งานจริงไม่ได้ — fingerprint เป็น placeholder ═══════════
+ * ═══ ✅ ตั้งค่าแล้ว — ใช้ SHA-256 จริงจาก Play App Signing ═══════════
  *
- * SHA-256 ที่ถูกต้องต้องมาจาก Play App Signing เท่านั้น และได้มาหลังจาก
- * อัปโหลด AAB ตัวแรกแล้วเท่านั้น:
+ * ที่มาของค่า (ค่าเดียวที่ถูกต้อง — ไม่ใช่ upload key ของเราเอง):
  *
  *   Play Console → Release → Setup → App integrity
  *                → App signing key certificate → SHA-256 certificate fingerprint
  *
- * ลำดับที่หลีกเลี่ยงไม่ได้ (chicken-and-egg ของ Play App Signing):
- *   1. build AAB ด้วย upload keystore ของเราเอง
- *   2. อัปโหลดขึ้น Internal testing
- *   3. คัดลอก SHA-256 จาก Play Console
- *   4. แทนที่ placeholder ข้างล่าง
- *   5. deploy rizance.com
- *   6. verify ด้วย Statement List Generator and Tester ของ Google
+ * ⚠️ ถ้า Google หมุน App Signing key เมื่อใด ต้องกลับมาแก้ค่านี้ ไม่อย่างนั้น
+ *    verification จะพังเงียบ ๆ และผู้ใช้จะเห็นแถบ URL ของ Chrome โผล่ขึ้นมา
  *
- * ⚠️ ห้ามเดาค่า fingerprint · ห้าม deploy ไฟล์นี้ตราบใดที่ยังเป็น placeholder
- *    (deploy ไปก็ไม่เสียหาย แต่ verify จะไม่ผ่านและทำให้เข้าใจผิดว่าตั้งค่าแล้ว)
+ * หลัง deploy ให้ยืนยันด้วย Statement List Generator and Tester ของ Google
+ * และ `curl -i https://rizance.com/.well-known/assetlinks.json`
  *
  * ไฟล์นี้เป็นข้อมูลสาธารณะล้วน — ไม่มีความลับใด ๆ ทั้งสิ้น
+ * (fingerprint ของใบรับรองเป็นข้อมูลที่ต้องเปิดเผยโดยนิยามของ Digital Asset Links)
  */
 
-/** เปลี่ยนเป็น SHA-256 จริงจาก Play Console แล้วค่อย deploy */
-const PLAY_APP_SIGNING_SHA256 = "<PLAY_APP_SIGNING_SHA256>";
+/** SHA-256 จาก Play App Signing ของ app.rizance */
+const PLAY_APP_SIGNING_SHA256 =
+  "FF:60:AD:69:0F:CF:7E:1D:85:FD:4C:60:A0:CD:26:80:EE:98:89:E3:33:4E:DA:D8:91:F3:04:AC:9C:32:49:C9";
 
 /** package id ของแอป Android production — ต้องตรงกับที่ตั้งใน Bubblewrap เป๊ะ */
 const ANDROID_PACKAGE_NAME = "app.rizance";
@@ -49,17 +45,21 @@ export async function GET() {
     },
   ];
 
-  const verified = !PLAY_APP_SIGNING_SHA256.startsWith("<");
+  // ยืนยันรูปแบบจริง (32 ไบต์ hex ตัวพิมพ์ใหญ่ คั่นด้วย :) ไม่ใช่แค่ "ไม่ใช่ placeholder"
+  // ถ้าวันหน้ามีคนวางค่าผิดรูปแบบ header จะกลับไปเป็น placeholder + no-store ทันที
+  const verified = /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/.test(
+    PLAY_APP_SIGNING_SHA256,
+  );
 
   return NextResponse.json(statements, {
     headers: {
       "Content-Type": "application/json",
-      // ยังเป็น placeholder → ห้าม cache เด็ดขาด เผื่อเผลอ deploy ไปแล้วต้องแก้ทันที
-      // เมื่อใส่ fingerprint จริงแล้วค่อยให้ cache ได้ 1 ชั่วโมง (Google ดึงซ้ำเป็นระยะ)
+      // fingerprint ถูกต้องแล้ว → cache ได้ 1 ชั่วโมง (Google ดึงไฟล์นี้ซ้ำเป็นระยะ)
+      // ถ้าค่าผิดรูปแบบเมื่อใด จะตกไป no-store ทันทีเพื่อให้แก้แล้วเห็นผลเลย
       "Cache-Control": verified
         ? "public, max-age=3600"
         : "no-store, must-revalidate",
-      // สัญญาณให้คนที่ curl ดูเห็นทันทีว่ายังไม่พร้อม — ไม่กระทบตัว parser ของ Google
+      // สัญญาณให้คนที่ curl ดูเห็นสถานะได้ทันที — ไม่กระทบตัว parser ของ Google
       "X-Rizance-Assetlinks-Status": verified ? "configured" : "placeholder",
     },
   });
