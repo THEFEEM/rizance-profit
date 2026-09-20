@@ -7,7 +7,20 @@ const PUBLIC_PATHS = ["/", "/login", "/register", "/pricing", "/privacy", "/term
 const LEGACY_APP_HOST = "rizance-profit.vercel.app";
 
 function isPublicStaticFile(pathname: string): boolean {
-  const PUBLIC_FILES = ["/sw.js", "/manifest.json", "/favicon.ico"];
+  // /.well-known/assetlinks.json — Google ดึงไฟล์นี้จากภายนอกโดยไม่มี cookie
+  // เพื่อ verify Digital Asset Links ของ TWA (package app.rizance)
+  //
+  // ⚠️ วันนี้ path นี้ถูกกันไว้แล้วโดยบังเอิญที่ matcher ท้ายไฟล์ (กฎ `.json$`)
+  //    จึงไม่เคยวิ่งผ่าน middleware อยู่แล้ว — แต่การพึ่งกฎนามสกุลไฟล์เป็นเรื่อง
+  //    เปราะบาง ถ้าวันหน้ามีคนถอน `json` ออกจาก matcher การ verify จะพังเงียบ ๆ
+  //    และหาสาเหตุยากมาก · บรรทัดนี้จึงเป็นการประกาศเจตนาให้ชัดและเป็นชั้นสำรอง
+  //    (ระบุเฉพาะไฟล์เดียว ไม่เปิด /.well-known/* ทั้งหมด)
+  const PUBLIC_FILES = [
+    "/sw.js",
+    "/manifest.json",
+    "/favicon.ico",
+    "/.well-known/assetlinks.json",
+  ];
   return (
     PUBLIC_FILES.includes(pathname) ||
     pathname.startsWith("/icons/") ||

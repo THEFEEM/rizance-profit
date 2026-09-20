@@ -31,9 +31,20 @@ export function InstallAppButton({
   const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
+    // แอปที่ติดตั้งแล้ว = ไม่ต้องชวนติดตั้งซ้ำ
+    //
+    // ⚠️ ใน TWA (Android) `beforeinstallprompt` **ไม่ยิงเลย** ปุ่มจึงจะค้างอยู่
+    //    ถ้าตรวจไม่เจอว่าเป็นแอปติดตั้งแล้ว · การเช็ค display-mode เดิมครอบ TWA
+    //    ได้อยู่แล้ว (Bubblewrap ตั้ง display: standalone) แต่เพิ่มอีกสองด่าน
+    //    เพื่อให้ทนต่อการตั้งค่าอื่น:
+    //      · fullscreen / minimal-ui — ถ้าวันหน้าเปลี่ยน display ใน manifest
+    //      · document.referrer ขึ้นต้น android-app:// — สัญญาณเฉพาะของ TWA
+    //        ที่เชื่อถือได้ที่สุด ไม่ขึ้นกับ display mode
+    const displayModes = ["standalone", "fullscreen", "minimal-ui"];
     const standalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+      displayModes.some((m) => window.matchMedia(`(display-mode: ${m})`).matches) ||
+      (window.navigator as Navigator & { standalone?: boolean }).standalone === true ||
+      document.referrer.startsWith("android-app://");
     if (standalone) setInstalled(true);
 
     const ua = navigator.userAgent || "";
