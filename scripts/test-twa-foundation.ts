@@ -21,12 +21,22 @@ const head = (t: string) => console.log(`\n== ${t} ${"=".repeat(Math.max(0, 56 -
 const ROOT = process.cwd();
 
 /**
- * SHA-256 จาก Play App Signing ของ `app.rizance`
- * ค่านี้ต้องตรงกับ Play Console → Release → Setup → App integrity เป๊ะ
- * ถ้าไม่ตรง Google จะ verify ไม่ผ่าน และ TWA จะโชว์แถบ URL ของ Chrome
+ * ทุก SHA-256 ที่ Play Console ยืนยันแล้วสำหรับ `app.rizance`
+ *
+ * รายการนี้เขียนแยกจาก route โดยตั้งใจ — ถ้าใครแก้ข้างเดียว เทสจะแดงทันที
+ * ตัวที่ 3 (F7:A9:…) คือใบที่ APK บนเครื่อง Samsung ใช้จริง ยืนยันด้วย ADB
  */
-const EXPECTED_SHA256 =
-  "FF:60:AD:69:0F:CF:7E:1D:85:FD:4C:60:A0:CD:26:80:EE:98:89:E3:33:4E:DA:D8:91:F3:04:AC:9C:32:49:C9";
+const EXPECTED_FINGERPRINTS = [
+  "FF:60:AD:69:0F:CF:7E:1D:85:FD:4C:60:A0:CD:26:80:EE:98:89:E3:33:4E:DA:D8:91:F3:04:AC:9C:32:49:C9",
+  "5F:C7:C8:5E:23:E3:83:9D:48:73:B0:5D:5F:85:D5:E8:20:4A:97:39:A3:08:6E:EF:16:94:65:F7:DD:AE:E0:55",
+  "F7:A9:8A:50:90:12:31:5E:00:A7:9E:BA:1B:2F:72:5E:50:4D:63:37:37:66:F1:68:32:62:4D:97:86:51:93:D1",
+];
+
+/** ใบที่ติดตั้งจริงบนเครื่อง — ขาดตัวนี้ = TWA โชว์แถบ URL ของ Chrome */
+const DEVICE_INSTALLED_FINGERPRINT = EXPECTED_FINGERPRINTS[2];
+
+/** 32 ไบต์ hex ตัวพิมพ์ใหญ่ คั่นด้วย : */
+const FINGERPRINT_RE = /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/;
 
 async function main(): Promise<void> {
   // ══ 1 · MANIFEST ═══════════════════════════════════════════════════
@@ -81,14 +91,35 @@ async function main(): Promise<void> {
   check("2.7 package_name = app.rizance ตรงเป๊ะ",
     st?.target?.package_name === "app.rizance", st?.target?.package_name);
 
-  const fp = String(st?.target?.sha256_cert_fingerprints?.[0]);
+  const fps = st?.target?.sha256_cert_fingerprints ?? [];
 
-  check("2.8 fingerprint ไม่ใช่ placeholder แล้ว",
-    !/^<.*>$/.test(fp) && fp.length > 0, fp);
-  check("2.9 fingerprint ตรงกับ Play App Signing SHA-256 เป๊ะทุกตัวอักษร",
-    fp === EXPECTED_SHA256, fp);
-  check("2.9b รูปแบบถูกต้อง: 32 ไบต์ hex ตัวพิมพ์ใหญ่ คั่นด้วย :",
-    /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/.test(fp));
+  check("2.8 ไม่มี placeholder หลงเหลือใน fingerprints",
+    fps.length > 0 && !fps.some((f) => /^<.*>$/.test(String(f))),
+    fps.join(" "));
+
+  // ครบทุกตัวที่ Play Console ยืนยัน — ขาดตัวใดตัวหนึ่ง verify อาจพังบนบางเครื่อง
+  for (const want of EXPECTED_FINGERPRINTS) {
+    check(`2.9 มี fingerprint ${want.slice(0, 11)}…`, fps.includes(want));
+  }
+  check("2.9d มีใบที่ติดตั้งจริงบนเครื่อง Samsung (ADB-verified)",
+    fps.includes(DEVICE_INSTALLED_FINGERPRINT));
+
+  // ไม่มีตัวเกินที่ไม่ได้อยู่ในรายการที่ Play Console รับรอง
+  const extras = fps.filter((f) => !EXPECTED_FINGERPRINTS.includes(String(f)));
+  check("2.9e ไม่มี fingerprint นอกรายการที่รับรอง", extras.length === 0,
+    extras.join(" "));
+
+  check("2.9f จำนวนตรงกับรายการที่รับรองพอดี",
+    fps.length === EXPECTED_FINGERPRINTS.length, `${fps.length}`);
+
+  check("2.9g ไม่มี fingerprint ซ้ำ",
+    new Set(fps.map(String)).size === fps.length,
+    fps.join(" "));
+
+  check("2.9h ทุกตัวรูปแบบถูกต้อง (32 ไบต์ hex ตัวพิมพ์ใหญ่)",
+    fps.every((f) => FINGERPRINT_RE.test(String(f))),
+    fps.filter((f) => !FINGERPRINT_RE.test(String(f))).join(" ") || "-");
+
   check("2.10 configured → Cache-Control ใช้ branch production",
     (res.headers.get("cache-control") ?? "") === "public, max-age=3600",
     res.headers.get("cache-control") ?? "-");
