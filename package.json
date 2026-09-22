@@ -45,6 +45,7 @@
     "test:oauth-security": "npx tsx scripts/test-oauth-security.ts",
     "test:account-deletion": "npx tsx scripts/test-account-deletion-foundation.ts",
     "test:twa-foundation": "npx tsx scripts/test-twa-foundation.ts",
+    "test:app-entry": "npx tsx scripts/test-app-entry.ts",
     "verify:migrations-0036-0037": "node scripts/verify-migrations-0036-0037.mjs"
   },
   "dependencies": {

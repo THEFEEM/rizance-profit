@@ -6,6 +6,14 @@ import { getAppUrl, getPosAppOrigin, isVercel } from "@/lib/env";
 const PUBLIC_PATHS = ["/", "/login", "/register", "/pricing", "/privacy", "/terms"];
 const LEGACY_APP_HOST = "rizance-profit.vercel.app";
 
+// ANDROID 4.1 — ทางเข้าของแอปที่ติดตั้ง (TWA / PWA) · ไม่มี UI ของตัวเอง
+// ตัดสินที่ edge แล้ว redirect ทันที ผู้ใช้จึงไม่เห็น landing แวบแม้แต่เฟรมเดียว
+//   มี session   → /home   (หน้าแรกของแอปเดิม)
+//   ไม่มี session → /login (หน้าล็อกอินเดิม · ไม่ส่ง ?next= เพราะ /app ไม่ใช่ปลายทาง)
+// จับเฉพาะ path นี้ตัวเดียวแบบตรงตัว — ไม่ใช่ prefix — เพื่อไม่ไปทับเส้นทางอื่นในอนาคต
+// เว็บปกติที่ / ยังเห็น landing เหมือนเดิมทุกประการ
+const APP_ENTRY_PATH = "/app";
+
 function isPublicStaticFile(pathname: string): boolean {
   // /.well-known/assetlinks.json — Google ดึงไฟล์นี้จากภายนอกโดยไม่มี cookie
   // เพื่อ verify Digital Asset Links ของ TWA (package app.rizance)
@@ -71,6 +79,12 @@ export async function middleware(req: NextRequest) {
 
   const token = req.cookies.get(SESSION_COOKIE)?.value;
   const userId = await verifySession(token);
+
+  // App entry (ดูคำอธิบายที่ APP_ENTRY_PATH) — ต้องอยู่ก่อนบล็อก `?next=` ด้านล่าง
+  // ไม่อย่างนั้นผู้ใช้ที่ยังไม่ล็อกอินจะได้ /login?next=/app แล้ววนกลับมาที่นี่อีกรอบ
+  if (pathname === APP_ENTRY_PATH) {
+    return NextResponse.redirect(new URL(userId ? "/home" : "/login", req.url));
+  }
 
   // Signed-in users: landing → app home; skip login/register.
   if (userId && pathname === "/") {
