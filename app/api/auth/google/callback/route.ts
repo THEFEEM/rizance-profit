@@ -8,6 +8,7 @@ import {
 import { signSession, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth";
 import { requestHostname } from "@/lib/jwt";
 import { CONTEXT_COOKIE, contextCookieOptions } from "@/lib/context";
+import { canonicalRedirectTarget } from "@/lib/env";
 import {
   authorizeGoogleReauth,
   createGoogleOAuthClient,
@@ -48,6 +49,23 @@ function reauthRedirect(req: NextRequest, returnTo: string, status: "ok" | "fail
 export async function GET(req: NextRequest) {
   if (!isGoogleAuthEnabled()) {
     return NextResponse.json({ error: { message: "Google login is not configured" } }, { status: 404 });
+  }
+
+  // ── Canonical host ก่อนทุกอย่าง ─────────────────────────────────────
+  // state cookie เป็น host-only บน canonical host (ตั้งตอนเริ่ม flow ที่ /api/auth/google)
+  // ถ้า Google ส่งกลับมาที่ host อื่น (เช่น rizance.app ตาม redirect_uri เดิม) จะไม่มี
+  // cookie ให้ตรวจ → ต้องพา request ทั้งก้อน (path + code + state + error) ไป canonical
+  // แล้วให้ verifyOAuthState ทำงานตามปกติที่นั่น — **ไม่ได้ข้ามการตรวจ** แค่ย้ายที่ตรวจ
+  //
+  // ปลายทางมาจาก config เท่านั้น (getAppUrl) ไม่ใช่จาก Host header → ไม่มี open redirect
+  // /api/* ไม่ผ่าน middleware จึงต้องมี guard ตรงนี้เอง
+  const canonical = canonicalRedirectTarget(
+    requestHostname(req),
+    req.nextUrl.pathname,
+    req.nextUrl.search,
+  );
+  if (canonical) {
+    return NextResponse.redirect(canonical, 308);
   }
 
   const googleError = req.nextUrl.searchParams.get("error");

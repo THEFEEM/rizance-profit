@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/jwt";
-import { getAppUrl, getPosAppOrigin, isVercel } from "@/lib/env";
+import { canonicalRedirectTarget, getPosAppOrigin, isVercel } from "@/lib/env";
 
 // /privacy และ /terms ต้องเปิดได้โดยไม่ล็อกอิน — Google Play ตรวจ URL จากภายนอก
 const PUBLIC_PATHS = ["/", "/login", "/register", "/pricing", "/privacy", "/terms"];
-const LEGACY_APP_HOST = "rizance-profit.vercel.app";
 
 // ANDROID 4.1 — ทางเข้าของแอปที่ติดตั้ง (TWA / PWA) · ไม่มี UI ของตัวเอง
 // ตัดสินที่ edge แล้ว redirect ทันที ผู้ใช้จึงไม่เห็น landing แวบแม้แต่เฟรมเดียว
@@ -65,9 +64,13 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(`https://${host}${pathname}${req.nextUrl.search}`, 301);
   }
 
-  // Permanent redirect from the old production Vercel host to the canonical app domain.
-  if (host === LEGACY_APP_HOST) {
-    return NextResponse.redirect(`${getAppUrl()}${pathname}${req.nextUrl.search}`, 308);
+  // Canonical host — rizance.app และ host เก่า *.vercel.app ต้อง 308 มา www.rizance.com
+  // คง path + query · ปลายทางมาจาก config ไม่ใช่จาก Host header (ดู lib/env.ts)
+  // ⚠️ ครอบเฉพาะเส้นทางที่ผ่าน matcher — /api/* ไม่ผ่านที่นี่ Google callback
+  //    จึงมี guard ของตัวเองใน app/api/auth/google/callback/route.ts
+  const canonical = canonicalRedirectTarget(host, pathname, req.nextUrl.search);
+  if (canonical) {
+    return NextResponse.redirect(canonical, 308);
   }
 
   // PWA / static passthrough — must run before auth (sw.js, manifest, icons).

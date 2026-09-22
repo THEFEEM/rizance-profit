@@ -17,6 +17,7 @@ import { join } from "node:path";
 // ค่านี้ใช้เฉพาะในเทส ไม่เกี่ยวกับ secret จริงใด ๆ
 process.env.JWT_SECRET = "test-only-secret-for-app-entry-check-0000";
 delete process.env.VERCEL; // ปิด branch บังคับ https เพื่อให้เทสไม่ขึ้นกับ x-forwarded-proto
+process.env.NEXT_PUBLIC_APP_URL = "https://www.rizance.com"; // เหมือน production
 
 let pass = 0;
 let fail = 0;
@@ -26,7 +27,6 @@ function check(name: string, cond: boolean, detail = ""): void {
 }
 const head = (t: string) => console.log(`\n== ${t} ${"=".repeat(Math.max(0, 56 - t.length))}`);
 
-const ORIGIN = "https://www.rizance.com";
 const ROOT = process.cwd();
 
 async function main(): Promise<void> {
@@ -37,11 +37,12 @@ async function main(): Promise<void> {
   const validToken = await signSession("00000000-0000-4000-8000-000000000001");
 
   type Auth = "none" | "valid" | "garbage";
-  async function hit(path: string, auth: Auth) {
-    const headers = new Headers({ host: "www.rizance.com" });
+  async function hit(path: string, auth: Auth, host = "www.rizance.com") {
+    const headers = new Headers({ host });
     if (auth === "valid") headers.set("cookie", `${SESSION_COOKIE}=${validToken}`);
     if (auth === "garbage") headers.set("cookie", `${SESSION_COOKIE}=not.a.jwt`);
-    const req = new NextRequest(`${ORIGIN}${path}`, { headers });
+    // URL ของ request ต้องใช้ host เดียวกับ header — เหมือน request จริงที่ edge
+    const req = new NextRequest(`https://${host.replace(/:443$/, "")}${path}`, { headers });
     const res = await middleware(req);
     const loc = res.headers.get("location");
     return {
@@ -104,6 +105,61 @@ async function main(): Promise<void> {
   r = await hit("/app/x", "none");
   check("R7 /app/x ไม่ถูกดักเป็น entry (ตรงตัวเท่านั้น)",
     isRedirectTo(r, "/login") && r.location?.searchParams.get("next") === "/app/x", describe(r));
+
+  // ══ H · CANONICAL HOST (rizance.app → www.rizance.com) ═══════════════
+  head("H · CANONICAL HOST");
+  const is308To = (r: Awaited<ReturnType<typeof hit>>, href: string) =>
+    r.status === 308 && r.location?.href === href;
+
+  r = await hit("/", "none", "rizance.app");
+  check("H1 rizance.app/ → 308 https://www.rizance.com/", is308To(r, "https://www.rizance.com/"), describe(r));
+
+  r = await hit("/app", "none", "rizance.app");
+  check("H2 rizance.app/app → 308 www/app (path คงเดิม)", is308To(r, "https://www.rizance.com/app"), describe(r));
+
+  r = await hit("/login?next=/home", "none", "rizance.app");
+  check("H3 rizance.app/login?next=/home → 308 www/login?next=/home (query คงเดิม)",
+    is308To(r, "https://www.rizance.com/login?next=/home"), describe(r));
+
+  r = await hit("/home", "valid", "rizance.app");
+  check("H4 มี session ก็ยัง 308 ก่อน (canonicalize มาก่อน auth)",
+    is308To(r, "https://www.rizance.com/home"), describe(r));
+
+  r = await hit("/app", "none", "rizance.app:443");
+  check("H5 host มี port ก็จับได้", is308To(r, "https://www.rizance.com/app"), describe(r));
+
+  r = await hit("/app", "none", "RIZANCE.APP");
+  check("H6 host ตัวพิมพ์ใหญ่ก็จับได้", is308To(r, "https://www.rizance.com/app"), describe(r));
+
+  r = await hit("/app", "none", "pos.rizance.app");
+  check("H7 pos.rizance.app **ไม่โดน** canonicalize (ทำงานปกติ → /login)",
+    r.status !== 308 && isRedirectTo(r, "/login") && r.location?.host === "pos.rizance.app", describe(r));
+
+  r = await hit("/app", "none", "www.rizance.com");
+  check("H8 www ไม่ redirect ตัวเอง (ไม่มี loop)", r.status !== 308, describe(r));
+
+  r = await hit("/", "none", "localhost:3000");
+  check("H9 localhost ไม่โดน (dev ไม่เปลี่ยน)", r.passthrough, describe(r));
+
+  r = await hit("/app", "none", "evil.example");
+  check("H10 host แปลกไม่ถูก redirect ไปไหน (ไม่มี open redirect · ไม่รู้จัก = ไม่แตะ)",
+    r.status !== 308 && r.location?.host === "evil.example", describe(r));
+
+  r = await hit("/app", "none", "rizance-profit.vercel.app");
+  check("H11 host เก่า vercel.app ยัง 308 มา www (พฤติกรรมเดิมคงอยู่)",
+    is308To(r, "https://www.rizance.com/app"), describe(r));
+
+  // env ไม่ตั้ง → default ต้องเป็น www ไม่ใช่ apex (ไม่งั้นวน apex↔www ที่ Vercel)
+  {
+    const saved = process.env.NEXT_PUBLIC_APP_URL;
+    delete process.env.NEXT_PUBLIC_APP_URL;
+    r = await hit("/app", "none", "rizance.app");
+    check("H12 ไม่ตั้ง NEXT_PUBLIC_APP_URL → default ยัง www (กัน loop กับ Vercel apex redirect)",
+      is308To(r, "https://www.rizance.com/app"), describe(r));
+    r = await hit("/app", "none", "www.rizance.com");
+    check("H13 …และ www ไม่ redirect ตัวเองแม้ env ไม่ตั้ง", r.status !== 308, describe(r));
+    if (saved !== undefined) process.env.NEXT_PUBLIC_APP_URL = saved;
+  }
 
   // ══ S · โครงสร้างที่ต้องคง ═══════════════════════════════════════════
   head("S · STRUCTURE");

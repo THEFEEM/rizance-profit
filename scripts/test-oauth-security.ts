@@ -318,6 +318,100 @@ async function main(): Promise<void> {
   check("5.22 REAUTH_DEFAULT_RETURN_TO is /profile (route ที่มีอยู่จริง)", REAUTH_DEFAULT_RETURN_TO === "/profile");
   check("5.23 default returnTo ผ่าน safeReturnTo", safeReturnTo(REAUTH_DEFAULT_RETURN_TO, "/home") === "/profile");
 
+  // ══════════════════════════════════════════════════════════════════
+  head("6 · CALLBACK CANONICAL HOST (TWA session root cause)");
+  // เรียก route handler จริง · ไม่มี DB/Google จริง — env dummy ให้ module โหลดได้
+  // (pg Pool ไม่ connect จนกว่าจะ query · เราหยุดก่อนถึง code exchange ทุกเคส)
+  process.env.DATABASE_URL ??= "postgres://test:test@127.0.0.1:1/test_never_connects";
+  process.env.GOOGLE_CLIENT_ID ??= "test-client-id";
+  process.env.GOOGLE_CLIENT_SECRET ??= "test-client-secret";
+  process.env.GOOGLE_REDIRECT_URI ??= "https://www.rizance.com/api/auth/google/callback";
+  process.env.NEXT_PUBLIC_APP_URL = "https://www.rizance.com";
+  delete process.env.VERCEL;
+
+  const { NextRequest } = await import("next/server");
+  const callback = await import("../app/api/auth/google/callback/route");
+  const CB = "/api/auth/google/callback";
+
+  async function callbackOn(host: string, search: string, cookie?: string) {
+    const headers = new Headers({ host });
+    if (cookie) headers.set("cookie", cookie);
+    const res = await callback.GET(new NextRequest(`https://${host}${CB}${search}`, { headers }));
+    const loc = res.headers.get("location");
+    return { status: res.status, location: loc ? new URL(loc) : null };
+  }
+
+  // 6.1–6.4 · non-canonical host → 308 canonical · path + query ครบ
+  let cb = await callbackOn("rizance.app", "?code=OPAQUE_CODE&state=OPAQUE_STATE");
+  check("6.1 callback บน rizance.app → 308", cb.status === 308, String(cb.status));
+  check("6.2 …ไป www.rizance.com host เดียวเท่านั้น", cb.location?.host === "www.rizance.com", cb.location?.host ?? "-");
+  check("6.3 …pathname คงเดิม", cb.location?.pathname === CB, cb.location?.pathname ?? "-");
+  check("6.4 …query คงเดิมทั้ง code และ state",
+    cb.location?.searchParams.get("code") === "OPAQUE_CODE" &&
+    cb.location?.searchParams.get("state") === "OPAQUE_STATE", cb.location?.search ?? "-");
+
+  cb = await callbackOn("rizance.app", "?error=access_denied&state=OPAQUE_STATE");
+  check("6.5 error จาก Google ก็ถูกส่งต่อไป canonical ทั้งก้อน (ไม่ตัดสินบน host ผิด)",
+    cb.status === 308 && cb.location?.searchParams.get("error") === "access_denied", cb.location?.search ?? "-");
+
+  // 6.6 · canonical host → ไม่ redirect host · เข้าสู่การตรวจ state ปกติ (ไม่มี cookie → bad_state)
+  cb = await callbackOn("www.rizance.com", "?code=OPAQUE_CODE&state=OPAQUE_STATE");
+  check("6.6 callback บน www → ไม่ 308 · เข้าตรวจ state ปกติ → /login?error=bad_state บน www",
+    cb.status !== 308 && cb.location?.host === "www.rizance.com" &&
+    cb.location?.pathname === "/login" && cb.location?.searchParams.get("error") === "bad_state",
+    `${cb.status} → ${cb.location?.href ?? "-"}`);
+
+  // 6.7 · state ถูกต้องบน canonical → ผ่าน state check (ไปตายที่ code exchange ซึ่งไม่มีเน็ต = google_callback ไม่ใช่ bad_state)
+  {
+    const s = await createOAuthState({ purpose: "login" });
+    cb = await callbackOn("www.rizance.com", `?code=OPAQUE_CODE&state=${s.state}`, `${OAUTH_STATE_COOKIE}=${s.cookieValue}`);
+    check("6.7 state ถูกบน www → ผ่าน verifyOAuthState (ไม่ใช่ bad_state) — A-3.SEC ยังทำงานตามลำดับเดิม",
+      cb.location?.searchParams.get("error") !== "bad_state", `${cb.status} → ${cb.location?.href ?? "-"}`);
+  }
+
+  // 6.8 · state cookie ที่ตั้งบน www แต่ callback มาลง rizance.app → ต้องไม่ถูกปฏิเสธที่ rizance.app
+  //       (นั่นคือบั๊กเดิม) แต่ถูกพาไป www ที่ cookie อยู่
+  {
+    const s = await createOAuthState({ purpose: "login" });
+    cb = await callbackOn("rizance.app", `?code=OPAQUE_CODE&state=${s.state}`);
+    check("6.8 สถานการณ์จริงของบั๊ก: callback ลง rizance.app โดยไม่มี cookie → 308 ไป www (ไม่ใช่ bad_state บน rizance.app)",
+      cb.status === 308 && cb.location?.host === "www.rizance.com" && cb.location?.searchParams.get("state") === s.state,
+      `${cb.status} → ${cb.location?.href ?? "-"}`);
+  }
+
+  // 6.9–6.11 · ไม่มี open redirect: host ที่ไม่รู้จัก / X-Forwarded-Host ไม่ถูกใช้เป็นปลายทาง
+  cb = await callbackOn("evil.example", "?code=x&state=y");
+  check("6.9 host แปลก → ไม่ 308 ไปที่ไหน (ตรวจ state ปกติบน host นั้น → bad_state)",
+    cb.status !== 308 && cb.location?.host === "evil.example" && cb.location?.searchParams.get("error") === "bad_state",
+    `${cb.status} → ${cb.location?.href ?? "-"}`);
+  {
+    const headers = new Headers({ host: "rizance.app", "x-forwarded-host": "evil.example" });
+    const res = await callback.GET(new NextRequest(`https://rizance.app${CB}?code=x&state=y`, { headers }));
+    const loc = res.headers.get("location") ? new URL(res.headers.get("location")!) : null;
+    check("6.10 X-Forwarded-Host ถูกเมิน — ปลายทางยังเป็น www จาก config",
+      res.status === 308 && loc?.host === "www.rizance.com", loc?.href ?? "-");
+  }
+  cb = await callbackOn("pos.rizance.app", "?code=x&state=y");
+  check("6.11 pos.rizance.app ไม่ถูก canonicalize (คนละบริการ)", cb.status !== 308, String(cb.status));
+
+  // 6.12 · env ไม่ตั้ง → default www → ไม่ loop
+  {
+    const saved = process.env.NEXT_PUBLIC_APP_URL;
+    delete process.env.NEXT_PUBLIC_APP_URL;
+    cb = await callbackOn("www.rizance.com", "?code=x&state=y");
+    check("6.12 ไม่ตั้ง NEXT_PUBLIC_APP_URL → www ไม่ redirect ตัวเอง (ไม่มี loop)", cb.status !== 308, String(cb.status));
+    process.env.NEXT_PUBLIC_APP_URL = saved!;
+  }
+
+  // 6.13 · guard อยู่ก่อน verifyOAuthState ในซอร์ส (ลำดับสำคัญ: ตรวจ state บน host ที่ cookie อยู่)
+  {
+    const src = readFileSync(join(process.cwd(), "app/api/auth/google/callback/route.ts"), "utf8");
+    const iGuard = src.indexOf("canonicalRedirectTarget(");
+    const iVerify = src.indexOf("await verifyOAuthState(");
+    check("6.13 canonical guard อยู่ก่อน verifyOAuthState", iGuard > 0 && iVerify > iGuard);
+    check("6.14 verifyOAuthState ยังถูกเรียกเหมือนเดิม (ไม่ได้ข้าม)", src.includes("if (!oauthState) {"));
+  }
+
   head("SUMMARY");
   console.log(`PASS ${pass} · FAIL ${fail}`);
   process.exit(fail ? 1 : 0);
