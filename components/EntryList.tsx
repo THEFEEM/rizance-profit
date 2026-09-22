@@ -16,6 +16,7 @@ import {
 } from "@/lib/personal-categories";
 import { DeleteConfirm } from "@/components/DeleteConfirm";
 import { ExpenseArrowIcon, IncomeArrowIcon } from "@/components/today/today-icons";
+import { renderCategoryIcon, renderEntryKindIcon } from "@/lib/category-lucide-icons";
 import { PAYMENT_METHOD_LABELS, type PaymentMethod } from "@/types/booth";
 
 export type EntryRow = {
@@ -216,8 +217,19 @@ export function EntryList({
               data-cat-group={entryCategoryKey(e)}
               className={`flex items-center gap-3 px-4 py-3 ${e.voided ? "opacity-55" : ""}`}
             >
-              <span className="text-xl" aria-hidden>
-                {e.voided ? "🚫" : isIncome ? "💰" : "🧾"}
+              <span
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                  e.voided
+                    ? "bg-rz-hint/15 text-rz-hint"
+                    : isIncome
+                      ? "bg-rz-green/15 text-rz-green"
+                      : "bg-rz-red/15 text-rz-red"
+                }`}
+                aria-hidden
+              >
+                {e.voided
+                  ? renderEntryKindIcon("voided", 18)
+                  : renderCategoryIcon(ledger, e.kind, entryCategoryKey(e), 18)}
               </span>
               <span
                 className={`min-w-0 flex-1 truncate text-sm ${

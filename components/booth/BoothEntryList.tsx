@@ -7,6 +7,7 @@ import { formatDayShort } from "@/lib/date";
 import { expenseCategoryLabel, expenseCostTypeLabel, incomeCategoryLabel } from "@/lib/expense-categories";
 import { DeleteConfirm } from "@/components/DeleteConfirm";
 import { ExpenseArrowIcon, IncomeArrowIcon } from "@/components/today/today-icons";
+import { renderShopExpenseIcon, renderShopIncomeIcon } from "@/lib/category-lucide-icons";
 import {
   PAYMENT_METHOD_LABELS,
   type BoothExpense,
@@ -178,8 +179,15 @@ export function BoothEntryList({
 
           return (
             <li key={e.id} className="flex items-center gap-3 px-4 py-3">
-              <span className="text-xl" aria-hidden>
-                {rowIncome ? "💰" : "🧾"}
+              <span
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                  rowIncome ? "bg-rz-green/15 text-rz-green" : "bg-rz-red/15 text-rz-red"
+                }`}
+                aria-hidden
+              >
+                {rowIncome
+                  ? renderShopIncomeIcon(e.category, 18)
+                  : renderShopExpenseIcon(e.category, 18)}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm text-slate-700">{t}</p>

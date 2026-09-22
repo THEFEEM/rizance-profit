@@ -51,17 +51,9 @@ export const PERSONAL_INCOME_LABELS: Record<PersonalIncomeKey, string> = {
   savings_withdrawal: "ถอนเงินออม",
 };
 
-export const PERSONAL_INCOME_ICONS: Record<PersonalIncomeKey, string> = {
-  salary: "💰",
-  business: "💼",
-  freelance: "💻",
-  scholarship: "🎓",
-  family: "👨‍👩‍👧",
-  bonus: "🎁",
-  loan_return: "💸",
-  other_income: "···",
-  savings_withdrawal: "🏦",
-};
+// NOTE: icon ของหมวดส่วนตัวอยู่ที่ lib/category-lucide-icons.tsx เท่านั้น (Lucide)
+//    ไฟล์นี้เก็บแค่ key + label · ห้ามเพิ่ม emoji map กลับมา — เคยมีสองแหล่งแล้ว
+//    ChatEntryCard หยิบ emoji ไปแสดงในขณะที่ฟอร์มหลักเป็น Lucide
 
 export const PERSONAL_EXPENSE_LABELS: Record<PersonalExpenseKey, string> = {
   food: "อาหาร",
@@ -81,50 +73,12 @@ export const PERSONAL_EXPENSE_LABELS: Record<PersonalExpenseKey, string> = {
   savings_deposit: "ออมเงิน",
 };
 
-export const PERSONAL_EXPENSE_ICONS: Record<PersonalExpenseKey, string> = {
-  food: "🍔",
-  transport: "🚌",
-  education: "📚",
-  rent: "🏠",
-  water: "💧",
-  electricity: "⚡",
-  internet: "📱",
-  phone: "📞",
-  health: "🏥",
-  clothing: "👕",
-  donation: "🤝",
-  installment: "💳",
-  social: "👥",
-  other_expense: "···",
-  savings_deposit: "🏦",
-};
-
-export const PERSONAL_INCOME_GRID_OPTIONS = PERSONAL_INCOME_KEYS.map((key) => ({
-  value: key,
-  label: PERSONAL_INCOME_LABELS[key],
-  icon: PERSONAL_INCOME_ICONS[key],
-}));
-
-export const PERSONAL_EXPENSE_GRID_OPTIONS = PERSONAL_EXPENSE_KEYS.map((key) => ({
-  value: key,
-  label: PERSONAL_EXPENSE_LABELS[key],
-  icon: PERSONAL_EXPENSE_ICONS[key],
-}));
-
 export function personalIncomeLabel(key: string): string {
   return PERSONAL_INCOME_LABELS[key as PersonalIncomeKey] ?? key;
 }
 
 export function personalExpenseLabel(key: string): string {
   return PERSONAL_EXPENSE_LABELS[key as PersonalExpenseKey] ?? key;
-}
-
-export function personalIncomeIcon(key: string): string {
-  return PERSONAL_INCOME_ICONS[key as PersonalIncomeKey] ?? "💰";
-}
-
-export function personalExpenseIcon(key: string): string {
-  return PERSONAL_EXPENSE_ICONS[key as PersonalExpenseKey] ?? "📦";
 }
 
 export function isPersonalIncomeKey(key: string): key is PersonalIncomeKey {

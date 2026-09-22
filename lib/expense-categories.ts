@@ -29,44 +29,41 @@ export type ExpenseCategoryKey = (typeof EXPENSE_CATEGORY_KEYS)[number];
 
 export type ExpenseCostType = "fixed" | "variable";
 
+/**
+ * NOTE: ไฟล์นี้เก็บ **ข้อมูล** เท่านั้น (key · label · fixed/variable)
+ * การแสดงผล icon ทั้งหมดอยู่ที่ lib/category-lucide-icons.tsx (Lucide, monochrome)
+ * ห้ามเพิ่ม emoji / icon string กลับมาที่นี่ — เคยมีสองแหล่งแล้วทำให้หน้าแชท
+ * โหมดส่วนตัวหยิบ emoji ไปแสดงในขณะที่ฟอร์มอื่นเป็น Lucide
+ */
 export type IncomeCategoryDef = {
   key: IncomeCategoryKey;
   label: string;
-  icon: string;
 };
 
 export type ExpenseCategoryDef = {
   key: ExpenseCategoryKey;
   label: string;
-  icon: string;
   type: ExpenseCostType;
 };
 
 export const INCOME_CATEGORIES: IncomeCategoryDef[] = [
-  { key: "storefront", label: "ขายหน้าร้าน", icon: "🏪" },
-  { key: "online", label: "ขายออนไลน์", icon: "🛒" },
-  { key: "delivery", label: "เดลิเวอรี", icon: "🛵" },
-  { key: "service", label: "บริการ", icon: "🧰" },
-  { key: "misc", label: "อื่นๆ", icon: "⋯" },
-  { key: "other_income", label: "รายได้อื่น", icon: "💡" },
+  { key: "storefront", label: "ขายหน้าร้าน" },
+  { key: "online", label: "ขายออนไลน์" },
+  { key: "delivery", label: "เดลิเวอรี" },
+  { key: "service", label: "บริการ" },
+  { key: "misc", label: "อื่นๆ" },
+  { key: "other_income", label: "รายได้อื่น" },
 ];
 
-/** CategoryGrid options — labels/icons from INCOME_CATEGORIES only. */
-export const INCOME_CATEGORY_GRID_OPTIONS = INCOME_CATEGORIES.map((c) => ({
-  value: c.key,
-  label: c.label,
-  icon: c.icon,
-}));
-
 export const EXPENSE_CATEGORIES: ExpenseCategoryDef[] = [
-  { key: "rent", label: "ค่าเช่า", icon: "🏢", type: "fixed" },
-  { key: "wage", label: "ค่าแรง", icon: "👥", type: "fixed" },
-  { key: "equipment", label: "อุปกรณ์", icon: "🔧", type: "fixed" },
-  { key: "materials", label: "วัตถุดิบ", icon: "📦", type: "variable" },
-  { key: "utilities", label: "สาธารณูปโภค", icon: "⚡", type: "variable" },
-  { key: "shipping", label: "ขนส่ง", icon: "🚚", type: "variable" },
-  { key: "marketing", label: "การตลาด", icon: "📣", type: "variable" },
-  { key: "expense_misc", label: "อื่นๆ", icon: "⋯", type: "variable" },
+  { key: "rent", label: "ค่าเช่า", type: "fixed" },
+  { key: "wage", label: "ค่าแรง", type: "fixed" },
+  { key: "equipment", label: "อุปกรณ์", type: "fixed" },
+  { key: "materials", label: "วัตถุดิบ", type: "variable" },
+  { key: "utilities", label: "สาธารณูปโภค", type: "variable" },
+  { key: "shipping", label: "ขนส่ง", type: "variable" },
+  { key: "marketing", label: "การตลาด", type: "variable" },
+  { key: "expense_misc", label: "อื่นๆ", type: "variable" },
 ];
 
 /** Display-only fixed/variable badge text under expense category chips. */
@@ -74,14 +71,6 @@ export const EXPENSE_COST_TYPE_LABELS: Record<ExpenseCostType, string> = {
   fixed: "คงที่",
   variable: "ผันแปร",
 };
-
-/** CategoryGrid options — labels/icons/badges from EXPENSE_CATEGORIES only. */
-export const EXPENSE_CATEGORY_GRID_OPTIONS = EXPENSE_CATEGORIES.map((c) => ({
-  value: c.key,
-  label: c.label,
-  icon: c.icon,
-  badge: EXPENSE_COST_TYPE_LABELS[c.type],
-}));
 
 /** Round 1 forms still expose legacy picker values until Round 3 UI. */
 export const LEGACY_INCOME_FORM_KEYS = ["storefront", "delivery", "other"] as const;
@@ -96,14 +85,6 @@ export const LEGACY_EXPENSE_FORM_KEYS = [
   "other",
 ] as const;
 export type LegacyExpenseFormKey = (typeof LEGACY_EXPENSE_FORM_KEYS)[number];
-
-const INCOME_ICON_BY_KEY = Object.fromEntries(
-  INCOME_CATEGORIES.map((c) => [c.key, c.icon]),
-) as Record<IncomeCategoryKey, string>;
-
-const EXPENSE_ICON_BY_KEY = Object.fromEntries(
-  EXPENSE_CATEGORIES.map((c) => [c.key, c.icon]),
-) as Record<ExpenseCategoryKey, string>;
 
 const INCOME_LABEL_BY_KEY = Object.fromEntries(
   INCOME_CATEGORIES.map((c) => [c.key, c.label]),
@@ -180,22 +161,6 @@ export function expenseCategoryLabel(key: string): string {
   return key;
 }
 
-export function incomeCategoryIcon(key: string): string {
-  if (isIncomeCategoryKey(key)) return INCOME_ICON_BY_KEY[key];
-  if ((LEGACY_INCOME_FORM_KEYS as readonly string[]).includes(key)) {
-    return INCOME_ICON_BY_KEY[LEGACY_INCOME_TO_CANONICAL[key as LegacyIncomeFormKey]];
-  }
-  return "•";
-}
-
-export function expenseCategoryIcon(key: string): string {
-  if (isExpenseCategoryKey(key)) return EXPENSE_ICON_BY_KEY[key];
-  if ((LEGACY_EXPENSE_FORM_KEYS as readonly string[]).includes(key)) {
-    return EXPENSE_ICON_BY_KEY[LEGACY_EXPENSE_TO_CANONICAL[key as LegacyExpenseFormKey]];
-  }
-  return "•";
-}
-
 /** Canonical sort index for display lists (unknown keys sort last). */
 export function incomeCategoryOrder(key: string): number {
   const canonical = normalizeIncomeCategory(key);
@@ -243,18 +208,18 @@ export function boothCategoryFromCostType(
 
 /** Form pickers — legacy subset (Round 3 expands to full list). */
 export const INCOME_CATEGORY_OPTIONS = [
-  { value: "storefront" as const, label: "ขายหน้าร้าน", icon: "🏪" },
-  { value: "delivery" as const, label: "เดลิเวอรี", icon: "🛵" },
-  { value: "other" as const, label: "อื่นๆ", icon: "⋯" },
+  { value: "storefront" as const, label: "ขายหน้าร้าน" },
+  { value: "delivery" as const, label: "เดลิเวอรี" },
+  { value: "other" as const, label: "อื่นๆ" },
 ];
 
 export const EXPENSE_CATEGORY_OPTIONS = [
-  { value: "supplies" as const, label: "วัตถุดิบ", icon: "📦" },
-  { value: "rent" as const, label: "ค่าเช่า", icon: "🏢" },
-  { value: "salary" as const, label: "ค่าแรง", icon: "👥" },
-  { value: "utilities" as const, label: "สาธารณูปโภค", icon: "⚡" },
-  { value: "equipment" as const, label: "อุปกรณ์", icon: "🔧" },
-  { value: "other" as const, label: "อื่นๆ", icon: "⋯" },
+  { value: "supplies" as const, label: "วัตถุดิบ" },
+  { value: "rent" as const, label: "ค่าเช่า" },
+  { value: "salary" as const, label: "ค่าแรง" },
+  { value: "utilities" as const, label: "สาธารณูปโภค" },
+  { value: "equipment" as const, label: "อุปกรณ์" },
+  { value: "other" as const, label: "อื่นๆ" },
 ];
 
 export const PAYMENT_METHODS = ["cash", "transfer"] as const;

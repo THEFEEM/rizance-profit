@@ -11,12 +11,12 @@ import {
   type ExpenseCategoryKey,
   type IncomeCategoryKey,
 } from "@/types";
+// icon ต้องมาจากแหล่ง Lucide เดียวกับฟอร์มหลัก (เดิมหยิบ emoji จาก personal-categories)
 import {
   PERSONAL_EXPENSE_GRID_OPTIONS,
   PERSONAL_INCOME_GRID_OPTIONS,
-  type PersonalExpenseKey,
-  type PersonalIncomeKey,
-} from "@/lib/personal-categories";
+} from "@/lib/category-lucide-icons";
+import type { PersonalExpenseKey, PersonalIncomeKey } from "@/lib/personal-categories";
 
 export function ChatEntryCard({
   card,

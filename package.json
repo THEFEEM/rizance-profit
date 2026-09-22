@@ -47,6 +47,7 @@
     "test:twa-foundation": "npx tsx scripts/test-twa-foundation.ts",
     "test:app-entry": "npx tsx scripts/test-app-entry.ts",
     "test:session-cookie": "npx tsx scripts/test-session-cookie.ts",
+    "test:category-icons": "npx tsx scripts/test-category-icons.ts",
     "verify:migrations-0036-0037": "node scripts/verify-migrations-0036-0037.mjs"
   },
   "dependencies": {

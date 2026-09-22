@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import {
+  ArrowLeftRight,
+  Ban,
   Bike,
   Briefcase,
-  Building,
+  Building2,
   Car,
   Coins,
   CreditCard,
@@ -20,6 +22,7 @@ import {
   PartyPopper,
   PiggyBank,
   Shirt,
+  ShoppingCart,
   Smartphone,
   Store,
   Truck,
@@ -71,7 +74,7 @@ const PERSONAL_EXPENSE_LUCIDE: Record<PersonalExpenseKey, LucideIcon> = {
   food: Utensils,
   transport: Car,
   education: GraduationCap,
-  rent: Building,
+  rent: Building2,
   water: Droplet,
   electricity: Zap,
   internet: Wifi,
@@ -87,7 +90,7 @@ const PERSONAL_EXPENSE_LUCIDE: Record<PersonalExpenseKey, LucideIcon> = {
 
 const SHOP_INCOME_LUCIDE: Record<IncomeCategoryKey, LucideIcon> = {
   storefront: Store,
-  online: Package,
+  online: ShoppingCart, // ไม่ใช้ Package — ซ้ำกับ materials ฝั่งจ่าย
   delivery: Bike,
   service: Wrench,
   other_income: Lightbulb,
@@ -95,7 +98,7 @@ const SHOP_INCOME_LUCIDE: Record<IncomeCategoryKey, LucideIcon> = {
 };
 
 const SHOP_EXPENSE_LUCIDE: Record<ExpenseCategoryKey, LucideIcon> = {
-  rent: Store,
+  rent: Building2, // ไม่ใช้ Store — ซ้ำกับ storefront ฝั่งรับ
   wage: Users,
   equipment: Wrench,
   materials: Package,
@@ -123,6 +126,19 @@ export function renderShopIncomeIcon(key: string, size = 20, className = ""): Re
 export function renderShopExpenseIcon(key: string, size = 20, className = ""): ReactNode {
   const Icon = SHOP_EXPENSE_LUCIDE[key as ExpenseCategoryKey] ?? Ellipsis;
   return renderIcon(Icon, size, className);
+}
+
+/**
+ * icon ของ "ชนิดรายการ" ที่ไม่ใช่หมวด — ใช้ในแถวประวัติ
+ *   voided   → Ban            (บิลถูกยกเลิก)
+ *   transfer → ArrowLeftRight (โอนระหว่างกระเป๋า/บัญชี)
+ */
+export function renderEntryKindIcon(
+  kind: "voided" | "transfer",
+  size = 20,
+  className = "",
+): ReactNode {
+  return renderIcon(kind === "voided" ? Ban : ArrowLeftRight, size, className);
 }
 
 export function renderCategoryIcon(

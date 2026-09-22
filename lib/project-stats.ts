@@ -3,35 +3,8 @@ import { toCents } from "@/lib/money";
 import type { CategoryProgressRow } from "@/components/stats/CategoryProgressList";
 import type { CategoryBreakdownEntry } from "@/components/stats/CategoryBreakdownPanel";
 import type { ActivitySummary, FundBalance, ProjectExpense } from "@/types/project";
-
-const FUNDING_EMOJI: Record<string, string> = {
-  faculty_grant: "🏦",
-  membership: "👥",
-  participant_fee: "🎫",
-  sponsor: "🤝",
-  donation: "💝",
-  activity_income: "🏪",
-  other_income: "✏️",
-};
-
-const EXPENSE_EMOJI: Record<string, string> = {
-  venue: "🏗",
-  food: "🍔",
-  transport: "🚌",
-  materials: "🔧",
-  printing: "📄",
-  reward: "🏆",
-  service: "👷",
-  other_expense: "📦",
-};
-
-export function projectFundingEmoji(key: string): string {
-  return FUNDING_EMOJI[key] ?? "💰";
-}
-
-export function projectExpenseEmoji(key: string): string {
-  return EXPENSE_EMOJI[key] ?? "📦";
-}
+// icon ของหมวด Project อยู่ที่ lib/project-category-icons.tsx (ProjectIconBox) — ไม่ใช้ emoji แล้ว
+import { renderProjectExpenseIcon } from "@/lib/project-category-icons";
 
 export function sharePercent(part: string, total: string): number {
   const totalCents = toCents(total);
@@ -60,7 +33,7 @@ export function buildOrgExpenseCategoryRows(
       return {
         category,
         label: projectExpenseLabel(category),
-        icon: projectExpenseEmoji(category),
+        icon: renderProjectExpenseIcon(category, 28),
         amount,
         count,
         percentage: sharePercent(amount, totalSpent),

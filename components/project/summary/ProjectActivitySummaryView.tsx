@@ -2,8 +2,8 @@ import {
   buildFundProgressItems,
   buildOrgExpenseCategoryRows,
   groupProjectExpensesByCategory,
-  projectFundingEmoji,
 } from "@/lib/project-stats";
+import { renderProjectFundingIcon } from "@/lib/project-category-icons";
 import { formatDayShort, formatWeekdayShortThai } from "@/lib/date";
 import { formatMoney } from "@/lib/money";
 import type { DailyExpensePoint } from "@/types";
@@ -113,7 +113,7 @@ export function ProjectActivitySummaryView({
               {fundRows.map((f) => (
                 <ProgressBarRow
                   key={f.sourceKey}
-                  icon={projectFundingEmoji(f.sourceKey)}
+                  icon={renderProjectFundingIcon(f.sourceKey)}
                   label={f.sourceLabel}
                   amount={`${formatMoney(f.totalSpent, currency)} / ${formatMoney(f.totalReceived, currency)}`}
                   percentage={f.percentage}

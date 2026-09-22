@@ -25,7 +25,8 @@ export function ProgressBarRow({
   currency = "THB",
   tone = "green",
 }: {
-  icon?: string;
+  /** ReactNode (Lucide / ProjectIconBox) — ไม่รับ emoji string อีกต่อไป */
+  icon?: ReactNode;
   label: string;
   amount: string;
   percentage: number;
@@ -47,7 +48,7 @@ export function ProgressBarRow({
   return (
     <div className="flex items-center gap-3 px-4 py-3.5">
       {icon && (
-        <span className="text-xl leading-none" aria-hidden>
+        <span className="flex shrink-0 items-center justify-center leading-none" aria-hidden>
           {icon}
         </span>
       )}

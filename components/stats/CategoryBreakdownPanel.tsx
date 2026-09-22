@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { formatMoney } from "@/lib/money";
 import { formatDateLabel } from "@/lib/date";
 
 export type CategoryBreakdownRow = {
   category: string;
   label: string;
-  icon: string;
+  /** Lucide/ReactNode — ไม่ใช่ emoji string แล้ว (ให้ตรงกับ CategoryProgressRow) */
+  icon: ReactNode;
   amount: string;
   count: number;
 };
@@ -90,7 +92,7 @@ function CategorySection({
                   className="tap-target flex w-full items-center gap-3 px-4 py-3.5 text-left active:bg-rz-elevated"
                   aria-expanded={expanded}
                 >
-                  <span className="text-xl leading-none" aria-hidden>
+                  <span className="flex shrink-0 items-center justify-center text-rz-muted" aria-hidden>
                     {row.icon}
                   </span>
                   <span className="min-w-0 flex-1 text-sm font-medium text-rz-text">
