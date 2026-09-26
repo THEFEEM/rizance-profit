@@ -3,6 +3,7 @@ import { getUserId } from "@/lib/session";
 import { fieldErrorsFrom } from "@/lib/validation";
 import { savingsGoalPatchSchema } from "@/lib/personal-validation";
 import { updateSavingsGoal } from "@/lib/personal-queries";
+import { personalApiGuard } from "@/lib/mode-access";
 
 export async function PATCH(
   req: NextRequest,
@@ -10,6 +11,8 @@ export async function PATCH(
 ) {
   const userId = await getUserId(req);
   if (!userId) return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
+  const retired = await personalApiGuard(userId);
+  if (retired) return retired;
 
   const { id } = await params;
 

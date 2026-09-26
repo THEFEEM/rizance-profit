@@ -20,6 +20,7 @@ import type {
   Plan,
   TrustItem,
 } from "./types";
+import { SHOW_ORG_MODE, SHOW_PERSONAL_MODE } from "@/lib/feature-flags";
 
 export const EXAMPLES: ChatExample[] = [
   { user: "ขายกาแฟ 3 แก้ว 150 บาท", kind: "รายรับ", cat: "เครื่องดื่ม", amount: "+฿150", sign: "pos" },
@@ -27,7 +28,12 @@ export const EXAMPLES: ChatExample[] = [
   { user: "ค่าเช่าที่บูธวันนี้ 300", kind: "รายจ่าย", cat: "ค่าเช่า", amount: "-฿300", sign: "neg" },
 ];
 
-export const MODES: ModeItem[] = [
+/**
+ * 4.3C: หน้าสาธารณะขายเฉพาะ Shop + Booth · personal/org เก็บข้อมูลไว้ (soft retirement)
+ * แสดงเฉพาะเมื่อเปิด flag — ใช้ flag เดียวกับในแอป
+ * ⚠️ flag ไม่ใช่ NEXT_PUBLIC_ → ถ้าเปิดวันหน้า client จะเห็น false (hydration ไม่ตรง) ต้องย้าย MODES ไปคำนวณฝั่ง server ก่อน
+ */
+const ALL_MODES: ModeItem[] = [
   {
     key: "personal",
     label: "ส่วนตัว",
@@ -58,11 +64,17 @@ export const MODES: ModeItem[] = [
   },
 ];
 
+export const MODES: ModeItem[] = ALL_MODES.filter((m) => {
+  if (m.key === "personal") return SHOW_PERSONAL_MODE;
+  if (m.key === "org") return SHOW_ORG_MODE;
+  return true;
+});
+
 export const CAPS: Capability[] = [
   { icon: MessageCircle, title: "คุยแล้วจดให้", desc: "พิมพ์เป็นประโยคธรรมดา Rizq เข้าใจและบันทึกให้ทันที" },
   { icon: ScanLine, title: "ถ่ายใบเสร็จ แยกรายการเอง", desc: "ส่งรูปสลิปหรือใบเสร็จ ระบบแยกทุกบรรทัดให้อัตโนมัติ" },
   { icon: PieChart, title: "ถามกำไรได้ทุกเมื่อ", desc: "พิมพ์ถาม Rizq สรุปตัวเลขให้ทันที ไม่ต้องเปิดตารางเอง" },
-  { icon: Sparkles, title: "แยกบัญชีทุกโหมด", desc: "ส่วนตัว ร้านค้า บูธ องค์กร ข้อมูลแต่ละที่ไม่ปนกัน" },
+  { icon: Sparkles, title: "แยกบัญชีร้านกับบูธ", desc: "ร้านค้าและบูธแต่ละงาน ข้อมูลแยกจากกัน ไม่ปนกัน" },
 ];
 
 export const TRUST: TrustItem[] = [
@@ -81,7 +93,8 @@ export const CHART_DATA: ChartPoint[] = [
   { d: "อา", v: 74 },
 ];
 
-export const PLANS: Plan[] = [
+// 4.3C: Personal Plus ไม่ถูกทำการตลาดเมื่อโหมดส่วนตัวปิด · plan id `personal_plus` ใน Stripe/webhook/ผู้สมัครเดิม **ไม่แตะ**
+const ALL_PLANS: Plan[] = [
   {
     key: "free",
     name: "ฟรี",
@@ -119,6 +132,8 @@ export const PLANS: Plan[] = [
     items: ["ไม่จำกัดร้าน", "รายงานเชิงลึก", "รองรับทีมงาน"],
   },
 ];
+
+export const PLANS: Plan[] = ALL_PLANS.filter((p) => p.key !== "personal_plus" || SHOW_PERSONAL_MODE);
 
 export const FAQS: FaqEntry[] = [
   { q: "ต้องผูกบัตรก่อนใช้งานไหม", a: "ไม่ต้องครับ แพ็กเกจฟรีใช้ได้ทันทีโดยไม่ต้องกรอกข้อมูลบัตร อัพเกรดเมื่อพร้อมจ่ายจริงเท่านั้น" },

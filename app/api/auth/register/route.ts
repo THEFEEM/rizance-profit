@@ -5,6 +5,7 @@ import { createUser, findUserByEmail } from "@/lib/queries";
 import { hashPassword, signSession, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth";
 import { requestHostname } from "@/lib/jwt";
 import { CONTEXT_COOKIE, contextCookieOptions } from "@/lib/context";
+import { normalizeRegisterMode } from "@/lib/register-mode";
 
 export async function POST(req: NextRequest) {
   const limited = checkAuthRateLimit(req, "register");
@@ -49,12 +50,16 @@ export async function POST(req: NextRequest) {
   const passwordHash = await hashPassword(password);
   const user = await createUser({ email, passwordHash, shopName });
 
+  // 4.3C: ไม่เชื่อ mode จาก client — โหมดที่ปลดระวางถูก normalize เป็น Shop ฝั่ง server
+  // (ผู้ใช้ใหม่ไม่มีข้อมูลเดิม จึงไม่มีทาง grandfathered · schema default ยังเป็น "personal" → ตกมาที่นี่เช่นกัน)
+  const effectiveMode = normalizeRegisterMode(mode);
+
   let contextValue = "regular";
   let redirect = "/home";
-  if (mode === "personal") {
+  if (effectiveMode === "personal") {
     contextValue = "personal";
     redirect = "/home";
-  } else if (mode === "org") {
+  } else if (effectiveMode === "org") {
     contextValue = "regular";
     redirect = "/projects/new";
   }

@@ -3,6 +3,7 @@ import { createActivity, getProject } from "@/lib/project-queries";
 import { createProjectActivitySchema } from "@/lib/project-validation";
 import { getUserId } from "@/lib/session";
 import { fieldErrorsFrom } from "@/lib/validation";
+import { orgApiGuard } from "@/lib/mode-access";
 
 export async function POST(
   req: NextRequest,
@@ -10,6 +11,8 @@ export async function POST(
 ) {
   const userId = await getUserId(req);
   if (!userId) return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
+  const retired = await orgApiGuard(userId);
+  if (retired) return retired;
 
   const { id: projectId } = await params;
 

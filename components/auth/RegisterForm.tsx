@@ -7,7 +7,11 @@ import { AuthButton } from "@/components/auth/AuthButton";
 import { AuthDivider } from "@/components/auth/AuthDivider";
 import { AuthField } from "@/components/auth/AuthField";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
-import { RegisterModeTiles, defaultRegisterMode } from "@/components/auth/RegisterModeTiles";
+import {
+  RegisterModeTiles,
+  defaultRegisterMode,
+  visibleRegisterTiles,
+} from "@/components/auth/RegisterModeTiles";
 import {
   EyeIcon,
   EyeOffIcon,
@@ -95,7 +99,10 @@ export function RegisterForm({
         </>
       )}
 
-      <p className="mb-2.5 text-sm font-medium text-rz-text">เลือกโหมดการใช้งาน</p>
+      {/* 4.3C: หัวข้อโชว์เฉพาะเมื่อมีโหมดให้เลือกมากกว่าหนึ่ง (flag เปิด) */}
+      {visibleRegisterTiles().length > 1 && (
+        <p className="mb-2.5 text-sm font-medium text-rz-text">เลือกโหมดการใช้งาน</p>
+      )}
       <RegisterModeTiles value={mode} onChange={setMode} />
 
       <div className="mt-5 flex flex-col gap-3.5">

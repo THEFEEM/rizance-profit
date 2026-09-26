@@ -20,7 +20,10 @@ export async function PricingPreview() {
             <p className={`${sectionSub} mx-auto`}>ไม่มีค่าใช้จ่ายแอบแฝง ยกเลิกเมื่อไหร่ก็ได้</p>
           </div>
         </Reveal>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* 4.3C: Personal Plus ซ่อนเมื่อโหมดส่วนตัวปิด → เหลือ 3 แพ็กเกจ ไม่ให้มีช่องว่างคอลัมน์ที่ 4 */}
+        <div
+          className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${PLANS.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-4"}`}
+        >
           {PLANS.map((p, i) => (
             <Reveal key={p.name} delay={i * 70}>
               <div

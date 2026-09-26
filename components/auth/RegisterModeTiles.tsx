@@ -36,13 +36,20 @@ const TILES: {
   },
 ];
 
-function visibleTiles() {
+/**
+ * 4.3C: สมัครใหม่ = ร้านค้า · บูธสร้างทีหลังในแอป (สมัครแบบ booth เดิมก็ลงเป็น regular อยู่แล้ว)
+ * personal/org กลับมาได้ถ้าเปิด flag
+ */
+export function visibleRegisterTiles() {
   return TILES.filter((tile) => {
     if (tile.mode === "personal" && !SHOW_PERSONAL_MODE) return false;
     if (tile.mode === "org" && !SHOW_ORG_MODE) return false;
+    if (tile.mode === "booth") return false;
     return true;
   });
 }
+
+const visibleTiles = visibleRegisterTiles;
 
 export function defaultRegisterMode(): RegisterMode {
   const tiles = visibleTiles();
@@ -57,6 +64,8 @@ export function RegisterModeTiles({
   onChange: (mode: RegisterMode) => void;
 }) {
   const tiles = visibleTiles();
+  // เหลือตัวเลือกเดียว (ร้านค้า) → ไม่ต้องให้เลือก
+  if (tiles.length <= 1) return null;
 
   return (
     <div

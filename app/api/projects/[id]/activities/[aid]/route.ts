@@ -3,6 +3,7 @@ import { getProjectActivity, updateActivity } from "@/lib/project-queries";
 import { projectActivityPatchSchema } from "@/lib/project-validation";
 import { getUserId } from "@/lib/session";
 import { fieldErrorsFrom } from "@/lib/validation";
+import { orgApiGuard } from "@/lib/mode-access";
 
 export async function PATCH(
   req: NextRequest,
@@ -10,6 +11,8 @@ export async function PATCH(
 ) {
   const userId = await getUserId(req);
   if (!userId) return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
+  const retired = await orgApiGuard(userId);
+  if (retired) return retired;
 
   const { id: projectId, aid: activityId } = await params;
 

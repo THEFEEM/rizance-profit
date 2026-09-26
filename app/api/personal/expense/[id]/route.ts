@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserId } from "@/lib/session";
 import { deletePersonalExpense } from "@/lib/personal-queries";
+import { personalApiGuard } from "@/lib/mode-access";
 
 export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const userId = await getUserId(req);
   if (!userId) return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
+  const retired = await personalApiGuard(userId);
+  if (retired) return retired;
 
   const { id } = await ctx.params;
   const removed = await deletePersonalExpense(userId, id);

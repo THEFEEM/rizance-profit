@@ -9,6 +9,7 @@ import {
 import { pool } from "@/lib/db";
 import { fieldErrorsFrom } from "@/lib/validation";
 import { getCurrentUser } from "@/lib/session";
+import { SHOW_ORG_MODE } from "@/lib/feature-flags";
 import type { PoolClient } from "pg";
 
 /** Placeholder shop name after shop reset — user renames on /shop/new. */
@@ -153,7 +154,9 @@ export async function POST(req: NextRequest) {
       case "org":
         if (ctx.mode !== "project") throw new Error("unreachable");
         await clearOrg(client, user.id, ctx.projectId);
-        redirect = "/projects/new";
+        // 4.3C: ล้างองค์กรสุดท้ายแล้วอาจหมดสิทธิ์ grandfathered → /projects/new จะเด้งกลับ /home
+        // จึงส่งไป /projects/new เฉพาะเมื่อโหมดองค์กรเปิดให้บริการ · การลบข้อมูลไม่เปลี่ยน
+        redirect = SHOW_ORG_MODE ? "/projects/new" : "/home";
         break;
     }
 

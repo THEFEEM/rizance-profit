@@ -6,12 +6,15 @@ import {
   tokenQuotaExceededResponse,
 } from "@/lib/subscription-user";
 import { getCurrentUser } from "@/lib/session";
+import { personalApiGuard } from "@/lib/mode-access";
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
   }
+  const retired = await personalApiGuard(user.id);
+  if (retired) return retired;
 
   let body: unknown;
   try {

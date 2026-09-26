@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { summarizeProject } from "@/lib/project-summary";
 import { getUserId } from "@/lib/session";
+import { orgApiGuard } from "@/lib/mode-access";
 
 export async function GET(
   req: NextRequest,
@@ -8,6 +9,8 @@ export async function GET(
 ) {
   const userId = await getUserId(req);
   if (!userId) return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
+  const retired = await orgApiGuard(userId);
+  if (retired) return retired;
 
   const { id } = await params;
   const data = await summarizeProject(userId, id);

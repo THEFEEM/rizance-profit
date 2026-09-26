@@ -23,6 +23,7 @@ import {
   tokenQuotaExceededResponse,
 } from "@/lib/subscription-user";
 import { getCurrentUser } from "@/lib/session";
+import { personalApiGuard } from "@/lib/mode-access";
 
 async function replyAssistant(
   userId: string,
@@ -119,6 +120,8 @@ export async function POST(req: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
   }
+  const retired = await personalApiGuard(user.id);
+  if (retired) return retired;
 
   let body: unknown;
   try {
@@ -202,6 +205,8 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
   }
+  const retired = await personalApiGuard(user.id);
+  if (retired) return retired;
 
   const messages = await getPersonalChatMessages(user.id);
   return NextResponse.json({ data: { messages } satisfies { messages: PersonalChatMessageRow[] } });

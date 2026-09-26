@@ -3,6 +3,7 @@ import { createProjectMember, getProject, listProjectMembers } from "@/lib/proje
 import { projectMemberSchema } from "@/lib/project-validation";
 import { getUserId } from "@/lib/session";
 import { fieldErrorsFrom } from "@/lib/validation";
+import { orgApiGuard } from "@/lib/mode-access";
 
 export async function GET(
   req: NextRequest,
@@ -10,6 +11,8 @@ export async function GET(
 ) {
   const userId = await getUserId(req);
   if (!userId) return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
+  const retired = await orgApiGuard(userId);
+  if (retired) return retired;
 
   const { id } = await params;
   const project = await getProject(userId, id);
@@ -25,6 +28,8 @@ export async function POST(
 ) {
   const userId = await getUserId(req);
   if (!userId) return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
+  const retired = await orgApiGuard(userId);
+  if (retired) return retired;
 
   const { id } = await params;
 

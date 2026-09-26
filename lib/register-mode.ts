@@ -1,7 +1,19 @@
 import type { z } from "zod";
 import type { registerModeSchema } from "@/lib/validation";
+import { SHOW_ORG_MODE, SHOW_PERSONAL_MODE } from "@/lib/feature-flags";
 
 export type RegisterMode = z.infer<typeof registerModeSchema>;
+
+/**
+ * 4.3C: mode ที่ใช้จริงตอนสมัคร — โหมดที่ปลดระวาง (personal/org) กลายเป็น Shop เมื่อ flag ปิด
+ * booth ก็เป็น Shop ตอนสมัคร (บูธสร้างทีหลังในแอป — พฤติกรรมเดิมของ route ก็เป็น regular อยู่แล้ว)
+ */
+export function normalizeRegisterMode(mode: RegisterMode): RegisterMode {
+  if (mode === "personal" && !SHOW_PERSONAL_MODE) return "regular";
+  if (mode === "org" && !SHOW_ORG_MODE) return "regular";
+  if (mode === "booth") return "regular";
+  return mode;
+}
 
 export function registerNameField(mode: RegisterMode): { label: string; placeholder: string } {
   if (mode === "personal") {

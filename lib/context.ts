@@ -3,6 +3,7 @@ import { useSecureCookies } from "@/lib/env";
 import { defaultBoothEntryDate } from "@/lib/date";
 import { getBooth } from "@/lib/booth-queries";
 import { getProject } from "@/lib/project-queries";
+import { canUsePersonalMode } from "@/lib/mode-access";
 import type { Booth } from "@/types/booth";
 import type { Project } from "@/types/project";
 import type { AppContext } from "@/types/context";
@@ -93,6 +94,9 @@ export async function resolveTodayContext(
   }
 
   if (parsed.type === "personal") {
+    // 4.3C: cookie personal ค้าง (เช่นผู้ใช้ Google ใหม่ หรือ API เก่า) แต่ไม่มีสิทธิ์ → Shop
+    // ทุกหน้า/nav/API ที่อ่าน context ผ่านฟังก์ชันนี้จึงไม่ชี้ไป /personal/* อีก · ไม่ redirect ที่นี่ (กันลูป)
+    if (!(await canUsePersonalMode(userId))) return { mode: "regular" };
     return { mode: "personal" };
   }
 
@@ -126,7 +130,8 @@ export function shouldClearContextCookie(
   raw: string | undefined,
   resolved: ResolvedTodayContext,
 ): boolean {
-  if (!raw || raw === "regular" || raw === "personal") return false;
+  // 4.3C: เดิม "personal" ไม่เคยถูกล้าง · ตอนนี้ล้างเมื่อ resolve ไม่ได้เป็น personal (ไม่มีสิทธิ์แล้ว)
+  if (!raw || raw === "regular") return false;
   const parsed = parseContextCookie(raw);
   if (parsed.type === "invalid") return true;
   if (parsed.type === "personal" && resolved.mode !== "personal") return true;

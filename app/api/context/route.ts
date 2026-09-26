@@ -12,6 +12,7 @@ import {
 } from "@/lib/context";
 import { getBooth } from "@/lib/booth-queries";
 import { getProject } from "@/lib/project-queries";
+import { orgApiGuard, personalApiGuard } from "@/lib/mode-access";
 
 function contextResponse(
   resolved: Awaited<ReturnType<typeof resolveTodayContext>>,
@@ -74,12 +75,18 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (parsed.data.mode === "personal") {
+    // 4.3C: โหมดปลดระวาง — ผู้ใช้ที่ไม่มีสิทธิ์ (ไม่ใช่ grandfathered) สลับเข้าไม่ได้
+    const retired = await personalApiGuard(userId);
+    if (retired) return retired;
     const res = NextResponse.json({ data: { mode: "personal" as const } });
     res.cookies.set(CONTEXT_COOKIE, "personal", contextCookieOptions());
     return res;
   }
 
   if (parsed.data.mode === "project") {
+    // 4.3C: ตรวจสิทธิ์โหมดก่อน — 403 ชัดเจนแทน 404 project_not_found สำหรับผู้ใช้ใหม่
+    const retired = await orgApiGuard(userId);
+    if (retired) return retired;
     const project = await getProject(userId, parsed.data.projectId);
     if (!project) {
       return NextResponse.json(

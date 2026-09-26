@@ -3,10 +3,13 @@ import { getUserId } from "@/lib/session";
 import { fieldErrorsFrom } from "@/lib/validation";
 import { personalIncomeSchema } from "@/lib/personal-validation";
 import { createPersonalIncome } from "@/lib/personal-queries";
+import { personalApiGuard } from "@/lib/mode-access";
 
 export async function POST(req: NextRequest) {
   const userId = await getUserId(req);
   if (!userId) return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
+  const retired = await personalApiGuard(userId);
+  if (retired) return retired;
 
   let body: unknown;
   try {

@@ -8,6 +8,7 @@ import {
   getPersonalChatMessage,
 } from "@/lib/personal-chat-queries";
 import { getCurrentUser } from "@/lib/session";
+import { personalApiGuard } from "@/lib/mode-access";
 
 export async function POST(
   _req: NextRequest,
@@ -17,6 +18,8 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
   }
+  const retired = await personalApiGuard(user.id);
+  if (retired) return retired;
 
   const { messageId } = await params;
   const msg = await getPersonalChatMessage(user.id, messageId);

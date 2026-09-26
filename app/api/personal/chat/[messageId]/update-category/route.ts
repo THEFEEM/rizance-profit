@@ -11,6 +11,7 @@ import {
   isPersonalIncomeKey,
 } from "@/lib/personal-categories";
 import { getCurrentUser } from "@/lib/session";
+import { personalApiGuard } from "@/lib/mode-access";
 
 export async function POST(
   req: NextRequest,
@@ -20,6 +21,8 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
   }
+  const retired = await personalApiGuard(user.id);
+  if (retired) return retired;
 
   const { messageId } = await params;
 

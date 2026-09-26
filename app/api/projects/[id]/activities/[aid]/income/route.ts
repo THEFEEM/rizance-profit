@@ -3,6 +3,7 @@ import { createProjectIncome, getProjectActivity, listProjectIncome } from "@/li
 import { projectIncomeSchema } from "@/lib/project-validation";
 import { getUserId } from "@/lib/session";
 import { fieldErrorsFrom } from "@/lib/validation";
+import { orgApiGuard } from "@/lib/mode-access";
 
 export async function GET(
   req: NextRequest,
@@ -10,6 +11,8 @@ export async function GET(
 ) {
   const userId = await getUserId(req);
   if (!userId) return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
+  const retired = await orgApiGuard(userId);
+  if (retired) return retired;
 
   const { id: projectId, aid: activityId } = await params;
   const activity = await getProjectActivity(userId, projectId, activityId);
@@ -27,6 +30,8 @@ export async function POST(
 ) {
   const userId = await getUserId(req);
   if (!userId) return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
+  const retired = await orgApiGuard(userId);
+  if (retired) return retired;
 
   const { id: projectId, aid: activityId } = await params;
 
