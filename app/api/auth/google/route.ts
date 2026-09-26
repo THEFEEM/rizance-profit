@@ -15,9 +15,14 @@ export async function GET(req: NextRequest) {
 
   try {
     const client = createGoogleOAuthClient();
-    // A-3.SEC: ไม่รับ returnTo จาก client — flow ล็อกอินไป /home เสมอ
-    // (สเปกสั่งว่าอย่าเพิ่ม returnTo แบบพลวัตถ้าไม่จำเป็น)
-    const oauth = await createOAuthState({ purpose: OAUTH_PURPOSE_LOGIN });
+    // AUTH-HOTFIX-1: รับ ?next= เป็น **path ภายในเท่านั้น** (createOAuthState ผ่าน safeReturnTo ให้)
+    // เก็บใน state cookie httpOnly ที่ลงลายเซ็น — ไม่ได้อยู่ใน `state` ที่ส่งไป Google
+    // ใช้พา POS handoff กลับมาที่ /api/pos/handoff หลังล็อกอิน · ค่าอื่น/ไม่ปลอดภัย → /home เหมือนเดิม
+    const next = req.nextUrl.searchParams.get("next");
+    const oauth = await createOAuthState({
+      purpose: OAUTH_PURPOSE_LOGIN,
+      ...(next ? { returnTo: next } : {}),
+    });
     const url = client.generateAuthUrl({
       access_type: "offline",
       scope: ["openid", "email", "profile"],

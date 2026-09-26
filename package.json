@@ -48,6 +48,8 @@
     "test:app-entry": "npx tsx scripts/test-app-entry.ts",
     "test:session-cookie": "npx tsx scripts/test-session-cookie.ts",
     "test:category-icons": "npx tsx scripts/test-category-icons.ts",
+    "test:pos-handoff": "npx tsx scripts/test-pos-handoff.ts",
+    "test:pos-handoff-db": "npx tsx scripts/test-pos-handoff-db.ts",
     "verify:migrations-0036-0037": "node scripts/verify-migrations-0036-0037.mjs"
   },
   "dependencies": {

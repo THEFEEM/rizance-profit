@@ -21,10 +21,18 @@ function GoogleIcon() {
   );
 }
 
-export function GoogleSignInButton({ label = "เข้าสู่ระบบด้วย Google" }: { label?: string }) {
+export function GoogleSignInButton({
+  label = "เข้าสู่ระบบด้วย Google",
+  next,
+}: {
+  label?: string;
+  /** path ภายในที่จะกลับไปหลังล็อกอิน (เช่น /api/pos/handoff?…) — server ตรวจซ้ำด้วย safeReturnTo */
+  next?: string;
+}) {
+  const href = next && next !== "/home" ? `/api/auth/google?next=${encodeURIComponent(next)}` : "/api/auth/google";
   return (
     <a
-      href="/api/auth/google"
+      href={href}
       className="tap-target no-select inline-flex w-full items-center justify-center gap-2.5 rounded-[11px] border-[0.5px] border-rz-border bg-rz-card px-5 py-[15px] text-[15px] font-medium text-rz-text transition-opacity active:opacity-90"
     >
       <GoogleIcon />

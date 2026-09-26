@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/jwt";
 import { canonicalRedirectTarget, getPosAppOrigin, isVercel } from "@/lib/env";
+import { safeNextPath } from "@/lib/safe-next";
 
 // /privacy และ /terms ต้องเปิดได้โดยไม่ล็อกอิน — Google Play ตรวจ URL จากภายนอก
 const PUBLIC_PATHS = ["/", "/login", "/register", "/pricing", "/privacy", "/terms"];
@@ -94,7 +95,13 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/home", req.url));
   }
 
-  if (userId && (pathname === "/login" || pathname === "/register")) {
+  if (userId && pathname === "/login") {
+    // AUTH-HOTFIX-1: เคารพ ?next= ที่เป็น path ภายใน (เช่น /api/pos/handoff?…) — เดิมทิ้งไป /home เสมอ
+    // ทำให้ POS handoff ของคนที่ล็อกอินอยู่แล้วหลุดไปหน้าแอป · safeNextPath = allowlist รวมศูนย์ ไม่รับ origin อื่น
+    const next = safeNextPath(req.nextUrl.searchParams.get("next"), "/home");
+    return NextResponse.redirect(new URL(next, req.url));
+  }
+  if (userId && pathname === "/register") {
     return NextResponse.redirect(new URL("/home", req.url));
   }
 

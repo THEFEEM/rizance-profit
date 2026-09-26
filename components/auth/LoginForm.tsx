@@ -9,6 +9,7 @@ import { AuthField } from "@/components/auth/AuthField";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { EyeIcon, EyeOffIcon, LockIcon, MailIcon } from "@/components/auth/auth-icons";
 import { apiFetch } from "@/lib/api-client";
+import { requiresFullNavigation, safeNextPath } from "@/lib/safe-next";
 import type { User } from "@/types";
 
 function AuthBanner({ children, variant = "error" }: { children: React.ReactNode; variant?: "error" | "info" }) {
@@ -41,7 +42,8 @@ function googleErrorMessage(error: string | null): string | null {
 function LoginFormInner({ googleEnabled }: { googleEnabled: boolean }) {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get("next") || "/home";
+  // AUTH-HOTFIX-1: ผ่าน allowlist รวมศูนย์ — เดิมรับค่าดิบ (open-redirect surface)
+  const next = safeNextPath(params.get("next"), "/home");
   const oauthError = params.get("error");
 
   const [email, setEmail] = useState("");
@@ -69,6 +71,11 @@ function LoginFormInner({ googleEnabled }: { googleEnabled: boolean }) {
       body: JSON.stringify({ email, password }),
     });
     if (res.ok) {
+      if (requiresFullNavigation(next)) {
+        // route handler (เช่น /api/pos/handoff) ตอบ redirect — client router ตามไม่ได้ ต้อง full navigation
+        window.location.assign(next);
+        return;
+      }
       router.replace(next);
       router.refresh();
     } else {
@@ -89,7 +96,7 @@ function LoginFormInner({ googleEnabled }: { googleEnabled: boolean }) {
 
       {googleEnabled && (
         <>
-          <GoogleSignInButton />
+          <GoogleSignInButton next={next} />
           <AuthDivider />
         </>
       )}

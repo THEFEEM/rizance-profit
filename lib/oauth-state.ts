@@ -1,5 +1,6 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
+import { safeNextPath } from "@/lib/safe-next";
 import { useSecureCookies } from "@/lib/env";
 
 /**
@@ -92,20 +93,8 @@ function safeEqual(a: string, b: string): boolean {
  *         /\evil.example · ค่าที่มี CR/LF (header injection)
  */
 export function safeReturnTo(raw: string | null | undefined, fallback = "/home"): string {
-  if (typeof raw !== "string" || raw === "") return fallback;
-  if (/[\r\n\t]/.test(raw)) return fallback;
-  if (!raw.startsWith("/")) return fallback;          // absolute URL · javascript: · data:
-  if (raw.startsWith("//")) return fallback;          // protocol-relative
-  if (raw.startsWith("/\\") || raw.startsWith("/%2F") || raw.startsWith("/%5C")) return fallback;
-  try {
-    const marker = "https://return-to.invalid";
-    const u = new URL(raw, marker);
-    if (u.origin !== marker) return fallback;         // หลุดออกนอก origin = ไม่รับ
-    const path = `${u.pathname}${u.search}${u.hash}`;
-    return path.startsWith("/") && !path.startsWith("//") ? path : fallback;
-  } catch {
-    return fallback;
-  }
+  // ตรรกะเดิมทุกบรรทัด ย้ายไป lib/safe-next.ts (edge-safe) ให้ middleware/LoginForm ใช้ตัวเดียวกัน
+  return safeNextPath(raw, fallback);
 }
 
 function stateCookieOptions(maxAge: number) {

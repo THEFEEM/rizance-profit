@@ -192,7 +192,9 @@ export async function GET(req: NextRequest) {
     }
 
     const token = await signSession(user.id);
-    const res = withStateCleared(NextResponse.redirect(new URL("/home", req.url)));
+    // AUTH-HOTFIX-1: returnTo ใน state cookie ผ่าน safeReturnTo แล้ว (path ภายในเท่านั้น) · ไม่มี → /home เหมือนเดิม
+    const landing = safeReturnTo(oauthState.returnTo, "/home");
+    const res = withStateCleared(NextResponse.redirect(new URL(landing, req.url)));
     res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions(requestHostname(req)));
     if (isNewUser) {
       res.cookies.set(CONTEXT_COOKIE, "personal", contextCookieOptions());
